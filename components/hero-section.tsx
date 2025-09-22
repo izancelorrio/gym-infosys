@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button"
 import { Play } from "lucide-react"
 import { useEffect, useState } from "react"
+import { API_CONFIG } from "@/lib/config"
 
 export function HeroSection() {
   const [membersCount, setMembersCount] = useState<number>(500)
@@ -11,22 +12,36 @@ export function HeroSection() {
   useEffect(() => {
     const fetchMembersCount = async () => {
       try {
-        console.log("[v0] Fetching members count")
-        const response = await fetch("/api/count-members")
+        const apiUrl = `/api${API_CONFIG.ENDPOINTS.COUNT_MEMBERS}`
+        console.log("[DEBUG] hero-section: Fetching members count from:", apiUrl)
+        console.log("[DEBUG] hero-section: API_CONFIG.ENDPOINTS.COUNT_MEMBERS:", API_CONFIG.ENDPOINTS.COUNT_MEMBERS)
+        
+        const response = await fetch(apiUrl)
+        console.log("[DEBUG] hero-section: Response status:", response.status, response.statusText)
+        
+        if (!response.ok) {
+          console.error("[DEBUG] hero-section: Response not ok:", response.status)
+          return
+        }
+        
         const data = await response.json()
+        console.log("[DEBUG] hero-section: Response data:", data)
 
-        if (data.count) {
+        if (data.count !== undefined) {
           setMembersCount(data.count)
-          console.log("[v0] Members count updated:", data.count)
+          console.log("[DEBUG] hero-section: Members count updated:", data.count)
+        } else {
+          console.warn("[DEBUG] hero-section: No count in response data")
         }
       } catch (error) {
-        console.error("[v0] Error fetching members count:", error)
+        console.error("[DEBUG] hero-section: Error fetching members count:", error)
         // Mantener el valor por defecto de 500
       } finally {
         setIsLoading(false)
       }
     }
 
+    console.log("[DEBUG] hero-section: useEffect triggered, calling fetchMembersCount")
     fetchMembersCount()
   }, [])
 

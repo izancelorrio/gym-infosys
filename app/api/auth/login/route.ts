@@ -38,11 +38,16 @@ export async function POST(request: NextRequest) {
       }
 
       const data = await response.json()
-      console.log("[v0] Datos parseados correctamente:", data)
+      console.log("[DEBUG] Datos parseados correctamente:", JSON.stringify(data, null, 2))
+      console.log("[DEBUG] Response OK:", response.ok)
+      console.log("[DEBUG] Response status:", response.status)
 
       if (response.ok) {
+        console.log("[DEBUG] Processing successful login response")
+        console.log("[DEBUG] User data:", JSON.stringify(data.user, null, 2))
+        
         if (data.user && data.user.verified === false) {
-          console.log("[v0] Usuario no verificado:", data.user.email)
+          console.log("[DEBUG] Usuario no verificado:", data.user.email)
           return NextResponse.json(
             {
               error:
@@ -54,11 +59,14 @@ export async function POST(request: NextRequest) {
         }
 
         if (data.user && !data.user.role) {
+          console.log("[DEBUG] Adding default role to user")
           data.user.role = "usuario"
         }
 
+        console.log("[DEBUG] Returning successful login response:", JSON.stringify(data, null, 2))
         return NextResponse.json(data)
       } else {
+        console.log("[DEBUG] Login failed, returning error")
         return NextResponse.json({ error: data.detail || "Credenciales inválidas" }, { status: response.status })
       }
     } catch (fetchError) {

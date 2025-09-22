@@ -17,7 +17,7 @@ export const API_CONFIG = {
   TIMEOUT: 10000, // 10 segundos
 } as const
 
-export const API_DISPONIBLE = 0 // 1 para usar API, 0 para modo offline
+export const API_DISPONIBLE = 1// 0 para usar API, 0 para modo offline
 
 export const USUARIOS_DEMO = [
   {

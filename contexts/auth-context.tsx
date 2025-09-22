@@ -7,7 +7,7 @@ interface User {
   id: number
   email: string
   name: string
-  role: "usuario" | "cliente" | "entrenador" | "administrador" | "admin"
+  role: "usuario" | "cliente" | "clientepro" | "entrenador" | "administrador" | "admin"
   verified?: boolean
 }
 

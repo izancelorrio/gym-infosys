@@ -38,23 +38,35 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }: LoginModalPr
 
     try {
       if (API_DISPONIBLE === 1) {
-        // Modo API
-        const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.LOGIN}`, {
+        // Modo API - usar el API route de Next.js
+        console.log("[DEBUG] Making login request through Next.js API route")
+        const response = await fetch("/api/auth/login", {
           method: "POST",
-          headers: API_CONFIG.HEADERS,
+          headers: {
+            "Content-Type": "application/json",
+          },
           body: JSON.stringify({ email, password }),
         })
 
+        console.log("[DEBUG] Login response status:", response.status)
+        const userData = await response.json()
+        console.log("[DEBUG] Login response data:", userData)
+
         if (!response.ok) {
-          throw new Error("Error de autenticación")
+          setError(userData.error || "Error de autenticación")
+          return
         }
 
-        const userData = await response.json()
-        login(userData)
-        onClose()
-        setEmail("")
-        setPassword("")
-        setError("")
+        if (userData.user) {
+          console.log("[DEBUG] Login successful, user data:", userData.user)
+          login(userData.user)
+          onClose()
+          setEmail("")
+          setPassword("")
+          setError("")
+        } else {
+          setError("Datos de usuario no válidos")
+        }
       } else {
         // Modo offline
         await new Promise((resolve) => setTimeout(resolve, 500)) // Simular delay de red
@@ -94,19 +106,24 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }: LoginModalPr
 
     try {
       if (API_DISPONIBLE === 1) {
-        // Modo API
-        const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.SEND_RESET_EMAIL}`, {
+        // Modo API - usar el API route de Next.js
+        const response = await fetch("/api/auth/send-reset-email", {
           method: "POST",
-          headers: API_CONFIG.HEADERS,
+          headers: {
+            "Content-Type": "application/json",
+          },
           body: JSON.stringify({ email: resetEmail }),
         })
 
+        const result = await response.json()
+
         if (!response.ok) {
-          throw new Error("Error al enviar email")
+          setResetMessage(result.error || "Error al enviar email")
+          return
         }
 
         setResetSent(true)
-        setResetMessage("Se ha enviado un enlace de restablecimiento a tu email")
+        setResetMessage(result.message || "Se ha enviado un enlace de restablecimiento a tu email")
       } else {
         // Modo offline
         await new Promise((resolve) => setTimeout(resolve, 1000))

@@ -1,0 +1,113 @@
+version: '3.8'
+
+services:
+  # Backend FastAPI (clonado desde GitHub)
+  backend:
+    image: gym-backend:latest
+    build:
+      context: .
+      dockerfile_inline: |
+        FROM python:3.11-slim
+        
+        # Install git and system dependencies
+        RUN apt-get update && apt-get install -y \
+            git \
+            gcc \
+            sqlite3 \
+            curl \
+            && rm -rf /var/lib/apt/lists/*
+        
+        # Clone repository from GitHub
+        WORKDIR /tmp
+        RUN git clone https://github.com/izancelorrio/gym-infosys.git repo
+        
+        # Set up application
+        WORKDIR /app
+        
+        # Install Python dependencies
+        RUN pip install fastapi uvicorn[standard] python-multipart pydantic bcrypt python-jose[cryptography] python-dotenv
+        
+        # Copy API files from cloned repo
+        COPY --from=0 /tmp/repo/API/ /app/
+        
+        # Create directory for database
+        RUN mkdir -p /app/data
+        
+        # Expose port
+        EXPOSE 8000
+        
+        # Command to run the application
+        CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+    container_name: gym-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - gym_database:/app/data
+    environment:
+      - DATABASE_PATH=/app/data/users.db
+    restart: unless-stopped
+    networks:
+      - gym-network
+
+  # Frontend Next.js (clonado desde GitHub)
+  frontend:
+    image: gym-frontend:latest
+    build:
+      context: .
+      dockerfile_inline: |
+        FROM node:18-alpine
+        
+        # Install git and dependencies
+        RUN apk add --no-cache git libc6-compat curl
+        
+        # Clone repository from GitHub
+        WORKDIR /tmp
+        RUN git clone https://github.com/izancelorrio/gym-infosys.git repo
+        
+        # Set up application
+        WORKDIR /app
+        COPY --from=0 /tmp/repo/ /app/
+        
+        # Update next.config.mjs for Docker
+        RUN echo 'const nextConfig = { \
+          eslint: { ignoreDuringBuilds: true }, \
+          typescript: { ignoreBuildErrors: true }, \
+          images: { unoptimized: true }, \
+          output: "standalone" \
+        }; \
+        export default nextConfig;' > next.config.mjs
+        
+        # Install dependencies
+        RUN corepack enable pnpm && pnpm install --frozen-lockfile
+        
+        # Set environment variables for build
+        ENV NEXT_TELEMETRY_DISABLED=1
+        ENV NEXT_PUBLIC_API_URL=http://localhost:8000
+        
+        # Build the application
+        RUN pnpm run build
+        
+        # Expose port
+        EXPOSE 3000
+        
+        # Command to run the application
+        CMD ["pnpm", "start"]
+    container_name: gym-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NODE_ENV=production
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - gym-network
+
+volumes:
+  gym_database:
+    driver: local
+
+networks:
+  gym-network:
+    driver: bridge
