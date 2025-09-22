@@ -20,8 +20,6 @@ def print_server_ip():
 
 print_server_ip()
 
-
-
 # ----------------------------------------------------
 # RESUMEN DE ENDPOINTS DE ESTE FICHERO
 # ----------------------------------------------------
@@ -143,32 +141,34 @@ def send_verification_email(to_email: str, verify_link: str):
 
 @app.middleware("http")
 async def log_request_body(request: Request, call_next):
-    # Agregar fecha y hora actual al log
-    current_time = datetime.utcnow().isoformat()
-    
     body = await request.body()
-    print(f"{current_time} INFO: {request.client.host} - \"{request.method} {request.url.path}\" Body: {body.decode('utf-8')}")
+    # Imprime la IP, método, ruta y cuerpo recibido
+    print(f"INFO: {request.client.host} - \"{request.method} {request.url.path}\" Body: {body.decode('utf-8')}")
     response = await call_next(request)
     return response
 
+## Endpoint para iniciar sesión de usuario
 @app.post("/login")
 def login(req: LoginRequest):
     conn = sqlite3.connect("users.db")
     cursor = conn.cursor()
-    cursor.execute("SELECT id, name, email, password, email_verified FROM users WHERE email=?", (req.email,))
+    cursor.execute("SELECT id, name, email, password, email_verified, role FROM users WHERE email=?", (req.email,))
     user = cursor.fetchone()
     conn.close()
     if user and verify_password(req.password, user[3]):
         if not user[4]:
             raise HTTPException(status_code=403, detail="Debes verificar tu email antes de iniciar sesión")
-        return {
+        response = {
             "success": True,
             "message": "Login exitoso",
-            "user": {"id": user[0], "email": user[2], "name": user[1]}
+            "user": {"id": user[0], "email": user[2], "name": user[1], "role": user[5]}
         }
+        print("[DEBUG] Login response:", response)
+        return response
     else:
         raise HTTPException(status_code=401, detail="Credenciales inválidas")
 
+## Endpoint para registrar un nuevo usuario
 @app.post("/register")
 def register(req: RegisterRequest):
     print(f"[DEBUG] Intentando registrar usuario: {req.email}")
@@ -214,6 +214,7 @@ def register(req: RegisterRequest):
         }
     }
 
+## Endpoint para cambiar la contraseña de un usuario
 @app.post("/change-password")
 def change_password(req: ChangePasswordRequest):
     if not req.email or not req.current_password or not req.new_password:
@@ -236,6 +237,7 @@ def change_password(req: ChangePasswordRequest):
         "message": "Contraseña cambiada exitosamente"
     }
 
+## Endpoint para enviar email de recuperación de contraseña
 @app.post("/send-reset-email")
 def send_reset_email_endpoint(req: SendResetEmailRequest):
     conn = sqlite3.connect("users.db")
@@ -259,6 +261,7 @@ def send_reset_email_endpoint(req: SendResetEmailRequest):
         print("[DEBUG] Link de recuperación (solo debug):", reset_link)
     return {"success": True, "message": "Email de recuperación enviado"}
 
+## Endpoint para restablecer la contraseña usando un token
 @app.post("/reset-password")
 def reset_password(req: ResetPasswordRequest):
     conn = sqlite3.connect("users.db")
@@ -282,6 +285,7 @@ def reset_password(req: ResetPasswordRequest):
     conn.close()
     return {"success": True, "message": "Contraseña actualizada correctamente"}
 
+## Endpoint para verificar el email del usuario
 @app.post("/verify-email")
 def verify_email(req: VerifyEmailRequest):
     conn = sqlite3.connect("users.db")
@@ -304,6 +308,7 @@ def verify_email(req: VerifyEmailRequest):
     conn.close()
     return {"success": True, "message": "Email verificado correctamente"}
 
+## Endpoint para obtener el número total de usuarios registrados
 @app.get("/count-members")
 def count_members():
     conn = sqlite3.connect("users.db")
