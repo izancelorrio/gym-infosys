@@ -71,7 +71,7 @@ export function Footer() {
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li>📍 Av. Principal 123, Ciudad</li>
               <li>📞 +34 900 123 456</li>
-              <li>✉️ info@fitgym.com</li>
+              <li>✉️ izan.celorrio.caballero@gmail.com</li>
               <li>🕒 Lun-Dom: 24/7</li>
             </ul>
           </div>

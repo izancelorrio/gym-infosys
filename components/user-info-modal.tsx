@@ -1,6 +1,6 @@
 "use client"
 import { Button } from "@/components/ui/button"
-import { X, User, Mail, Hash, Calendar } from "lucide-react"
+import { X, User, Mail, Hash, Calendar, Shield } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 
 interface UserInfoModalProps {
@@ -63,6 +63,14 @@ export function UserInfoModal({ isOpen, onClose }: UserInfoModalProps) {
               </div>
             </div>
           )}
+
+          <div className="flex items-center space-x-3 p-3 bg-accent/50 rounded-lg">
+            <Shield className="h-5 w-5 text-muted-foreground" />
+            <div>
+              <p className="text-sm font-medium text-foreground">Rol</p>
+              <p className="text-sm text-muted-foreground">{user?.role || "Usuario"}</p>
+            </div>
+          </div>
         </div>
 
         <div className="flex justify-end p-6 border-t border-border">
