@@ -327,3 +327,117 @@ def count_members():
     count = cursor.fetchone()[0]
     conn.close()
     return {"count": count}
+
+## Endpoints para planes
+@app.get("/planes")
+def get_planes():
+    """Obtener todos los planes activos ordenados por orden_display"""
+    try:
+        conn = sqlite3.connect("users.db")
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT id, nombre, descripcion, precio_mensual, precio_anual, 
+                   duracion_meses, caracteristicas, limite_clases, 
+                   acceso_nutricionista, acceso_entrenador_personal, 
+                   acceso_areas_premium, popular, activo, color_tema, 
+                   orden_display, created_at, updated_at
+            FROM planes 
+            WHERE activo = 1 
+            ORDER BY orden_display ASC
+        """)
+        
+        planes = []
+        for row in cursor.fetchall():
+            # Parsear características JSON
+            import json
+            try:
+                caracteristicas = json.loads(row[6])
+            except:
+                caracteristicas = []
+            
+            plan = {
+                "id": row[0],
+                "nombre": row[1],
+                "descripcion": row[2],
+                "precio_mensual": float(row[3]),
+                "precio_anual": float(row[4]) if row[4] else None,
+                "duracion_meses": row[5],
+                "caracteristicas": caracteristicas,
+                "limite_clases": row[7],
+                "acceso_nutricionista": bool(row[8]),
+                "acceso_entrenador_personal": bool(row[9]),
+                "acceso_areas_premium": bool(row[10]),
+                "popular": bool(row[11]),
+                "activo": bool(row[12]),
+                "color_tema": row[13],
+                "orden_display": row[14],
+                "created_at": row[15],
+                "updated_at": row[16]
+            }
+            planes.append(plan)
+        
+        conn.close()
+        return {"planes": planes}
+        
+    except Exception as e:
+        conn.close()
+        raise HTTPException(status_code=500, detail=f"Error al obtener planes: {str(e)}")
+
+@app.get("/planes/{plan_id}")
+def get_plan_by_id(plan_id: int):
+    """Obtener un plan específico por ID"""
+    try:
+        conn = sqlite3.connect("users.db")
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT id, nombre, descripcion, precio_mensual, precio_anual, 
+                   duracion_meses, caracteristicas, limite_clases, 
+                   acceso_nutricionista, acceso_entrenador_personal, 
+                   acceso_areas_premium, popular, activo, color_tema, 
+                   orden_display, created_at, updated_at
+            FROM planes 
+            WHERE id = ? AND activo = 1
+        """, (plan_id,))
+        
+        row = cursor.fetchone()
+        if not row:
+            conn.close()
+            raise HTTPException(status_code=404, detail="Plan no encontrado")
+        
+        # Parsear características JSON
+        import json
+        try:
+            caracteristicas = json.loads(row[6])
+        except:
+            caracteristicas = []
+        
+        plan = {
+            "id": row[0],
+            "nombre": row[1],
+            "descripcion": row[2],
+            "precio_mensual": float(row[3]),
+            "precio_anual": float(row[4]) if row[4] else None,
+            "duracion_meses": row[5],
+            "caracteristicas": caracteristicas,
+            "limite_clases": row[7],
+            "acceso_nutricionista": bool(row[8]),
+            "acceso_entrenador_personal": bool(row[9]),
+            "acceso_areas_premium": bool(row[10]),
+            "popular": bool(row[11]),
+            "activo": bool(row[12]),
+            "color_tema": row[13],
+            "orden_display": row[14],
+            "created_at": row[15],
+            "updated_at": row[16]
+        }
+        
+        conn.close()
+        return plan
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        conn.close()
+        raise HTTPException(status_code=500, detail=f"Error al obtener plan: {str(e)}")
