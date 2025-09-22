@@ -1,0 +1,40 @@
+tengo que instalar git para windows ya que al hacer git clone en vscode no entiende de protocolo git
+node.js para poder correr todo el frontend en javascript
+python para poder correr la API desarroyada en fastapi de python
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+comandos git:
+git --version
+git clone https://github.com/izancelorrio/gym-infosys.git para traer o replicar el repositorio
+git init con eso inicializo mi carpeta git local
+git config --global user.name "Izan Celorrio"
+git config --global user.email "900013@unizar.es"
+
+git remote add izan https://github.com/izancelorrio/gym-infosys.git
+git remote remove izan
+git add . sirve pra validar todos los ficheros cambiados para sincronizar
+git commit -m "cambio base url api" preparo ya con un texto los cambios para subir
+git push
+git pull
