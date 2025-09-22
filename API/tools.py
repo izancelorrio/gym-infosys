@@ -1,9 +1,17 @@
 import sqlite3
 import bcrypt
 import requests
+import os
+
+def get_db_connection():
+    """Obtiene la conexión a la base de datos users.db ubicada en la raíz del proyecto"""
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(script_dir)
+    db_path = os.path.join(project_root, "users.db")
+    return sqlite3.connect(db_path)
 
 def borrar_usuarios():
-    conn = sqlite3.connect("users.db")
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM users")
     conn.commit()
@@ -11,7 +19,7 @@ def borrar_usuarios():
     print("Todos los usuarios han sido eliminados.")
 
 def borrar_reset_tokens():
-    conn = sqlite3.connect("users.db")
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM reset_tokens")
     conn.commit()
@@ -27,7 +35,7 @@ def hash_password(password: str) -> str:
     return hashed.decode("utf-8")
 
 def encriptar_passwords():
-    conn = sqlite3.connect("users.db")
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT id, password FROM users")
     users = cursor.fetchall()
@@ -41,20 +49,6 @@ def encriptar_passwords():
     conn.close()
     print(f"Contraseñas actualizadas: {updated}")
 
-def add_email_verified_column():
-    conn = sqlite3.connect("users.db")
-    cursor = conn.cursor()
-    # Añade la columna solo si no existe
-    cursor.execute("PRAGMA table_info(users)")
-    columns = [col[1] for col in cursor.fetchall()]
-    if "email_verified" not in columns:
-        cursor.execute("ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 0")
-        conn.commit()
-        print("Columna email_verified añadida a la tabla users.")
-    else:
-        print("La columna email_verified ya existe en la tabla users.")
-    conn.close()
-
 def contar_usuarios_via_api():
     url = "http://localhost:8000/count-members"
     try:
@@ -65,6 +59,53 @@ def contar_usuarios_via_api():
     except Exception as e:
         print("Error al consultar el endpoint /count-members:", e)
 
+def generar_usuarios_demo():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Verificar que la tabla users existe
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users';")
+    if not cursor.fetchone():
+        print("Error: La tabla 'users' no existe en la base de datos.")
+        conn.close()
+        return
+    
+    # Lista de nombres comunes españoles
+    nombres_usuarios = [
+        "Carlos García",
+        "María López",
+        "Juan Martínez", 
+        "Ana Rodríguez",
+        "Pedro Sánchez",
+        "Laura Fernández",
+        "Miguel González",
+        "Carmen Ruiz",
+        "Antonio Jiménez",
+        "Isabel Moreno"
+    ]
+    
+    usuarios_creados = 0
+    
+    for nombre in nombres_usuarios:
+        # Generar email basado en el nombre (primera parte del nombre + @email.com)
+        email = nombre.lower().split()[0] + "@email.com"
+        password_hash = hash_password("123456")
+        
+        try:
+            # Insertar usuario con email_verified = 1
+            cursor.execute(
+                "INSERT INTO users (name, email, password, email_verified, role) VALUES (?, ?, ?, ?, ?)",
+                (nombre, email, password_hash, 1, "usuario")
+            )
+            usuarios_creados += 1
+            print(f"Usuario creado: {nombre} ({email})")
+        except sqlite3.IntegrityError:
+            print(f"El usuario {email} ya existe, omitiendo...")
+    
+    conn.commit()
+    conn.close()
+    print(f"\nTotal de usuarios demo creados: {usuarios_creados}")
+
 def menu():
     while True:
         print("\nHerramientas de administración:")
@@ -72,7 +113,7 @@ def menu():
         print("2. Borrar todos los reset_tokens")
         print("3. Encriptar contraseñas de usuarios (bcrypt)")
         print("4. Mostrar número de usuarios (vía endpoint /count-members)")
-        print("5. Añadir columna email_verified a users")
+        print("5. Generar 10 usuarios demo")
         print("0. Salir")
         opcion = input("Selecciona una opción: ")
         if opcion == "1":
@@ -84,7 +125,7 @@ def menu():
         elif opcion == "4":
             contar_usuarios_via_api()
         elif opcion == "5":
-            add_email_verified_column()
+            generar_usuarios_demo()
         elif opcion == "0":
             print("Saliendo...")
             break

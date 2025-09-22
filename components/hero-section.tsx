@@ -4,10 +4,14 @@ import { Button } from "@/components/ui/button"
 import { Play } from "lucide-react"
 import { useEffect, useState } from "react"
 import { API_CONFIG } from "@/lib/config"
+import { useAuth } from "@/contexts/auth-context"
+import { ContractPlanModal } from "./contract-plan-modal"
 
 export function HeroSection() {
   const [membersCount, setMembersCount] = useState<number>(500)
   const [isLoading, setIsLoading] = useState(true)
+  const [isContractModalOpen, setIsContractModalOpen] = useState(false)
+  const { user, isAuthenticated } = useAuth()
 
   useEffect(() => {
     const fetchMembersCount = async () => {
@@ -68,17 +72,29 @@ export function HeroSection() {
         </p>
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-          <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 text-lg px-8 py-3">
-            Comienza Hoy
-          </Button>
-          <Button
-            size="lg"
-            variant="outline"
-            className="border-white text-white hover:bg-white hover:text-black text-lg px-8 py-3 bg-transparent"
-          >
-            <Play className="mr-2 h-5 w-5" />
-            <span className="sm:inline hidden">Ver Video</span>
-          </Button>
+          {isAuthenticated && user?.role === "usuario" ? (
+            <Button 
+              size="lg" 
+              className="bg-primary text-primary-foreground hover:bg-primary/90 text-lg px-8 py-3"
+              onClick={() => setIsContractModalOpen(true)}
+            >
+              Contratar Plan
+            </Button>
+          ) : (
+            <>
+              <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 text-lg px-8 py-3">
+                Comienza Hoy
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                className="border-white text-white hover:bg-white hover:text-black text-lg px-8 py-3 bg-transparent"
+              >
+                <Play className="mr-2 h-5 w-5" />
+                <span className="sm:inline hidden">Ver Video</span>
+              </Button>
+            </>
+          )}
         </div>
 
         {/* Stats */}
@@ -97,6 +113,12 @@ export function HeroSection() {
           </div>
         </div>
       </div>
+
+      {/* Modal de contratación de plan */}
+      <ContractPlanModal
+        isOpen={isContractModalOpen}
+        onClose={() => setIsContractModalOpen(false)}
+      />
     </section>
   )
 }
