@@ -1,3 +1,0 @@
-npm install
-npm run dev
-python.exe -m uvicorn API.main:app --reload --host 0.0.0.0
