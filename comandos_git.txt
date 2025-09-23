@@ -28,6 +28,7 @@ python para poder correr la API desarroyada en fastapi de python
 comandos git:
 git --version
 git clone https://github.com/izancelorrio/gym-infosys.git para traer o replicar el repositorio
+cd para posicioanrme en la carpeta del proyecto
 git init con eso inicializo mi carpeta git local
 git config --global user.name "Izan Celorrio"
 git config --global user.email "900013@unizar.es"
