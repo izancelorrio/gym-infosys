@@ -5,6 +5,7 @@ REM Uso: sqlite.cmd [database] [query]
 setlocal
 set SQLITE_EXE=%~dp0sqlite-tools\sqlite3.exe
 set DATABASE=%~dp0users.db
+set SQL_DIR=%~dp0sqlite-tools
 
 if not exist "%SQLITE_EXE%" (
     echo ❌ SQLite3 no encontrado en sqlite-tools/
@@ -37,6 +38,19 @@ if "%~1"=="" (
 ) else if "%~1"=="users" (
     echo 👥 Últimos 10 usuarios:
     "%SQLITE_EXE%" "%DATABASE%" "SELECT id, name, email, role, email_verified, created_at FROM users ORDER BY id DESC LIMIT 10;"
+) else if "%~1"=="sql" (
+    if not "%~2"=="" (
+        REM Ejecutar archivo SQL desde sqlite-tools
+        set SQL_FILE=%SQL_DIR%\%~2
+        if exist "%SQL_FILE%" (
+            echo 📂 Ejecutando archivo SQL: %~2
+            "%SQLITE_EXE%" "%DATABASE%" ".read %SQL_FILE%"
+        ) else (
+            echo ❌ Archivo SQL no encontrado: %~2
+        )
+    ) else (
+        echo ❌ Debe especificar un archivo SQL
+    )
 ) else (
     REM Si es una query personalizada
     echo 🔍 Ejecutando: %*

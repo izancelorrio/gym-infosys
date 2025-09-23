@@ -6,12 +6,14 @@ import { useEffect, useState } from "react"
 import { API_CONFIG } from "@/lib/config"
 import { useAuth } from "@/contexts/auth-context"
 import { ContractPlanModal } from "./contract-plan-modal"
+import { useRouter } from "next/navigation"
 
 export function HeroSection() {
   const [membersCount, setMembersCount] = useState<number>(500)
   const [isLoading, setIsLoading] = useState(true)
   const [isContractModalOpen, setIsContractModalOpen] = useState(false)
   const { user, isAuthenticated } = useAuth()
+  const router = useRouter()
 
   useEffect(() => {
     const fetchMembersCount = async () => {
@@ -80,6 +82,22 @@ export function HeroSection() {
             >
               Contratar Plan
             </Button>
+          ) : isAuthenticated && user?.role === "cliente" ? (
+            <>
+              <Button 
+                size="lg" 
+                className="bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/50 transition-all text-lg px-8 py-3"
+              >
+                Ver Estadísticas
+              </Button>
+              <Button 
+                size="lg" 
+                className="bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/50 transition-all text-lg px-8 py-3"
+                onClick={() => router.push("/cliente/registrar-ejercicio")}
+              >
+                Registrar Ejercicio
+              </Button>
+            </>
           ) : (
             <>
               <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 text-lg px-8 py-3">

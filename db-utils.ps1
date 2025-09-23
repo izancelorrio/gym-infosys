@@ -102,7 +102,12 @@ function Execute-DbQuery {
 # Función para ejecutar archivo SQL
 function Execute-SqlFile {
     param([string]$SqlFile)
-    if (-not $SqlFile -or -not (Test-Path $SqlFile)) {
+    # Si no es una ruta completa, buscar en sqlite-tools
+    if (-not [System.IO.Path]::IsPathRooted($SqlFile)) {
+        $SqlFile = Join-Path $PSScriptRoot "sqlite-tools\$SqlFile"
+    }
+    
+    if (-not (Test-Path $SqlFile)) {
         Write-Host "❌ Archivo SQL no encontrado: $SqlFile" -ForegroundColor Red
         return
     }
@@ -127,7 +132,7 @@ function Show-DbHelp {
     Write-Host "  Show-DbUsers               # Mostrar usuarios (últimos 10)"
     Write-Host "  Count-DbUsers              # Contar total de usuarios"
     Write-Host "  Execute-DbQuery 'SQL'      # Ejecutar consulta"
-    Write-Host "  Execute-SqlFile file.sql   # Ejecutar archivo SQL"
+    Write-Host "  Execute-SqlFile file.sql   # Ejecutar archivo SQL desde sqlite-tools"
     Write-Host "  Backup-Database            # Crear backup de la BD"
     Write-Host ""
     Write-Host "📝 Ejemplos:" -ForegroundColor Yellow
