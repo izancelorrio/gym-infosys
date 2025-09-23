@@ -2,6 +2,12 @@ tengo que instalar git para windows ya que al hacer git clone en vscode no entie
 node.js para poder correr todo el frontend en javascript
 python para poder correr la API desarroyada en fastapi de python
 
+En la carpeta domnde este el codigo python creo un entorno virtual para aislar las librerias con el cmd 
+py -m venv venv
+
+.\\venv\Scripts\Activate.ps1
+pip install uvicorn
+
 
 
 

@@ -13,7 +13,7 @@ export function CTASection() {
               ¡Comienza Tu Transformación Hoy!
             </h2>
             <p className="text-lg text-primary-foreground/90 text-pretty">
-              Únete a FitGym y obtén tu primera semana completamente gratis. Sin compromisos, sin letras pequeñas.
+              Únete a Gym-InfoSys y obtén tu primera semana completamente gratis. Sin compromisos, sin letras pequeñas.
             </p>
           </div>
 

@@ -43,7 +43,7 @@ export function Header() {
             {/* Logo */}
             <div className="flex items-center space-x-2">
               <Dumbbell className="h-8 w-8 text-primary" />
-              <span className="text-xl font-bold text-foreground">FitGym</span>
+              <span className="text-xl font-bold text-foreground">Gym-InfoSys</span>
             </div>
 
             {/* Desktop Navigation */}
