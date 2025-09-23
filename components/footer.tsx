@@ -11,7 +11,7 @@ export function Footer() {
           <div className="lg:col-span-1">
             <div className="flex items-center space-x-2 mb-4">
               <Dumbbell className="h-8 w-8 text-primary" />
-              <span className="text-xl font-bold text-foreground">FitGym</span>
+              <span className="text-xl font-bold text-foreground">Gym-InfoSys</span>
             </div>
             <p className="text-muted-foreground text-sm leading-relaxed mb-4">
               Tu gimnasio de confianza para alcanzar todos tus objetivos fitness. Más que un gimnasio, somos tu
@@ -92,7 +92,7 @@ export function Footer() {
 
         <div className="border-t border-border mt-8 pt-8 text-center">
           <p className="text-sm text-muted-foreground">
-            © 2024 FitGym. Todos los derechos reservados. |
+            © 2024 Gym-InfoSys. Todos los derechos reservados. |
             <a href="#" className="hover:text-primary transition-colors ml-1">
               Política de Privacidad
             </a>{" "}

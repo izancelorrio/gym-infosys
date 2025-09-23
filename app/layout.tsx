@@ -13,9 +13,9 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: "v0 App",
-  description: "Created with v0",
-  generator: "v0.app",
+  title: "Gym-InfoSys App",
+  description: "Sistema de información y gestión para gimnasios",
+  generator: "Gym-InfoSys",
 }
 
 export default function RootLayout({

@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
@@ -31,7 +31,7 @@ function setCookie(name: string, value: string, days = 7) {
   const expires = new Date()
   expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000)
   document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/;SameSite=Lax`
-  console.log("[v0] Cookie set:", name, value)
+  console.log("[GymInfoSys] Cookie set:", name, value)
 }
 
 function getCookie(name: string): string | null {
@@ -44,11 +44,11 @@ function getCookie(name: string): string | null {
     while (c.charAt(0) === " ") c = c.substring(1, c.length)
     if (c.indexOf(nameEQ) === 0) {
       const value = c.substring(nameEQ.length, c.length)
-      console.log("[v0] Cookie retrieved:", name, value)
+      console.log("[GymInfoSys] Cookie retrieved:", name, value)
       return value
     }
   }
-  console.log("[v0] Cookie not found:", name)
+  console.log("[GymInfoSys] Cookie not found:", name)
   return null
 }
 
@@ -56,7 +56,7 @@ function deleteCookie(name: string) {
   if (typeof document === "undefined") return
 
   document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;`
-  console.log("[v0] Cookie deleted:", name)
+  console.log("[GymInfoSys] Cookie deleted:", name)
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -66,26 +66,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter()
 
   useEffect(() => {
-    console.log("[v0] AuthProvider mounting, checking storage...")
+    console.log("[GymInfoSys] AuthProvider mounting, checking storage...")
     setIsHydrated(true)
 
     try {
       let userData: User | null = null
 
       if (typeof window !== "undefined") {
-        console.log("[v0] localStorage available:", typeof Storage !== "undefined")
-        console.log("[v0] All localStorage keys:", Object.keys(localStorage))
+        console.log("[GymInfoSys] localStorage available:", typeof Storage !== "undefined")
+        console.log("[GymInfoSys] All localStorage keys:", Object.keys(localStorage))
 
         const savedUser = localStorage.getItem("gym_user")
-        console.log("[v0] Raw localStorage value for 'gym_user':", savedUser)
+        console.log("[GymInfoSys] Raw localStorage value for 'gym_user':", savedUser)
 
         if (savedUser && savedUser !== "null") {
           userData = JSON.parse(savedUser)
           if (userData && !userData.role) {
             userData.role = "usuario"
-            console.log("[v0] Rol por defecto asignado a usuario existente:", userData)
+            console.log("[GymInfoSys] Rol por defecto asignado a usuario existente:", userData)
           }
-          console.log("[v0] User session restored from localStorage:", userData)
+          console.log("[GymInfoSys] User session restored from localStorage:", userData)
         }
       }
 
@@ -95,14 +95,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           userData = JSON.parse(decodeURIComponent(cookieUser))
           if (userData && !userData.role) {
             userData.role = "usuario"
-            console.log("[v0] Rol por defecto asignado a usuario de cookie:", userData)
+            console.log("[GymInfoSys] Rol por defecto asignado a usuario de cookie:", userData)
           }
-          console.log("[v0] User session restored from cookie:", userData)
+          console.log("[GymInfoSys] User session restored from cookie:", userData)
 
-          // Restaurar también en localStorage
+          // Restaurar tambiÃ©n en localStorage
           if (typeof window !== "undefined") {
             localStorage.setItem("gym_user", JSON.stringify(userData))
-            console.log("[v0] User data restored to localStorage from cookie")
+            console.log("[GymInfoSys] User data restored to localStorage from cookie")
           }
         }
       }
@@ -110,10 +110,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (userData) {
         setUser(userData)
       } else {
-        console.log("[v0] No saved user found in any storage")
+        console.log("[GymInfoSys] No saved user found in any storage")
       }
     } catch (error) {
-      console.error("[v0] Error restoring user session:", error)
+      console.error("[GymInfoSys] Error restoring user session:", error)
       // Limpiar datos corruptos
       if (typeof window !== "undefined") {
         localStorage.removeItem("gym_user")
@@ -121,12 +121,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       deleteCookie("gym_user")
     } finally {
       setIsLoading(false)
-      console.log("[v0] AuthProvider initialization complete")
+      console.log("[GymInfoSys] AuthProvider initialization complete")
     }
   }, [])
 
   const login = (userData: User) => {
-    console.log("[v0] Login called with:", userData)
+    console.log("[GymInfoSys] Login called with:", userData)
     const userWithRole = {
       ...userData,
       role: userData.role || ("usuario" as User["role"]),
@@ -138,24 +138,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Guardar en localStorage
       localStorage.setItem("gym_user", userString)
-      console.log("[v0] User saved to localStorage:", userWithRole)
+      console.log("[GymInfoSys] User saved to localStorage:", userWithRole)
 
       // Guardar en cookies como respaldo
       setCookie("gym_user", encodeURIComponent(userString), 7)
 
-      // Verificar que se guardó correctamente
+      // Verificar que se guardÃ³ correctamente
       const verification = localStorage.getItem("gym_user")
       const cookieVerification = getCookie("gym_user")
-      console.log("[v0] Storage verification - localStorage:", verification)
-      console.log("[v0] Storage verification - cookie:", cookieVerification)
+      console.log("[GymInfoSys] Storage verification - localStorage:", verification)
+      console.log("[GymInfoSys] Storage verification - cookie:", cookieVerification)
 
       if (userWithRole.role === "entrenador") {
-        console.log("[v0] Redirecting trainer to /entrenador")
+        console.log("[GymInfoSys] Redirecting trainer to /entrenador")
         setTimeout(() => {
           router.push("/entrenador")
         }, 100)
       } else if (userWithRole.role === "administrador" || userWithRole.role === "admin") {
-        console.log("[v0] Redirecting admin to /admin")
+        console.log("[GymInfoSys] Redirecting admin to /admin")
         setTimeout(() => {
           router.push("/admin")
         }, 100)
@@ -164,12 +164,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const logout = () => {
-    console.log("[v0] Logout called")
+    console.log("[GymInfoSys] Logout called")
     setUser(null)
 
     if (typeof window !== "undefined") {
       localStorage.removeItem("gym_user")
-      console.log("[v0] User removed from localStorage")
+      console.log("[GymInfoSys] User removed from localStorage")
     }
 
     deleteCookie("gym_user")
@@ -227,3 +227,4 @@ export function useAuth() {
   }
   return context
 }
+

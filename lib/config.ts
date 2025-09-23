@@ -8,6 +8,7 @@ export const API_CONFIG = {
     VERIFY_EMAIL: "/verify-email",
     RESET_PASSWORD: "/reset-password",
     SEND_RESET_EMAIL: "/send-reset-email",
+    PLANES: "/planes",
   },
   HEADERS: {
     "Content-Type": "application/json",

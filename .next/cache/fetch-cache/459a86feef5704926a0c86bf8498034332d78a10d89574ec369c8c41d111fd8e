@@ -1,0 +1,1 @@
+{"kind":"FETCH","data":{"headers":{"content-length":"12","content-type":"application/json","date":"Mon, 22 Sep 2025 18:06:21 GMT","server":"uvicorn"},"body":"eyJjb3VudCI6MTN9","status":200,"url":"http://127.0.0.1:8000/count-members"},"revalidate":31536000,"tags":[]}

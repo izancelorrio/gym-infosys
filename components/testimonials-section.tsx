@@ -6,7 +6,7 @@ const testimonials = [
     name: "María González",
     role: "Miembro desde 2022",
     content:
-      "FitGym cambió mi vida completamente. Los entrenadores son increíbles y el ambiente es muy motivador. He perdido 15 kilos y me siento más fuerte que nunca.",
+      "Gym-InfoSys cambió mi vida completamente. Los entrenadores son increíbles y el ambiente es muy motivador. He perdido 15 kilos y me siento más fuerte que nunca.",
     rating: 5,
     image: "/happy-woman-smiling-after-workout.jpg",
   },

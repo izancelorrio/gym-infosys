@@ -1,0 +1,21 @@
+{
+    "folders": [
+        {
+            "path": "."
+        }
+    ],
+    "settings": {
+        "python.defaultInterpreterPath": "./API/venv/Scripts/python.exe",
+        "python.terminal.activateEnvironment": true,
+        "terminal.integrated.cwd": "${workspaceFolder}/API"
+    },
+    "extensions": {
+        "recommendations": [
+            "ms-python.python",
+            "ms-python.pylint",
+            "ms-python.flake8",
+            "bradlc.vscode-tailwindcss",
+            "esbenp.prettier-vscode"
+        ]
+    }
+}
