@@ -1,4 +1,4 @@
-// File: C:\Users\admin\Documents\EINA\tercero\primercuatri\sistemas_informacion\gym-infosys\app\api\count-members\route.ts
+// File: C:\Users\dcelorrio\OneDrive\VSCODE\gym-infosys\app\api\count-members\route.ts
 import * as entry from '../../../../../app/api/count-members/route.js'
 import type { NextRequest } from 'next/server.js'
 

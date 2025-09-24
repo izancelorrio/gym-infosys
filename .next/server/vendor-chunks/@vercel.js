@@ -35,9 +35,9 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var next_dist_build_webpack_loaders_next_flight_loader_module_proxy__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! next/dist/build/webpack/loaders/next-flight-loader/module-proxy */ "(rsc)/./node_modules/next/dist/build/webpack/loaders/next-flight-loader/module-proxy.js");
 
 
-const e0 = (0,next_dist_build_webpack_loaders_next_flight_loader_module_proxy__WEBPACK_IMPORTED_MODULE_0__.createProxy)(String.raw`C:\Users\admin\Documents\EINA\tercero\primercuatri\sistemas_informacion\gym-infosys\node_modules\@vercel\analytics\dist\react\index.mjs#Analytics`);
+const e0 = (0,next_dist_build_webpack_loaders_next_flight_loader_module_proxy__WEBPACK_IMPORTED_MODULE_0__.createProxy)(String.raw`C:\Users\dcelorrio\OneDrive\VSCODE\gym-infosys\node_modules\@vercel\analytics\dist\react\index.mjs#Analytics`);
 
-const e1 = (0,next_dist_build_webpack_loaders_next_flight_loader_module_proxy__WEBPACK_IMPORTED_MODULE_0__.createProxy)(String.raw`C:\Users\admin\Documents\EINA\tercero\primercuatri\sistemas_informacion\gym-infosys\node_modules\@vercel\analytics\dist\react\index.mjs#track`);
+const e1 = (0,next_dist_build_webpack_loaders_next_flight_loader_module_proxy__WEBPACK_IMPORTED_MODULE_0__.createProxy)(String.raw`C:\Users\dcelorrio\OneDrive\VSCODE\gym-infosys\node_modules\@vercel\analytics\dist\react\index.mjs#track`);
 
 
 /***/ })

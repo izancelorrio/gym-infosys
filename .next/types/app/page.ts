@@ -1,4 +1,4 @@
-// File: C:\Users\admin\Documents\EINA\tercero\primercuatri\sistemas_informacion\gym-infosys\app\page.tsx
+// File: C:\Users\dcelorrio\OneDrive\VSCODE\gym-infosys\app\page.tsx
 import * as entry from '../../../app/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 
