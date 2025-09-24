@@ -1,4 +1,4 @@
-// File: C:\Users\admin\Documents\EINA\tercero\primercuatri\sistemas_informacion\gym-infosys\app\layout.tsx
+// File: C:\Users\izanc\Documents\EINA\tercero\primercuatri\sitemas_informacion\gym-infosys\app\layout.tsx
 import * as entry from '../../../app/layout.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 
