@@ -1,0 +1,7 @@
+Instalar Node.js
+Instalar Python
+Instalar GITHUB tools de consola
+Instalar git
+cd API
+python -m venv .venv
+pip install -r requirements.txt
