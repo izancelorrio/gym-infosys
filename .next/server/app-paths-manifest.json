@@ -1,5 +1,0 @@
-{
-  "/page": "app/page.js",
-  "/cliente/registrar-ejercicio/page": "app/cliente/registrar-ejercicio/page.js",
-  "/api/count-members/route": "app/api/count-members/route.js"
-}
