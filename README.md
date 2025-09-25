@@ -27,7 +27,8 @@ Sistema de información integral para gimnasios desarrollado con Next.js y FastA
 ├── API/                   # Backend FastAPI
 │   ├── main.py           # Servidor principal
 │   ├── db_manager.py     # Gestor de base de datos
-│   └── users.db          # Base de datos SQLite
+│   
+|── users.db               # Base de datos SQLite 
 └── sqlite-tools/          # Scripts SQL para BD
 ```
 
