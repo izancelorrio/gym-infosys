@@ -1,30 +1,79 @@
-# Gym landing page
+# 🏋️ Gym-InfoSys
 
-*Automatically synced with your [v0.app](https://v0.app) deployments*
+Sistema de información integral para gimnasios desarrollado con Next.js y FastAPI.
 
-[![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/izancelorriocaballero-9801s-projects/v0-gym-landing-page)
-[![Built with v0](https://img.shields.io/badge/Built%20with-v0.app-black?style=for-the-badge)](https://v0.app/chat/projects/tdOHjToSWlq)
+## 🚀 Tecnologías
 
-## Overview
+- **Frontend**: Next.js 13+ con TypeScript, Tailwind CSS, shadcn/ui
+- **Backend**: FastAPI (Python)
+- **Base de Datos**: SQLite
+- **Autenticación**: Context API personalizado
 
-This repository will stay in sync with your deployed chats on [v0.app](https://v0.app).
-Any changes you make to your deployed app will be automatically pushed to this repository from [v0.app](https://v0.app).
+## 📁 Estructura del Proyecto
 
-## Deployment
+```
+├── app/                     # Páginas de la aplicación (Next.js App Router)
+│   ├── admin/              # Panel de administrador
+│   ├── cliente/            # Panel de cliente
+│   ├── entrenador/         # Panel de entrenador
+│   └── page.tsx           # Página principal
+├── components/             # Componentes reutilizables
+│   ├── ui/                # Componentes base (shadcn/ui)
+│   ├── header.tsx         # Navegación principal
+│   ├── hero-section.tsx   # Sección principal con botones por rol
+│   └── footer.tsx         # Pie de página
+├── contexts/              # Contextos de React
+│   └── auth-context.tsx   # Gestión de autenticación
+├── API/                   # Backend FastAPI
+│   ├── main.py           # Servidor principal
+│   ├── db_manager.py     # Gestor de base de datos
+│   └── users.db          # Base de datos SQLite
+└── sqlite-tools/          # Scripts SQL para BD
+```
 
-Your project is live at:
+## 👥 Roles de Usuario
 
-**[https://vercel.com/izancelorriocaballero-9801s-projects/v0-gym-landing-page](https://vercel.com/izancelorriocaballero-9801s-projects/v0-gym-landing-page)**
+- **👤 Cliente**: Registrar actividades, ver estadísticas, gestionar agenda
+- **👨‍🏫 Entrenador**: Asignar entrenamientos, ver progreso de clientes
+- **🔧 Admin**: Gestionar usuarios, programar clases, estadísticas globales
 
-## Build your app
+## 🏃‍♂️ Inicio Rápido
 
-Continue building your app on:
+```bash
+# Instalar dependencias
+npm install
 
-**[https://v0.app/chat/projects/tdOHjToSWlq](https://v0.app/chat/projects/tdOHjToSWlq)**
+# Iniciar aplicación (Frontend + Backend)
+./run
 
-## How It Works
+# Solo frontend
+npm run dev
 
-1. Create and modify your project using [v0.app](https://v0.app)
-2. Deploy your chats from the v0 interface
-3. Changes are automatically pushed to this repository
-4. Vercel deploys the latest version from this repository
+# Solo backend
+cd API && python main.py
+```
+
+La aplicación estará disponible en:
+- **Frontend**: http://localhost:3000
+- **API**: http://localhost:8000
+
+## 📱 Funcionalidades Principales
+
+- **Gestión de usuarios** por roles
+- **Registro de actividades** (clases y ejercicios)
+- **Estadísticas personalizadas** por usuario
+- **Programación de clases** 
+- **Dashboard específico** para cada rol
+- **Sistema de autenticación** completo
+
+## 🗂️ Archivos Clave
+
+- `app/page.tsx` - Página principal con diferentes vistas por rol
+- `contexts/auth-context.tsx` - Manejo de sesiones y roles
+- `API/main.py` - Endpoints del backend
+- `components/hero-section.tsx` - Lógica de navegación principal
+- `sqlite-tools/*.sql` - Estructura de base de datos
+
+---
+
+**Desarrollado para el curso de Sistemas de Información - EINA**
