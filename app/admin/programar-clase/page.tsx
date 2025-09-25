@@ -13,6 +13,7 @@ interface ClaseProgramada {
   fecha: string
   hora: string
   tipoClase: string
+  instructor: string
 }
 
 export default function ProgramarClasePage() {
@@ -51,6 +52,19 @@ export default function ProgramarClasePage() {
     "Body Pump",
     "Body Combat",
     "Stretching",
+  ]
+
+  const instructoresDisponibles = [
+    "Ana García",
+    "Carlos López", 
+    "María Rodríguez",
+    "José Martín",
+    "Laura Fernández",
+    "David Ruiz",
+    "Carmen Silva",
+    "Miguel Torres",
+    "Elena Moreno",
+    "Pablo Jiménez"
   ]
 
   const horariosDisponibles = [
@@ -92,6 +106,7 @@ export default function ProgramarClasePage() {
         fecha: "",
         hora: "",
         tipoClase: "",
+        instructor: "",
       },
     ])
 
@@ -104,6 +119,7 @@ export default function ProgramarClasePage() {
       fecha: "",
       hora: "",
       tipoClase: "",
+      instructor: "",
     }
     setClases([...clases, nuevaClase])
   }
@@ -203,19 +219,20 @@ export default function ProgramarClasePage() {
           </CardHeader>
           <CardContent className="p-6">
             <div className="space-y-4">
-              <div className="grid grid-cols-12 gap-4 p-4 bg-primary/5 rounded-lg border border-primary/20">
-                <div className="col-span-4 font-semibold text-foreground">Fecha</div>
-                <div className="col-span-3 font-semibold text-foreground">Hora</div>
-                <div className="col-span-4 font-semibold text-foreground">Tipo de Clase</div>
+              <div className="grid grid-cols-13 gap-4 p-4 bg-primary/5 rounded-lg border border-primary/20">
+                <div className="col-span-3 font-semibold text-foreground">Fecha</div>
+                <div className="col-span-2 font-semibold text-foreground">Hora</div>
+                <div className="col-span-3 font-semibold text-foreground">Tipo de Clase</div>
+                <div className="col-span-4 font-semibold text-foreground">Instructor</div>
                 <div className="col-span-1 font-semibold text-foreground">Acción</div>
               </div>
 
               {clases.map((clase) => (
                 <div
                   key={clase.id}
-                  className="grid grid-cols-12 gap-4 p-4 border border-border rounded-lg bg-card hover:border-primary/50 transition-all duration-200"
+                  className="grid grid-cols-13 gap-4 p-4 border border-border rounded-lg bg-card hover:border-primary/50 transition-all duration-200"
                 >
-                  <div className="col-span-4">
+                  <div className="col-span-3">
                     <Select value={clase.fecha} onValueChange={(value) => actualizarClase(clase.id, "fecha", value)}>
                       <SelectTrigger className="bg-background border-border text-foreground">
                         <SelectValue placeholder="Seleccionar fecha" />
@@ -224,20 +241,19 @@ export default function ProgramarClasePage() {
                         {nextWeekDates.map((fecha) => (
                           <SelectItem key={fecha} value={fecha}>
                             {new Date(fecha).toLocaleDateString("es-ES", {
-                              weekday: "long",
-                              year: "numeric",
-                              month: "long",
+                              weekday: "short",
                               day: "numeric",
+                              month: "short",
                             })}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="col-span-3">
+                  <div className="col-span-2">
                     <Select value={clase.hora} onValueChange={(value) => actualizarClase(clase.id, "hora", value)}>
                       <SelectTrigger className="bg-background border-border text-foreground">
-                        <SelectValue placeholder="Seleccionar hora" />
+                        <SelectValue placeholder="Hora" />
                       </SelectTrigger>
                       <SelectContent>
                         {horariosDisponibles.map((hora) => (
@@ -248,18 +264,35 @@ export default function ProgramarClasePage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="col-span-4">
+                  <div className="col-span-3">
                     <Select
                       value={clase.tipoClase}
                       onValueChange={(value) => actualizarClase(clase.id, "tipoClase", value)}
                     >
                       <SelectTrigger className="bg-background border-border text-foreground">
-                        <SelectValue placeholder="Seleccionar tipo de clase" />
+                        <SelectValue placeholder="Tipo de clase" />
                       </SelectTrigger>
                       <SelectContent>
                         {tiposDeClase.map((tipo) => (
                           <SelectItem key={tipo} value={tipo}>
                             {tipo}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="col-span-4">
+                    <Select
+                      value={clase.instructor}
+                      onValueChange={(value) => actualizarClase(clase.id, "instructor", value)}
+                    >
+                      <SelectTrigger className="bg-background border-border text-foreground">
+                        <SelectValue placeholder="Seleccionar instructor" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {instructoresDisponibles.map((instructor) => (
+                          <SelectItem key={instructor} value={instructor}>
+                            {instructor}
                           </SelectItem>
                         ))}
                       </SelectContent>

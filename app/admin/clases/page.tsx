@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Calendar, Clock, Users, ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react"
+import { Calendar, Clock, Users, ArrowLeft, ChevronLeft, ChevronRight, BookOpen } from "lucide-react"
 
 // Datos de ejemplo de clases programadas
 const clasesEjemplo = [
@@ -17,6 +17,7 @@ const clasesEjemplo = [
     participantes: 12,
     maxParticipantes: 15,
     dia: 0,
+    instructor: "Ana García",
   },
   {
     id: 2,
@@ -26,6 +27,7 @@ const clasesEjemplo = [
     participantes: 20,
     maxParticipantes: 25,
     dia: 0,
+    instructor: "Laura Fernández",
   },
   {
     id: 15,
@@ -35,6 +37,7 @@ const clasesEjemplo = [
     participantes: 10,
     maxParticipantes: 12,
     dia: 0,
+    instructor: "Carlos López",
   },
   {
     id: 16,
@@ -44,6 +47,7 @@ const clasesEjemplo = [
     participantes: 18,
     maxParticipantes: 20,
     dia: 0,
+    instructor: "David Ruiz",
   },
   {
     id: 3,
@@ -53,6 +57,7 @@ const clasesEjemplo = [
     participantes: 8,
     maxParticipantes: 12,
     dia: 1,
+    instructor: "Carlos López",
   },
   {
     id: 4,
@@ -62,6 +67,7 @@ const clasesEjemplo = [
     participantes: 15,
     maxParticipantes: 20,
     dia: 1,
+    instructor: "Miguel Torres",
   },
   {
     id: 5,
@@ -71,6 +77,7 @@ const clasesEjemplo = [
     participantes: 10,
     maxParticipantes: 15,
     dia: 2,
+    instructor: "María Rodríguez",
   },
   {
     id: 6,
@@ -80,6 +87,7 @@ const clasesEjemplo = [
     participantes: 14,
     maxParticipantes: 15,
     dia: 2,
+    instructor: "Ana García",
   },
   {
     id: 7,
@@ -89,6 +97,7 @@ const clasesEjemplo = [
     participantes: 6,
     maxParticipantes: 12,
     dia: 3,
+    instructor: "José Martín",
   },
   {
     id: 8,
@@ -98,6 +107,7 @@ const clasesEjemplo = [
     participantes: 18,
     maxParticipantes: 25,
     dia: 3,
+    instructor: "Carmen Silva",
   },
   {
     id: 9,
@@ -107,6 +117,7 @@ const clasesEjemplo = [
     participantes: 12,
     maxParticipantes: 20,
     dia: 4,
+    instructor: "Elena Moreno",
   },
   {
     id: 10,
@@ -116,6 +127,7 @@ const clasesEjemplo = [
     participantes: 8,
     maxParticipantes: 15,
     dia: 4,
+    instructor: "María Rodríguez",
   },
   {
     id: 11,
@@ -125,6 +137,7 @@ const clasesEjemplo = [
     participantes: 11,
     maxParticipantes: 15,
     dia: 5,
+    instructor: "Ana García",
   },
   {
     id: 12,
@@ -134,6 +147,7 @@ const clasesEjemplo = [
     participantes: 9,
     maxParticipantes: 12,
     dia: 5,
+    instructor: "José Martín",
   },
   {
     id: 13,
@@ -143,6 +157,7 @@ const clasesEjemplo = [
     participantes: 22,
     maxParticipantes: 25,
     dia: 6,
+    instructor: "Pablo Jiménez",
   },
   {
     id: 14,
@@ -152,6 +167,7 @@ const clasesEjemplo = [
     participantes: 13,
     maxParticipantes: 15,
     dia: 6,
+    instructor: "María Rodríguez",
   },
 ]
 
@@ -290,9 +306,13 @@ export default function CalendarioClasesPage() {
                           <Clock className="h-3 w-3" />
                           {clase.hora} ({clase.duracion}min)
                         </div>
-                        <div className="flex items-center gap-1 text-xs">
+                        <div className="flex items-center gap-1 text-xs mb-1">
                           <Users className="h-3 w-3" />
                           {clase.participantes}/{clase.maxParticipantes}
+                        </div>
+                        <div className="flex items-center gap-1 text-xs">
+                          <BookOpen className="h-3 w-3" />
+                          {clase.instructor}
                         </div>
                       </div>
                     ))

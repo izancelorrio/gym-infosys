@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Clock, Users } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
+import { useRouter } from "next/navigation"
 
 const classes = [
   {
@@ -58,6 +59,7 @@ const classes = [
 
 export function ClassesSection() {
   const { user, isClient, isTrainer, isAdmin } = useAuth()
+  const router = useRouter()
 
   const canViewFullInfo = isClient() || isTrainer() || isAdmin()
   const canReserveClasses = isClient()
@@ -131,7 +133,10 @@ export function ClassesSection() {
                 )}
 
                 {canReserveClasses ? (
-                  <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
+                  <Button 
+                    className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+                    onClick={() => router.push("/cliente/reservar-clase")}
+                  >
                     Reservar Clase
                   </Button>
                 ) : user && user.role === "usuario" ? (

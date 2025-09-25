@@ -6,12 +6,16 @@ import { useEffect, useState } from "react"
 import { API_CONFIG } from "@/lib/config"
 import { useAuth } from "@/contexts/auth-context"
 import { ContractPlanModal } from "./contract-plan-modal"
+import { PromotionalVideoModal } from "./promotional-video-modal"
+import { RegisterModal } from "./register-modal"
 import { useRouter } from "next/navigation"
 
 export function HeroSection() {
   const [membersCount, setMembersCount] = useState<number>(500)
   const [isLoading, setIsLoading] = useState(true)
   const [isContractModalOpen, setIsContractModalOpen] = useState(false)
+  const [isVideoModalOpen, setIsVideoModalOpen] = useState(false)
+  const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false)
   const { user, isAuthenticated } = useAuth()
   const router = useRouter()
 
@@ -87,6 +91,7 @@ export function HeroSection() {
               <Button 
                 size="lg" 
                 className="bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/50 transition-all text-lg px-8 py-3"
+                onClick={() => router.push("/cliente/estadisticas")}
               >
                 Ver Estadísticas
               </Button>
@@ -95,18 +100,29 @@ export function HeroSection() {
                 className="bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/50 transition-all text-lg px-8 py-3"
                 onClick={() => router.push("/cliente/registrar-ejercicio")}
               >
-                Registrar Ejercicio
+                Registrar Actividad
+              </Button>
+              <Button 
+                size="lg" 
+                className="bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/50 transition-all text-lg px-8 py-3"
+                onClick={() => router.push("/cliente/agenda")}
+              >
+                Ver mi Agenda
               </Button>
             </>
           ) : (
             <>
-              <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 text-lg px-8 py-3">
+              <Button 
+                size="lg" 
+                className="bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/50 transition-all text-lg px-8 py-3"
+                onClick={() => setIsRegisterModalOpen(true)}
+              >
                 Comienza Hoy
               </Button>
               <Button
                 size="lg"
-                variant="outline"
-                className="border-white text-white hover:bg-white hover:text-black text-lg px-8 py-3 bg-transparent"
+                className="bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/50 transition-all text-lg px-8 py-3"
+                onClick={() => setIsVideoModalOpen(true)}
               >
                 <Play className="mr-2 h-5 w-5" />
                 <span className="sm:inline hidden">Ver Video</span>
@@ -136,6 +152,26 @@ export function HeroSection() {
       <ContractPlanModal
         isOpen={isContractModalOpen}
         onClose={() => setIsContractModalOpen(false)}
+      />
+
+      {/* Modal de video promocional */}
+      <PromotionalVideoModal
+        isOpen={isVideoModalOpen}
+        onClose={() => setIsVideoModalOpen(false)}
+        onStartToday={() => {
+          setIsVideoModalOpen(false)
+          setIsRegisterModalOpen(true)
+        }}
+      />
+
+      {/* Modal de registro */}
+      <RegisterModal
+        isOpen={isRegisterModalOpen}
+        onClose={() => setIsRegisterModalOpen(false)}
+        onSwitchToLogin={() => {
+          setIsRegisterModalOpen(false)
+          // Aquí puedes agregar lógica para abrir el modal de login si lo necesitas
+        }}
       />
     </section>
   )

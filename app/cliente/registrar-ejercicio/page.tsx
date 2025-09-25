@@ -12,8 +12,14 @@ import { Activity, Users, Plus, Save, ArrowLeft, Trash2 } from "lucide-react"
 interface Ejercicio {
   id: string
   fecha: string
-  ejercicio: string
-  series: number
+  tipo?: "clase" | "fuerza" // Hacer opcional para permitir estado inicial sin tipo
+  actividad: string
+  // Campos para ejercicios de fuerza
+  series?: number
+  repeticiones?: number
+  peso?: number
+  // Campo para clases
+  duracion?: number
 }
 
 export default function RegistrarEjercicioPage() {
@@ -47,6 +53,21 @@ export default function RegistrarEjercicioPage() {
     return fechas
   }, [])
 
+  const clasesDisponibles = [
+    "Pilates",
+    "Zumba", 
+    "CrossFit",
+    "Spinning",
+    "Yoga",
+    "Aeróbicos",
+    "Funcional",
+    "Boxing",
+    "Aqua Aeróbicos",
+    "Body Pump",
+    "Body Combat",
+    "Stretching"
+  ]
+
   const ejerciciosDisponibles = [
     "Press de banca",
     "Sentadillas",
@@ -66,6 +87,10 @@ export default function RegistrarEjercicioPage() {
     "Elíptica",
   ]
 
+  const duracionesClase = [30, 45, 60, 90] // en minutos
+  const repeticionesDisponibles = [5, 6, 7, 8, 9, 10, 12, 15, 20]
+  const pesosDisponibles = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 110, 120]
+
   useEffect(() => {
     if (!isAuthenticated) {
       router.push("/")
@@ -77,7 +102,19 @@ export default function RegistrarEjercicioPage() {
       return
     }
 
-    // Inicializar con la fecha de hoy formateada
+    // Verificar si hay datos existentes en localStorage
+    const ejerciciosGuardados = localStorage.getItem(`ejercicios-${user?.email}`)
+    if (ejerciciosGuardados) {
+      try {
+        const ejerciciosCargados = JSON.parse(ejerciciosGuardados)
+        console.log("Ejercicios cargados desde localStorage:", ejerciciosCargados)
+        // Mostrar ejercicios existentes pero permitir agregar nuevos
+      } catch (error) {
+        console.error("Error al cargar ejercicios:", error)
+      }
+    }
+    
+    // Inicializar con un ejercicio vacío para empezar a registrar
     const hoy = new Date()
     const dia = hoy.getDate().toString().padStart(2, '0')
     const mes = (hoy.getMonth() + 1).toString().padStart(2, '0')
@@ -87,13 +124,12 @@ export default function RegistrarEjercicioPage() {
       {
         id: Date.now().toString(),
         fecha: `${anio}-${mes}-${dia}`,
-        ejercicio: "",
-        series: 0,
+        actividad: "", // Sin tipo inicial para mostrar ambos dropdowns
       },
     ])
 
     setIsLoading(false)
-  }, [isAuthenticated, router, user?.role])
+  }, [isAuthenticated, router, user?.role, user?.email])
 
   const agregarEjercicio = () => {
     // Usar la fecha de hoy formateada
@@ -105,8 +141,7 @@ export default function RegistrarEjercicioPage() {
     const nuevoEjercicio: Ejercicio = {
       id: Date.now().toString(),
       fecha: `${anio}-${mes}-${dia}`,
-      ejercicio: "",
-      series: 0,
+      actividad: "", // Sin tipo inicial para mostrar ambos dropdowns
     }
     setEjercicios([...ejercicios, nuevoEjercicio])
   }
@@ -119,10 +154,44 @@ export default function RegistrarEjercicioPage() {
     setEjercicios(ejercicios.map((e) => (e.id === id ? { ...e, [campo]: valor } : e)))
   }
 
+  const actualizarEjercicioMultiple = (id: string, campos: Partial<Ejercicio>) => {
+    setEjercicios(ejercicios.map((e) => (e.id === id ? { ...e, ...campos } : e)))
+  }
+
   const guardarEjercicios = () => {
-    console.log("[v0] Guardando ejercicios:", ejercicios)
-    // TODO: Implementar guardado en backend
-    router.push("/")
+    // Filtrar ejercicios que tienen tipo y actividad seleccionados
+    const ejerciciosCompletos = ejercicios.filter(
+      (e) => e.tipo && e.actividad && e.actividad.trim() !== ""
+    )
+    
+    if (ejerciciosCompletos.length === 0) {
+      alert("Por favor, completa al menos una actividad antes de guardar.")
+      return
+    }
+
+    console.log("[v0] Guardando ejercicios:", ejerciciosCompletos)
+    
+    // Cargar ejercicios existentes del localStorage
+    const ejerciciosExistentes = localStorage.getItem(`ejercicios-${user?.email}`)
+    let todosLosEjercicios: Ejercicio[] = []
+    
+    if (ejerciciosExistentes) {
+      try {
+        todosLosEjercicios = JSON.parse(ejerciciosExistentes)
+      } catch (error) {
+        console.error("Error al cargar ejercicios existentes:", error)
+        todosLosEjercicios = []
+      }
+    }
+    
+    // Combinar con los nuevos ejercicios
+    const ejerciciosActualizados = [...todosLosEjercicios, ...ejerciciosCompletos]
+    
+    // Guardar en localStorage
+    localStorage.setItem(`ejercicios-${user?.email}`, JSON.stringify(ejerciciosActualizados))
+    
+    alert(`Se guardaron ${ejerciciosCompletos.length} actividades correctamente.`)
+    router.push("/cliente/agenda")
   }
 
   if (isLoading) {
@@ -147,7 +216,7 @@ export default function RegistrarEjercicioPage() {
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <CardTitle className="text-2xl font-bold text-white">Registrar Ejercicio</CardTitle>
+                  <CardTitle className="text-2xl font-bold text-white">Registrar Actividad</CardTitle>
                   <p className="text-orange-100">{user?.name}</p>
                   <p className="text-sm text-orange-200">{user?.email}</p>
                 </div>
@@ -200,91 +269,249 @@ export default function RegistrarEjercicioPage() {
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center space-x-2 text-foreground">
                 <Activity className="h-5 w-5" />
-                <span>Registro de Ejercicios</span>
+                <span>Registro de Actividades</span>
               </CardTitle>
               <Button onClick={agregarEjercicio} className="bg-primary hover:bg-primary/90 text-white">
                 <Plus className="h-4 w-4 mr-2" />
-                Agregar Ejercicio
+                Agregar Actividad
               </Button>
             </div>
           </CardHeader>
           <CardContent className="p-6">
             <div className="space-y-4">
               <div className="grid grid-cols-12 gap-4 p-4 bg-primary/5 rounded-lg border border-primary/20">
-                <div className="col-span-4 font-semibold text-foreground">Fecha</div>
-                <div className="col-span-5 font-semibold text-foreground">Ejercicio</div>
-                <div className="col-span-2 font-semibold text-foreground">Series</div>
+                <div className="col-span-3 font-semibold text-foreground">Fecha</div>
+                <div className="col-span-8 font-semibold text-foreground">Actividad</div>
                 <div className="col-span-1 font-semibold text-foreground">Acción</div>
               </div>
 
               {ejercicios.map((ejercicio) => (
                 <div
                   key={ejercicio.id}
-                  className="grid grid-cols-12 gap-4 p-4 border border-border rounded-lg bg-card hover:border-primary/50 transition-all duration-200"
+                  className="space-y-4 p-4 border border-border rounded-lg bg-card hover:border-primary/50 transition-all duration-200"
                 >
-                  <div className="col-span-4">
-                    <Select
-                      value={ejercicio.fecha}
-                      onValueChange={(value) => actualizarEjercicio(ejercicio.id, "fecha", value)}
-                    >
-                      <SelectTrigger className="bg-background border-border text-foreground">
-                        <SelectValue placeholder="Seleccionar fecha" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {fechasDisponibles.map((fecha) => (
-                          <SelectItem key={fecha.valor} value={fecha.valor}>
-                            {fecha.etiqueta}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  {/* Primera fila: Fecha y Actividad */}
+                  <div className="grid grid-cols-12 gap-4">
+                    <div className="col-span-3">
+                      <Select
+                        value={ejercicio.fecha}
+                        onValueChange={(value) => actualizarEjercicio(ejercicio.id, "fecha", value)}
+                      >
+                        <SelectTrigger className="bg-background border-border text-foreground">
+                          <SelectValue placeholder="Seleccionar fecha" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {fechasDisponibles.map((fecha) => (
+                            <SelectItem key={fecha.valor} value={fecha.valor}>
+                              {fecha.etiqueta}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div className="col-span-8">
+                      {/* Selector único que cambia según el contexto */}
+                      {ejercicio.tipo === "clase" ? (
+                        // Mostrar selector de clases y duración
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="text-sm font-medium text-foreground mb-2 block">Clase</label>
+                            <Select
+                              value={ejercicio.actividad}
+                              onValueChange={(value) => {
+                                actualizarEjercicio(ejercicio.id, "actividad", value)
+                              }}
+                            >
+                              <SelectTrigger className="bg-background border-border text-foreground">
+                                <SelectValue placeholder="Seleccionar clase" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {clasesDisponibles.map((clase) => (
+                                  <SelectItem key={clase} value={clase}>
+                                    {clase}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          
+                          <div>
+                            <label className="text-sm font-medium text-foreground mb-2 block">Duración</label>
+                            <Select
+                              value={ejercicio.duracion?.toString() || ""}
+                              onValueChange={(value) => actualizarEjercicio(ejercicio.id, "duracion", Number(value))}
+                            >
+                              <SelectTrigger className="bg-background border-border text-foreground">
+                                <SelectValue placeholder="Seleccionar duración" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {duracionesClase.map((duracion) => (
+                                  <SelectItem key={duracion} value={duracion.toString()}>
+                                    {duracion} min
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      ) : ejercicio.tipo === "fuerza" ? (
+                        // Mostrar selector de ejercicios de fuerza
+                        <div>
+                          <label className="text-sm font-medium text-foreground mb-2 block">Ejercicio de Fuerza</label>
+                          <Select
+                            value={ejercicio.actividad}
+                            onValueChange={(value) => {
+                              actualizarEjercicio(ejercicio.id, "actividad", value)
+                            }}
+                          >
+                            <SelectTrigger className="bg-background border-border text-foreground">
+                              <SelectValue placeholder="Seleccionar ejercicio" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {ejerciciosDisponibles.map((ejercicio) => (
+                                <SelectItem key={ejercicio} value={ejercicio}>
+                                  {ejercicio}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      ) : (
+                        // Selector inicial para elegir tipo
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="text-sm font-medium text-foreground mb-2 block">Clases</label>
+                            <Select
+                              value={ejercicio.tipo === "clase" ? ejercicio.actividad : ""}
+                              onValueChange={(value) => {
+                                actualizarEjercicioMultiple(ejercicio.id, {
+                                  tipo: "clase",
+                                  actividad: value,
+                                  // Limpiar campos de fuerza
+                                  series: undefined,
+                                  repeticiones: undefined,
+                                  peso: undefined
+                                })
+                              }}
+                            >
+                              <SelectTrigger className="bg-background border-border text-foreground">
+                                <SelectValue placeholder="Seleccionar clase" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {clasesDisponibles.map((clase) => (
+                                  <SelectItem key={clase} value={clase}>
+                                    {clase}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          
+                          <div>
+                            <label className="text-sm font-medium text-foreground mb-2 block">Ejercicios de Fuerza</label>
+                            <Select
+                              value={ejercicio.tipo === "fuerza" ? ejercicio.actividad : ""}
+                              onValueChange={(value) => {
+                                actualizarEjercicioMultiple(ejercicio.id, {
+                                  tipo: "fuerza",
+                                  actividad: value,
+                                  // Limpiar campo de clase
+                                  duracion: undefined
+                                })
+                              }}
+                            >
+                              <SelectTrigger className="bg-background border-border text-foreground">
+                                <SelectValue placeholder="Seleccionar ejercicio" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {ejerciciosDisponibles.map((ejercicio) => (
+                                  <SelectItem key={ejercicio} value={ejercicio}>
+                                    {ejercicio}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="col-span-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-red-600 text-red-600 hover:bg-red-600 hover:text-white bg-transparent mt-6"
+                        onClick={() => eliminarEjercicio(ejercicio.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
-                  <div className="col-span-5">
-                    <Select
-                      value={ejercicio.ejercicio}
-                      onValueChange={(value) => actualizarEjercicio(ejercicio.id, "ejercicio", value)}
-                    >
-                      <SelectTrigger className="bg-background border-border text-foreground">
-                        <SelectValue placeholder="Seleccionar ejercicio" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {ejerciciosDisponibles.map((ejercicio) => (
-                          <SelectItem key={ejercicio} value={ejercicio}>
-                            {ejercicio}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="col-span-2">
-                    <Select
-                      value={ejercicio.series === 0 ? "" : ejercicio.series.toString()}
-                      onValueChange={(value) =>
-                        actualizarEjercicio(ejercicio.id, "series", Number.parseInt(value))
-                      }
-                    >
-                      <SelectTrigger className="bg-background border-border text-foreground">
-                        <SelectValue placeholder="Seleccionar series" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {[1, 2, 3, 4].map((serie) => (
-                          <SelectItem key={serie} value={serie.toString()}>
-                            {serie} serie{serie > 1 ? "s" : ""}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="col-span-1">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="border-red-600 text-red-600 hover:bg-red-600 hover:text-white bg-transparent"
-                      onClick={() => eliminarEjercicio(ejercicio.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
+
+                  {/* Segunda fila: Campos condicionales solo para ejercicios de fuerza */}
+                  {ejercicio.actividad && ejercicio.tipo === "fuerza" && (
+                    <div className="pt-2 border-t border-border">
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <label className="text-sm font-medium text-foreground mb-2 block">Series</label>
+                          <Select
+                            value={ejercicio.series?.toString() || ""}
+                            onValueChange={(value) => actualizarEjercicio(ejercicio.id, "series", Number(value))}
+                          >
+                            <SelectTrigger className="bg-background border-border text-foreground">
+                              <SelectValue placeholder="Seleccionar series" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {[1, 2, 3, 4, 5].map((serie) => (
+                                <SelectItem key={serie} value={serie.toString()}>
+                                  {serie} serie{serie > 1 ? "s" : ""}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        <div>
+                          <label className="text-sm font-medium text-foreground mb-2 block">Repeticiones</label>
+                          <Select
+                            value={ejercicio.repeticiones?.toString() || ""}
+                            onValueChange={(value) => actualizarEjercicio(ejercicio.id, "repeticiones", Number(value))}
+                          >
+                            <SelectTrigger className="bg-background border-border text-foreground">
+                              <SelectValue placeholder="Seleccionar repeticiones" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {repeticionesDisponibles.map((rep) => (
+                                <SelectItem key={rep} value={rep.toString()}>
+                                  {rep} reps
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        <div>
+                          <label className="text-sm font-medium text-foreground mb-2 block">Peso (kg)</label>
+                          <Select
+                            value={ejercicio.peso?.toString() || ""}
+                            onValueChange={(value) => actualizarEjercicio(ejercicio.id, "peso", Number(value))}
+                          >
+                            <SelectTrigger className="bg-background border-border text-foreground">
+                              <SelectValue placeholder="Seleccionar peso" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {pesosDisponibles.map((peso) => (
+                                <SelectItem key={peso} value={peso.toString()}>
+                                  {peso} kg
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -292,7 +519,7 @@ export default function RegistrarEjercicioPage() {
             <div className="flex justify-end mt-6">
               <Button onClick={guardarEjercicios} className="bg-primary hover:bg-primary/90 text-white">
                 <Save className="h-4 w-4 mr-2" />
-                Guardar Registro de Ejercicios
+                Guardar Registro de Actividades
               </Button>
             </div>
           </CardContent>

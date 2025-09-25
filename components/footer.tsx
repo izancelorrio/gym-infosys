@@ -48,11 +48,6 @@ export function Footer() {
                 </a>
               </li>
               <li>
-                <a href="#entrenadores" className="text-muted-foreground hover:text-primary transition-colors">
-                  Entrenadores
-                </a>
-              </li>
-              <li>
                 <a href="#testimonios" className="text-muted-foreground hover:text-primary transition-colors">
                   Testimonios
                 </a>
