@@ -32,7 +32,7 @@ interface ContractPlanModalProps {
 }
 
 export function ContractPlanModal({ isOpen, onClose }: ContractPlanModalProps) {
-  const { user } = useAuth()
+  const { user, updateUser } = useAuth()
   const [planes, setPlanes] = useState<Plan[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -41,7 +41,11 @@ export function ContractPlanModal({ isOpen, onClose }: ContractPlanModalProps) {
     email: user?.email || "",
     dni: "",
     telefono: "",
+    fechaNacimiento: "",
+    genero: "",
     numeroTarjeta: "",
+    fechaExpiracion: "",
+    cvv: "",
     plan: ""
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -81,7 +85,11 @@ export function ContractPlanModal({ isOpen, onClose }: ContractPlanModalProps) {
         email: user?.email || "",
         dni: "",
         telefono: "",
+        fechaNacimiento: "",
+        genero: "",
         numeroTarjeta: "",
+        fechaExpiracion: "",
+        cvv: "",
         plan: ""
       })
     }
@@ -93,20 +101,61 @@ export function ContractPlanModal({ isOpen, onClose }: ContractPlanModalProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    if (!user) {
+      alert("Error: Usuario no autenticado")
+      return
+    }
+    
+    if (user.role !== "usuario") {
+      alert("Solo los usuarios pueden contratar planes")
+      return
+    }
+    
     setIsSubmitting(true)
+    setError(null)
 
     try {
-      // Aquí iría la lógica para procesar la contratación del plan
-      console.log("Datos de contratación:", formData)
-      
-      // Simulamos una llamada a la API
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      
-      alert("¡Plan contratado exitosamente!")
+      const contractData = {
+        user_id: user.id,
+        plan_id: parseInt(formData.plan),
+        dni: formData.dni,
+        numero_telefono: formData.telefono,
+        fecha_nacimiento: formData.fechaNacimiento,
+        genero: formData.genero,
+        num_tarjeta: formData.numeroTarjeta,
+        fecha_tarjeta: formData.fechaExpiracion,
+        cvv: formData.cvv
+      }
+
+      const response = await fetch('/api/contract-plan', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(contractData),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Error al contratar el plan')
+      }
+
+      // Actualizar la sesión del usuario con los nuevos datos
+      if (data.user) {
+        updateUser(data.user)
+      }
+
+      alert(`¡Plan contratado exitosamente! ${data.message}`)
       onClose()
+      
+      // Opcional: recargar la página para reflejar los cambios
+      window.location.reload()
+      
     } catch (error) {
       console.error("Error al contratar plan:", error)
-      alert("Error al procesar la contratación. Inténtalo de nuevo.")
+      setError(error instanceof Error ? error.message : "Error desconocido al contratar el plan")
     } finally {
       setIsSubmitting(false)
     }
@@ -160,6 +209,14 @@ export function ContractPlanModal({ isOpen, onClose }: ContractPlanModalProps) {
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Mostrar error si existe */}
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-red-600" />
+                <span className="text-red-800">{error}</span>
+              </div>
+            )}
+            
             {/* Layout horizontal: Info Personal + Selección de Plan + Info de Pago */}
             <div className="grid grid-cols-1 xl:grid-cols-3 lg:grid-cols-2 gap-6">
               {/* Información Personal */}
@@ -214,6 +271,32 @@ export function ContractPlanModal({ isOpen, onClose }: ContractPlanModalProps) {
                       placeholder="+34 123 456 789"
                       required
                     />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="fechaNacimiento">Fecha de Nacimiento *</Label>
+                    <Input
+                      id="fechaNacimiento"
+                      type="date"
+                      value={formData.fechaNacimiento}
+                      onChange={(e) => handleInputChange("fechaNacimiento", e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="genero">Género *</Label>
+                    <Select
+                      value={formData.genero}
+                      onValueChange={(value) => handleInputChange("genero", value)}
+                    >
+                      <SelectTrigger id="genero">
+                        <SelectValue placeholder="Selecciona tu género" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="masculino">Masculino</SelectItem>
+                        <SelectItem value="femenino">Femenino</SelectItem>
+                        <SelectItem value="otro">Otro</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </CardContent>
               </Card>
@@ -387,11 +470,23 @@ export function ContractPlanModal({ isOpen, onClose }: ContractPlanModalProps) {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label>Fecha de Expiración *</Label>
-                        <Input placeholder="MM/AA" maxLength={5} required />
+                        <Input 
+                          placeholder="MM/AA" 
+                          maxLength={5} 
+                          value={formData.fechaExpiracion}
+                          onChange={(e) => handleInputChange("fechaExpiracion", e.target.value)}
+                          required 
+                        />
                       </div>
                       <div className="space-y-2">
                         <Label>CVV *</Label>
-                        <Input placeholder="123" maxLength={3} required />
+                        <Input 
+                          placeholder="123" 
+                          maxLength={3} 
+                          value={formData.cvv}
+                          onChange={(e) => handleInputChange("cvv", e.target.value)}
+                          required 
+                        />
                       </div>
                     </div>
                   </div>
@@ -412,7 +507,7 @@ export function ContractPlanModal({ isOpen, onClose }: ContractPlanModalProps) {
               </Button>
               <Button
                 type="submit"
-                disabled={isSubmitting || !formData.plan || !formData.dni || !formData.telefono || !formData.numeroTarjeta}
+                disabled={isSubmitting || !formData.plan || !formData.dni || !formData.telefono || !formData.fechaNacimiento || !formData.genero || !formData.numeroTarjeta || !formData.fechaExpiracion || !formData.cvv}
                 className="px-6 bg-primary text-primary-foreground hover:bg-primary/90"
               >
                 {isSubmitting ? "Procesando..." : planSeleccionado ? `Contratar por €${planSeleccionado.precio_mensual}/mes` : "Seleccionar Plan"}

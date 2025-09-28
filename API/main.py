@@ -8,6 +8,7 @@ import smtplib
 from email.mime.text import MIMEText
 from datetime import datetime, timedelta
 import socket
+import os
 
 app = FastAPI()
 
@@ -42,6 +43,13 @@ print_server_ip()
 # POST   /verify-email       - Verificar email de usuario mediante token
 # ----------------------------------------------------
 
+def get_db_connection():
+    """Obtiene la conexión a la base de datos users.db ubicada en la raíz del proyecto"""
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(script_dir)
+    db_path = os.path.join(project_root, "users.db")
+    return sqlite3.connect(db_path)
+
 def hash_password(password: str) -> str:
     salt = bcrypt.gensalt()
     hashed = bcrypt.hashpw(password.encode("utf-8"), salt)
@@ -52,7 +60,7 @@ def verify_password(password: str, hashed: str) -> bool:
 
 # Inicializar la base de datos y crear la tabla si no existe
 def init_db():
-    conn = sqlite3.connect("users.db")
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
@@ -110,6 +118,17 @@ class ResetPasswordRequest(BaseModel):
 class VerifyEmailRequest(BaseModel):
     token: str
 
+class ContractPlanRequest(BaseModel):
+    user_id: int
+    plan_id: int
+    dni: str
+    numero_telefono: str
+    fecha_nacimiento: str
+    genero: str
+    num_tarjeta: str
+    fecha_tarjeta: str
+    cvv: str
+
 def send_reset_email(to_email: str, reset_link: str):
     # Configura estos valores según tu servidor SMTP
     SMTP_SERVER = "smtp.gmail.com"
@@ -160,29 +179,60 @@ async def log_request_body(request: Request, call_next):
 ## Endpoint para iniciar sesión de usuario
 @app.post("/login")
 def login(req: LoginRequest):
-    conn = sqlite3.connect("users.db")
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT id, name, email, password, email_verified, role FROM users WHERE email=?", (req.email,))
     user = cursor.fetchone()
-    conn.close()
+    
     if user and verify_password(req.password, user[3]):
         if not user[4]:
+            conn.close()
             raise HTTPException(status_code=403, detail="Debes verificar tu email antes de iniciar sesión")
+        
+        user_data = {"id": user[0], "email": user[2], "name": user[1], "role": user[5]}
+        
+        # Si es un cliente, cargar también sus datos específicos
+        if user[5] == "cliente":
+            cursor.execute("""
+                SELECT id, dni, numero_telefono, plan_id, fecha_nacimiento, genero, 
+                       num_tarjeta, fecha_tarjeta, cvv, fecha_inscripcion, estado 
+                FROM clientes WHERE id_usuario = ?
+            """, (user[0],))
+            cliente_data = cursor.fetchone()
+            
+            if cliente_data:
+                user_data["cliente"] = {
+                    "id": cliente_data[0],
+                    "dni": cliente_data[1],
+                    "numero_telefono": cliente_data[2],
+                    "plan_id": cliente_data[3],
+                    "fecha_nacimiento": cliente_data[4],
+                    "genero": cliente_data[5],
+                    "num_tarjeta": cliente_data[6],
+                    "fecha_tarjeta": cliente_data[7],
+                    "cvv": cliente_data[8],
+                    "fecha_inscripcion": cliente_data[9],
+                    "estado": cliente_data[10]
+                }
+        
+        conn.close()
+        
         response = {
             "success": True,
             "message": "Login exitoso",
-            "user": {"id": user[0], "email": user[2], "name": user[1], "role": user[5]}
+            "user": user_data
         }
         print("[DEBUG] Login response:", response)
         return response
     else:
+        conn.close()
         raise HTTPException(status_code=401, detail="Credenciales inválidas")
 
 ## Endpoint para registrar un nuevo usuario
 @app.post("/register")
 def register(req: RegisterRequest):
     print(f"[DEBUG] Intentando registrar usuario: {req.email}")
-    conn = sqlite3.connect("users.db")
+    conn = get_db_connection()
     cursor = conn.cursor()
     hashed_pw = hash_password(req.password)
     try:
@@ -231,7 +281,7 @@ def change_password(req: ChangePasswordRequest):
         raise HTTPException(status_code=400, detail="Todos los campos son requeridos")
     if len(req.new_password) < 6:
         raise HTTPException(status_code=400, detail="La nueva contraseña debe tener al menos 6 caracteres")
-    conn = sqlite3.connect("users.db")
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT id, password FROM users WHERE email=?", (req.email,))
     user = cursor.fetchone()
@@ -250,7 +300,7 @@ def change_password(req: ChangePasswordRequest):
 ## Endpoint para enviar email de recuperación de contraseña
 @app.post("/send-reset-email")
 def send_reset_email_endpoint(req: SendResetEmailRequest):
-    conn = sqlite3.connect("users.db")
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT id FROM users WHERE email=?", (req.email,))
     user = cursor.fetchone()
@@ -274,7 +324,7 @@ def send_reset_email_endpoint(req: SendResetEmailRequest):
 ## Endpoint para restablecer la contraseña usando un token
 @app.post("/reset-password")
 def reset_password(req: ResetPasswordRequest):
-    conn = sqlite3.connect("users.db")
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT user_id, expires_at FROM reset_tokens WHERE token=?", (req.token,))
     row = cursor.fetchone()
@@ -298,7 +348,7 @@ def reset_password(req: ResetPasswordRequest):
 ## Endpoint para verificar el email del usuario
 @app.post("/verify-email")
 def verify_email(req: VerifyEmailRequest):
-    conn = sqlite3.connect("users.db")
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT user_id, expires_at FROM email_verifications WHERE token=?", (req.token,))
     row = cursor.fetchone()
@@ -321,7 +371,7 @@ def verify_email(req: VerifyEmailRequest):
 ## Endpoint para obtener el número total de usuarios registrados
 @app.get("/count-members")
 def count_members():
-    conn = sqlite3.connect("users.db")
+    conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM users")
     count = cursor.fetchone()[0]
@@ -333,7 +383,7 @@ def count_members():
 def get_planes():
     """Obtener todos los planes activos ordenados por orden_display"""
     try:
-        conn = sqlite3.connect("users.db")
+        conn = get_db_connection()
         cursor = conn.cursor()
         
         cursor.execute("""
@@ -388,7 +438,7 @@ def get_planes():
 def get_plan_by_id(plan_id: int):
     """Obtener un plan específico por ID"""
     try:
-        conn = sqlite3.connect("users.db")
+        conn = get_db_connection()
         cursor = conn.cursor()
         
         cursor.execute("""
@@ -441,3 +491,97 @@ def get_plan_by_id(plan_id: int):
     except Exception as e:
         conn.close()
         raise HTTPException(status_code=500, detail=f"Error al obtener plan: {str(e)}")
+
+## Endpoint para contratar un plan
+@app.post("/contract-plan")
+def contract_plan(req: ContractPlanRequest):
+    print(f"[DEBUG] Usuario {req.user_id} contratando plan {req.plan_id}")
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        # 1. Verificar que el usuario existe y tiene rol 'usuario'
+        cursor.execute("SELECT id, name, email, role FROM users WHERE id = ?", (req.user_id,))
+        user = cursor.fetchone()
+        
+        if not user:
+            conn.close()
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        
+        if user[3] != "usuario":
+            conn.close()
+            raise HTTPException(status_code=400, detail="Solo los usuarios pueden contratar planes")
+        
+        # 2. Verificar que el plan existe
+        cursor.execute("SELECT id, nombre FROM planes WHERE id = ? AND activo = 1", (req.plan_id,))
+        plan = cursor.fetchone()
+        
+        if not plan:
+            conn.close()
+            raise HTTPException(status_code=404, detail="Plan no encontrado o inactivo")
+        
+        # 3. Actualizar el rol del usuario de 'usuario' a 'cliente'
+        cursor.execute("UPDATE users SET role = 'cliente' WHERE id = ?", (req.user_id,))
+        
+        # 4. Crear registro en la tabla clientes
+        cursor.execute("""
+            INSERT INTO clientes (
+                id_usuario, dni, numero_telefono, plan_id, fecha_nacimiento, 
+                genero, num_tarjeta, fecha_tarjeta, cvv, fecha_inscripcion, estado
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), 'activo')
+        """, (
+            req.user_id, req.dni, req.numero_telefono, req.plan_id,
+            req.fecha_nacimiento, req.genero, req.num_tarjeta, 
+            req.fecha_tarjeta, req.cvv
+        ))
+        
+        # 5. Obtener el ID del cliente recién creado
+        cliente_id = cursor.lastrowid
+        
+        conn.commit()
+        
+        # 6. Obtener los datos completos del usuario actualizado (incluyendo datos de cliente)
+        cursor.execute("""
+            SELECT id, dni, numero_telefono, plan_id, fecha_nacimiento, genero, 
+                   num_tarjeta, fecha_tarjeta, cvv, fecha_inscripcion, estado 
+            FROM clientes WHERE id = ?
+        """, (cliente_id,))
+        cliente_data = cursor.fetchone()
+        
+        conn.close()
+        
+        # 7. Retornar datos actualizados del usuario
+        updated_user = {
+            "id": user[0],
+            "name": user[1],
+            "email": user[2],
+            "role": "cliente",
+            "cliente": {
+                "id": cliente_data[0],
+                "dni": cliente_data[1],
+                "numero_telefono": cliente_data[2],
+                "plan_id": cliente_data[3],
+                "fecha_nacimiento": cliente_data[4],
+                "genero": cliente_data[5],
+                "num_tarjeta": cliente_data[6],
+                "fecha_tarjeta": cliente_data[7],
+                "cvv": cliente_data[8],
+                "fecha_inscripcion": cliente_data[9],
+                "estado": cliente_data[10]
+            }
+        }
+        
+        return {
+            "success": True,
+            "message": f"Plan {plan[1]} contratado exitosamente",
+            "user": updated_user
+        }
+        
+    except HTTPException:
+        conn.close()
+        raise
+    except Exception as e:
+        conn.close()
+        print(f"[ERROR] Error al contratar plan: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al contratar plan: {str(e)}")

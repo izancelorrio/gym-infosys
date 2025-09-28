@@ -9,12 +9,26 @@ interface User {
   name: string
   role: "usuario" | "cliente" | "clientepro" | "entrenador" | "administrador" | "admin"
   verified?: boolean
+  cliente?: {
+    id: number
+    dni: string
+    numero_telefono: string
+    plan_id: number
+    fecha_nacimiento: string
+    genero: string
+    num_tarjeta: string
+    fecha_tarjeta: string
+    cvv: string
+    fecha_inscripcion: string
+    estado: string
+  }
 }
 
 interface AuthContextType {
   user: User | null
   login: (userData: User) => void
   logout: () => void
+  updateUser: (userData: User) => void
   isAuthenticated: boolean
   isLoading: boolean
   hasRole: (role: User["role"]) => boolean
@@ -175,6 +189,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     deleteCookie("gym_user")
   }
 
+  const updateUser = (userData: User) => {
+    console.log("[GymInfoSys] UpdateUser called with:", userData)
+    const userWithRole = {
+      ...userData,
+      role: userData.role || ("usuario" as User["role"]),
+    }
+    setUser(userWithRole)
+
+    if (typeof window !== "undefined") {
+      const userString = JSON.stringify(userWithRole)
+
+      // Actualizar en localStorage
+      localStorage.setItem("gym_user", userString)
+      console.log("[GymInfoSys] User updated in localStorage:", userWithRole)
+
+      // Actualizar en cookies como respaldo
+      setCookie("gym_user", encodeURIComponent(userString), 7)
+    }
+  }
+
   const hasRole = (role: User["role"]) => {
     return user?.role === role
   }
@@ -207,6 +241,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         login,
         logout,
+        updateUser,
         isAuthenticated,
         isLoading,
         hasRole,
