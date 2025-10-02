@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import sqlite3
@@ -41,6 +41,12 @@ print_server_ip()
 # POST   /reset-password     - Cambiar contraseña usando token de recuperación
 # GET    /count-members      - Obtener número total de usuarios registrados
 # POST   /verify-email       - Verificar email de usuario mediante token
+# GET    /planes             - Obtener todos los planes disponibles
+# GET    /planes/{id}        - Obtener plan específico por ID
+# POST   /contract-plan      - Contratar plan (cambia rol usuario -> cliente)
+# GET    /admin/users        - Obtener todos los usuarios (solo admin)
+# GET    /admin/users/{id}   - Obtener usuario específico por ID (solo admin)
+# PUT    /admin/users/{id}   - Actualizar usuario específico (solo admin)
 # ----------------------------------------------------
 
 def get_db_connection():
@@ -128,6 +134,16 @@ class ContractPlanRequest(BaseModel):
     num_tarjeta: str
     fecha_tarjeta: str
     cvv: str
+
+class UpdateUserRequest(BaseModel):
+    name: str
+    email: str
+    role: str
+    # Campos opcionales para clientes
+    dni: str = None
+    numero_telefono: str = None
+    fecha_nacimiento: str = None
+    genero: str = None
 
 def send_reset_email(to_email: str, reset_link: str):
     # Configura estos valores según tu servidor SMTP
@@ -237,7 +253,7 @@ def register(req: RegisterRequest):
     hashed_pw = hash_password(req.password)
     try:
         cursor.execute(
-            "INSERT INTO users (name, email, password) VALUES (?, ?, ?)",
+            "INSERT INTO users (name, email, password, created_at, updated_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
             (req.name, req.email, hashed_pw)
         )
         conn.commit()
@@ -585,3 +601,315 @@ def contract_plan(req: ContractPlanRequest):
         conn.close()
         print(f"[ERROR] Error al contratar plan: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error al contratar plan: {str(e)}")
+
+## Endpoint para obtener todos los usuarios (solo para administradores)
+@app.get("/admin/users")
+def get_all_users(response: Response):
+    print("[DEBUG] Obteniendo todos los usuarios para administración")
+    
+    # Agregar headers anti-cache
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        # Obtener todos los usuarios con información básica
+        cursor.execute("""
+            SELECT id, name, email, role, email_verified, created_at, updated_at
+            FROM users 
+            ORDER BY id ASC
+        """)
+        users_data = cursor.fetchall()
+        
+        users_list = []
+        
+        for user_row in users_data:
+            user_info = {
+                "id": user_row[0],
+                "name": user_row[1],
+                "email": user_row[2],
+                "role": user_row[3],
+                "email_verified": bool(user_row[4]),
+                "created_at": user_row[5],
+                "updated_at": user_row[6],
+                "cliente": None
+            }
+            
+            # Si es un cliente, obtener datos adicionales de la tabla clientes
+            if user_row[3] == "cliente":
+                cursor.execute("""
+                    SELECT id, dni, numero_telefono, plan_id, fecha_nacimiento, genero, 
+                           fecha_inscripcion, estado, created_at, updated_at
+                    FROM clientes 
+                    WHERE id_usuario = ?
+                """, (user_row[0],))
+                cliente_data = cursor.fetchone()
+                
+                if cliente_data:
+                    # Obtener nombre del plan
+                    cursor.execute("SELECT nombre FROM planes WHERE id = ?", (cliente_data[3],))
+                    plan_data = cursor.fetchone()
+                    plan_name = plan_data[0] if plan_data else "Sin plan"
+                    
+                    user_info["cliente"] = {
+                        "id": cliente_data[0],
+                        "dni": cliente_data[1],
+                        "numero_telefono": cliente_data[2],
+                        "plan_id": cliente_data[3],
+                        "plan_name": plan_name,
+                        "fecha_nacimiento": cliente_data[4],
+                        "genero": cliente_data[5],
+                        "fecha_inscripcion": cliente_data[6],
+                        "estado": cliente_data[7],
+                        "created_at": cliente_data[8],
+                        "updated_at": cliente_data[9]
+                    }
+            
+            users_list.append(user_info)
+        
+        # Calcular estadísticas
+        stats = {
+            "total": len(users_list),
+            "admin": len([u for u in users_list if u["role"] in ["admin", "administrador"]]),
+            "entrenador": len([u for u in users_list if u["role"] == "entrenador"]),
+            "cliente": len([u for u in users_list if u["role"] == "cliente"]),
+            "clientepro": len([u for u in users_list if u["role"] == "clientepro"]),
+            "usuario": len([u for u in users_list if u["role"] == "usuario"]),
+            "verified": len([u for u in users_list if u["email_verified"]]),
+            "unverified": len([u for u in users_list if not u["email_verified"]])
+        }
+        
+        conn.close()
+        
+        return {
+            "success": True,
+            "users": users_list,
+            "stats": stats
+        }
+        
+    except Exception as e:
+        conn.close()
+        print(f"[ERROR] Error al obtener usuarios: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al obtener usuarios: {str(e)}")
+
+## Endpoint para obtener un usuario específico por ID (solo para administradores)
+@app.get("/admin/users/{user_id}")
+def get_user_by_id(user_id: int, response: Response):
+    print(f"[DEBUG] Obteniendo usuario con ID: {user_id}")
+    
+    # Agregar headers anti-cache
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        # Obtener usuario específico
+        cursor.execute("""
+            SELECT id, name, email, role, email_verified, created_at, updated_at
+            FROM users 
+            WHERE id = ?
+        """, (user_id,))
+        user_data = cursor.fetchone()
+        
+        if not user_data:
+            conn.close()
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        
+        user_info = {
+            "id": user_data[0],
+            "name": user_data[1],
+            "email": user_data[2],
+            "role": user_data[3],
+            "email_verified": bool(user_data[4]),
+            "created_at": user_data[5],
+            "updated_at": user_data[6],
+            "cliente": None
+        }
+        
+        # Si es un cliente, obtener datos adicionales
+        if user_data[3] == "cliente":
+            cursor.execute("""
+                SELECT id, dni, numero_telefono, plan_id, fecha_nacimiento, genero, 
+                       fecha_inscripcion, estado, created_at, updated_at
+                FROM clientes 
+                WHERE id_usuario = ?
+            """, (user_id,))
+            cliente_data = cursor.fetchone()
+            
+            if cliente_data:
+                # Obtener nombre del plan
+                cursor.execute("SELECT nombre FROM planes WHERE id = ?", (cliente_data[3],))
+                plan_data = cursor.fetchone()
+                plan_name = plan_data[0] if plan_data else "Sin plan"
+                
+                user_info["cliente"] = {
+                    "id": cliente_data[0],
+                    "dni": cliente_data[1],
+                    "numero_telefono": cliente_data[2],
+                    "plan_id": cliente_data[3],
+                    "plan_name": plan_name,
+                    "fecha_nacimiento": cliente_data[4],
+                    "genero": cliente_data[5],
+                    "fecha_inscripcion": cliente_data[6],
+                    "estado": cliente_data[7],
+                    "created_at": cliente_data[8],
+                    "updated_at": cliente_data[9]
+                }
+        
+        conn.close()
+        
+        return {
+            "success": True,
+            "user": user_info
+        }
+        
+    except HTTPException:
+        conn.close()
+        raise
+    except Exception as e:
+        conn.close()
+        print(f"[ERROR] Error al obtener usuario: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al obtener usuario: {str(e)}")
+
+## Endpoint para actualizar un usuario específico (solo para administradores)
+@app.put("/admin/users/{user_id}")
+def update_user(user_id: int, req: UpdateUserRequest, response: Response):
+    print(f"[DEBUG] Actualizando usuario con ID: {user_id}")
+    
+    # Agregar headers anti-cache
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        # Verificar que el usuario existe
+        cursor.execute("SELECT id, role FROM users WHERE id = ?", (user_id,))
+        user_data = cursor.fetchone()
+        
+        if not user_data:
+            conn.close()
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        
+        current_role = user_data[1]
+        
+        # Actualizar datos básicos del usuario
+        cursor.execute("""
+            UPDATE users 
+            SET name = ?, email = ?, role = ?
+            WHERE id = ?
+        """, (req.name, req.email, req.role, user_id))
+        
+        # Si el usuario es cliente y tenemos datos de cliente para actualizar
+        if req.role == "cliente" and any([req.dni, req.numero_telefono, req.fecha_nacimiento, req.genero]):
+            # Verificar si ya existe un registro de cliente
+            cursor.execute("SELECT id FROM clientes WHERE id_usuario = ?", (user_id,))
+            cliente_exists = cursor.fetchone()
+            
+            if cliente_exists:
+                # Actualizar datos existentes del cliente (solo los campos proporcionados)
+                update_fields = []
+                update_values = []
+                
+                if req.dni:
+                    update_fields.append("dni = ?")
+                    update_values.append(req.dni)
+                
+                if req.numero_telefono:
+                    update_fields.append("numero_telefono = ?")
+                    update_values.append(req.numero_telefono)
+                
+                if req.fecha_nacimiento:
+                    update_fields.append("fecha_nacimiento = ?")
+                    update_values.append(req.fecha_nacimiento)
+                
+                if req.genero:
+                    update_fields.append("genero = ?")
+                    update_values.append(req.genero)
+                
+                if update_fields:
+                    update_fields.append("updated_at = CURRENT_TIMESTAMP")
+                    update_values.append(user_id)
+                    
+                    update_query = f"UPDATE clientes SET {', '.join(update_fields)} WHERE id_usuario = ?"
+                    cursor.execute(update_query, update_values)
+        
+        conn.commit()
+        print(f"[DEBUG] Datos actualizados en BD para usuario {user_id}")
+        
+        # Obtener los datos actualizados del usuario
+        cursor.execute("""
+            SELECT id, name, email, role, email_verified, created_at, updated_at
+            FROM users 
+            WHERE id = ?
+        """, (user_id,))
+        updated_user_data = cursor.fetchone()
+        print(f"[DEBUG] Datos leídos de users: {updated_user_data}")
+        
+        updated_user_info = {
+            "id": updated_user_data[0],
+            "name": updated_user_data[1],
+            "email": updated_user_data[2],
+            "role": updated_user_data[3],
+            "email_verified": bool(updated_user_data[4]),
+            "created_at": updated_user_data[5],
+            "updated_at": updated_user_data[6],
+            "cliente": None
+        }
+        print(f"[DEBUG] Usuario info construido: {updated_user_info}")
+        
+        # Si es cliente, obtener datos actualizados del cliente
+        if updated_user_data[3] == "cliente":
+            cursor.execute("""
+                SELECT id, dni, numero_telefono, plan_id, fecha_nacimiento, genero, 
+                       fecha_inscripcion, estado, created_at, updated_at
+                FROM clientes 
+                WHERE id_usuario = ?
+            """, (user_id,))
+            cliente_data = cursor.fetchone()
+            
+            if cliente_data:
+                # Obtener nombre del plan
+                cursor.execute("SELECT nombre FROM planes WHERE id = ?", (cliente_data[3],))
+                plan_data = cursor.fetchone()
+                plan_name = plan_data[0] if plan_data else "Sin plan"
+                
+                updated_user_info["cliente"] = {
+                    "id": cliente_data[0],
+                    "dni": cliente_data[1],
+                    "numero_telefono": cliente_data[2],
+                    "plan_id": cliente_data[3],
+                    "plan_name": plan_name,
+                    "fecha_nacimiento": cliente_data[4],
+                    "genero": cliente_data[5],
+                    "fecha_inscripcion": cliente_data[6],
+                    "estado": cliente_data[7],
+                    "created_at": cliente_data[8],
+                    "updated_at": cliente_data[9]
+                }
+        
+        conn.close()
+        
+        print(f"[DEBUG] Respuesta final del PUT: usuario = {updated_user_info}")
+        
+        return {
+            "success": True,
+            "message": "Usuario actualizado correctamente",
+            "user": updated_user_info
+        }
+        
+    except HTTPException:
+        conn.close()
+        raise
+    except Exception as e:
+        conn.close()
+        print(f"[ERROR] Error al actualizar usuario: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al actualizar usuario: {str(e)}")

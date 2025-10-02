@@ -9,7 +9,32 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Users, ArrowLeft, UserCheck, Crown, Dumbbell, Save, User } from "lucide-react"
+import { Users, ArrowLeft, UserCheck, Crown, Dumbbell, Save, User, Loader2, AlertCircle, Mail, MailCheck, CreditCard, Phone, MapPin, Clock } from "lucide-react"
+
+interface Cliente {
+  id: number
+  dni: string
+  numero_telefono: string
+  plan_id: number
+  plan_name: string
+  fecha_nacimiento: string
+  genero: string
+  fecha_inscripcion: string
+  estado: string
+  created_at: string
+  updated_at: string
+}
+
+interface Usuario {
+  id: number
+  name: string
+  email: string
+  role: string
+  email_verified: boolean
+  created_at?: string
+  updated_at?: string
+  cliente?: Cliente
+}
 
 export default function DetalleUsuarioPage() {
   const { user } = useAuth()
@@ -17,8 +42,11 @@ export default function DetalleUsuarioPage() {
   const params = useParams()
   const userId = params.id as string
 
-  const [usuarioData, setUsuarioData] = useState<any>(null)
+  const [usuarioData, setUsuarioData] = useState<Usuario | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [editando, setEditando] = useState(false)
+  const [guardando, setGuardando] = useState(false)
 
   useEffect(() => {
     if (!user || (user.role !== "admin" && user.role !== "administrador")) {
@@ -26,123 +54,149 @@ export default function DetalleUsuarioPage() {
     }
   }, [user, router])
 
+  // Debugging: monitorear cambios en usuarioData
   useEffect(() => {
-    // Datos de ejemplo - en una app real vendría de la base de datos
-    const usuarios = [
-      {
-        id: 1,
-        nombre: "Juan Pérez",
-        correo: "juan@email.com",
-        role: "cliente",
-        telefono: "123-456-789",
-        fechaRegistro: "2024-01-15",
-      },
-      {
-        id: 2,
-        nombre: "María García",
-        correo: "maria@email.com",
-        role: "clientepro",
-        entrenador: "Carlos López",
-        telefono: "987-654-321",
-        fechaRegistro: "2024-02-20",
-      },
-      {
-        id: 3,
-        nombre: "Carlos López",
-        correo: "carlos@email.com",
-        role: "entrenador",
-        telefono: "555-123-456",
-        fechaRegistro: "2023-12-01",
-      },
-      {
-        id: 4,
-        nombre: "Ana Martín",
-        correo: "ana@email.com",
-        role: "basico",
-        telefono: "111-222-333",
-        fechaRegistro: "2024-03-10",
-      },
-      {
-        id: 5,
-        nombre: "Pedro Ruiz",
-        correo: "pedro@email.com",
-        role: "clientepro",
-        entrenador: "Elena Moreno",
-        telefono: "444-555-666",
-        fechaRegistro: "2024-01-25",
-      },
-      {
-        id: 6,
-        nombre: "Laura Sánchez",
-        correo: "laura@email.com",
-        role: "entrenador",
-        telefono: "777-888-999",
-        fechaRegistro: "2023-11-15",
-      },
-      {
-        id: 7,
-        nombre: "Miguel Torres",
-        correo: "miguel@email.com",
-        role: "admin",
-        telefono: "000-111-222",
-        fechaRegistro: "2023-10-01",
-      },
-      {
-        id: 8,
-        nombre: "Carmen Díaz",
-        correo: "carmen@email.com",
-        role: "basico",
-        telefono: "333-444-555",
-        fechaRegistro: "2024-02-14",
-      },
-      {
-        id: 9,
-        nombre: "Roberto Silva",
-        correo: "roberto@email.com",
-        role: "clientepro",
-        entrenador: "Laura Sánchez",
-        telefono: "666-777-888",
-        fechaRegistro: "2024-01-30",
-      },
-      {
-        id: 10,
-        nombre: "Elena Moreno",
-        correo: "elena@email.com",
-        role: "entrenador",
-        telefono: "999-000-111",
-        fechaRegistro: "2023-12-20",
-      },
-      {
-        id: 11,
-        nombre: "David Herrera",
-        correo: "david@email.com",
-        role: "cliente",
-        telefono: "222-333-444",
-        fechaRegistro: "2024-03-05",
-      },
-      {
-        id: 12,
-        nombre: "Isabel Castro",
-        correo: "isabel@email.com",
-        role: "basico",
-        telefono: "555-666-777",
-        fechaRegistro: "2024-02-28",
-      },
-    ]
+    if (usuarioData) {
+      console.log('📊 Estado usuarioData actualizado:', usuarioData)
+      console.log('👤 Nombre actual en estado:', usuarioData.name)
+    }
+  }, [usuarioData])
 
-    const usuario = usuarios.find((u) => u.id === Number.parseInt(userId))
-    setUsuarioData(usuario)
-  }, [userId])
+  // Función para cargar datos del usuario
+  const fetchUsuario = async (showLoading = true) => {
+    try {
+      if (showLoading) {
+        setLoading(true)
+      }
+      setError(null)
+      
+      const response = await fetch(`/api/admin/users/${userId}?_t=${Date.now()}`, {
+        method: 'GET',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      })
+      if (!response.ok) {
+        throw new Error('Error al cargar el usuario')
+      }
+      
+      const data = await response.json()
+      console.log('🔍 Datos recibidos del servidor:', data)
+      console.log('👤 Usuario específico:', data.user)
+      console.log('📅 Timestamp actual:', new Date().toISOString())
+      setUsuarioData(data.user)
+    } catch (error) {
+      console.error('Error fetching usuario:', error)
+      setError('No se pudo cargar el usuario')
+    } finally {
+      if (showLoading) {
+        setLoading(false)
+      }
+    }
+  }
+
+  // Cargar datos del usuario desde la API
+  useEffect(() => {
+    if (user && (user.role === "admin" || user.role === "administrador") && userId) {
+      fetchUsuario()
+    }
+  }, [user, userId])
+
+  const handleGuardar = async () => {
+    if (!usuarioData) return
+    
+    try {
+      setGuardando(true)
+      setError(null)
+      
+      const updateData = {
+        name: usuarioData.name,
+        email: usuarioData.email,
+        role: usuarioData.role,
+        // Incluir datos de cliente si aplica
+        ...(usuarioData.cliente && {
+          dni: usuarioData.cliente.dni,
+          numero_telefono: usuarioData.cliente.numero_telefono,
+          fecha_nacimiento: usuarioData.cliente.fecha_nacimiento,
+          genero: usuarioData.cliente.genero
+        })
+      }
+      
+      const response = await fetch(`/api/admin/users/${userId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        },
+        body: JSON.stringify(updateData),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Error al actualizar el usuario')
+      }
+
+      // Log detallado de la respuesta del PUT
+      console.log('🔄 Respuesta del PUT:', data)
+      console.log('👤 Usuario actualizado recibido:', data.user)
+      
+      // NO usar la respuesta del PUT, siempre recargar desde GET
+      // setUsuarioData(data.user)
+      setEditando(false)
+      
+      // Mostrar mensaje de éxito (opcional)
+      console.log('✅ Usuario actualizado correctamente')
+      
+      // Marcar que el usuario fue actualizado para refrescar la lista
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('userUpdated', 'true')
+      }
+      
+      // También refrescar los datos actuales por si algo cambió en el servidor
+      console.log('🔄 Refrescando datos después de guardar...')
+      // Pequeña pausa para asegurar que la BD se ha actualizado
+      await new Promise(resolve => setTimeout(resolve, 100))
+      await fetchUsuario(false)
+      console.log('🔄 Datos refrescados. Estado actual:', usuarioData)
+      
+    } catch (error) {
+      console.error('Error actualizando usuario:', error)
+      setError(error instanceof Error ? error.message : 'Error desconocido')
+    } finally {
+      setGuardando(false)
+    }
+  }
 
   if (!user || (user.role !== "admin" && user.role !== "administrador")) {
     return null
   }
 
-  if (!usuarioData) {
-    return <div>Cargando...</div>
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background p-6 flex items-center justify-center">
+        <div className="flex items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <span className="text-lg">Cargando usuario...</span>
+        </div>
+      </div>
+    )
   }
 
-  const entrenadores = ["Carlos López", "Laura Sánchez", "Elena Moreno"]
+  if (error || !usuarioData) {
+    return (
+      <div className="min-h-screen bg-background p-6 flex items-center justify-center">
+        <div className="flex items-center gap-3 text-red-600">
+          <AlertCircle className="h-8 w-8" />
+          <span className="text-lg">{error || 'Usuario no encontrado'}</span>
+        </div>
+      </div>
+    )
+  }
 
   const getRoleBadge = (role: string) => {
     switch (role) {
@@ -186,11 +240,7 @@ export default function DetalleUsuarioPage() {
     }
   }
 
-  const handleGuardar = () => {
-    // Aquí se guardarían los cambios en la base de datos
-    console.log("[v0] Guardando cambios del usuario:", usuarioData)
-    setEditando(false)
-  }
+
 
   return (
     <div className="min-h-screen bg-background p-6">
@@ -226,109 +276,304 @@ export default function DetalleUsuarioPage() {
                 <div className="bg-primary/20 p-2 rounded-full">
                   <User className="h-5 w-5 text-primary" />
                 </div>
-                {usuarioData.nombre}
+                {usuarioData.name}
                 {getRoleBadge(usuarioData.role)}
               </CardTitle>
-              <Button
-                onClick={() => (editando ? handleGuardar() : setEditando(true))}
-                className="bg-primary hover:bg-primary/90"
-              >
-                {editando ? (
-                  <>
-                    <Save className="h-4 w-4 mr-2" />
-                    Guardar
-                  </>
-                ) : (
-                  "Editar"
+              <div className="flex gap-2">
+                {editando && (
+                  <Button
+                    onClick={handleGuardar}
+                    disabled={guardando}
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    {guardando ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Guardando...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-4 w-4 mr-2" />
+                        Guardar
+                      </>
+                    )}
+                  </Button>
                 )}
-              </Button>
+                <Button
+                  onClick={() => setEditando(!editando)}
+                  variant={editando ? "outline" : "default"}
+                  className={editando ? "" : "bg-primary hover:bg-primary/90"}
+                  disabled={guardando}
+                >
+                  {editando ? "Cancelar" : "Editar"}
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
+            {/* Información básica */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label htmlFor="nombre">Nombre</Label>
                 <Input
                   id="nombre"
-                  value={usuarioData.nombre}
-                  onChange={(e) => setUsuarioData({ ...usuarioData, nombre: e.target.value })}
+                  value={usuarioData.name}
+                  onChange={(e) => setUsuarioData({...usuarioData, name: e.target.value})}
                   disabled={!editando}
+                  className={editando ? "" : "bg-muted"}
                 />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="correo">Correo Electrónico</Label>
-                <Input
-                  id="correo"
-                  type="email"
-                  value={usuarioData.correo}
-                  onChange={(e) => setUsuarioData({ ...usuarioData, correo: e.target.value })}
-                  disabled={!editando}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="telefono">Teléfono</Label>
-                <Input
-                  id="telefono"
-                  value={usuarioData.telefono}
-                  onChange={(e) => setUsuarioData({ ...usuarioData, telefono: e.target.value })}
-                  disabled={!editando}
-                />
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="correo"
+                    type="email"
+                    value={usuarioData.email}
+                    onChange={(e) => setUsuarioData({...usuarioData, email: e.target.value})}
+                    disabled={!editando}
+                    className={`flex-1 ${editando ? "" : "bg-muted"}`}
+                  />
+                  {usuarioData.email_verified ? (
+                    <div title="Email verificado">
+                      <MailCheck className="h-5 w-5 text-green-600" />
+                    </div>
+                  ) : (
+                    <div title="Email no verificado">
+                      <Mail className="h-5 w-5 text-gray-400" />
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="role">Rol</Label>
-                <Select
-                  value={usuarioData.role}
-                  onValueChange={(value) => setUsuarioData({ ...usuarioData, role: value })}
-                  disabled={!editando}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="basico">Básico</SelectItem>
-                    <SelectItem value="cliente">Cliente</SelectItem>
-                    <SelectItem value="clientepro">Cliente Pro</SelectItem>
-                    <SelectItem value="entrenador">Entrenador</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {usuarioData.role === "clientepro" && (
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="entrenador">Entrenador Asignado</Label>
+                {editando ? (
                   <Select
-                    value={usuarioData.entrenador || ""}
-                    onValueChange={(value) => setUsuarioData({ ...usuarioData, entrenador: value })}
-                    disabled={!editando}
+                    value={usuarioData.role}
+                    onValueChange={(value) => setUsuarioData({...usuarioData, role: value})}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar entrenador" />
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {entrenadores.map((entrenador) => (
-                        <SelectItem key={entrenador} value={entrenador}>
-                          {entrenador}
-                        </SelectItem>
-                      ))}
+                      <SelectItem value="usuario">Usuario</SelectItem>
+                      <SelectItem value="cliente">Cliente</SelectItem>
+                      <SelectItem value="clientepro">Cliente Pro</SelectItem>
+                      <SelectItem value="entrenador">Entrenador</SelectItem>
+                      <SelectItem value="administrador">Administrador</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <Label>Fecha de Registro</Label>
-                <Input value={new Date(usuarioData.fechaRegistro).toLocaleDateString()} disabled className="bg-muted" />
+                ) : (
+                  <Input
+                    id="role"
+                    value={usuarioData.role}
+                    disabled
+                    className="bg-muted"
+                  />
+                )}
               </div>
 
               <div className="space-y-2">
                 <Label>ID de Usuario</Label>
-                <Input value={usuarioData.id.toString().padStart(3, "0")} disabled className="bg-muted font-mono" />
+                <Input 
+                  value={usuarioData.id.toString().padStart(3, "0")} 
+                  disabled 
+                  className="bg-muted font-mono" 
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Estado de Email</Label>
+                <Input 
+                  value={usuarioData.email_verified ? "Verificado" : "Pendiente de verificación"}
+                  disabled 
+                  className="bg-muted" 
+                />
               </div>
             </div>
+
+            {/* Información de timestamps del usuario */}
+            <div className="border-t pt-6">
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <Clock className="h-5 w-5" />
+                Información Temporal del Usuario
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label>Usuario Creado</Label>
+                  <Input 
+                    value={usuarioData.created_at ? new Date(usuarioData.created_at).toLocaleString() : 'No disponible'}
+                    disabled 
+                    className="bg-muted text-xs" 
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Última Actualización</Label>
+                  <Input 
+                    value={usuarioData.updated_at ? new Date(usuarioData.updated_at).toLocaleString() : 'No disponible'}
+                    disabled 
+                    className="bg-muted text-xs" 
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Información de cliente si aplica */}
+            {usuarioData.cliente && (
+              <div className="space-y-4">
+                <div className="border-t pt-6">
+                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <CreditCard className="h-5 w-5" />
+                    Información de Cliente
+                  </h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div className="space-y-2">
+                      <Label>DNI/NIE</Label>
+                      <Input 
+                        value={usuarioData.cliente.dni}
+                        onChange={(e) => setUsuarioData({
+                          ...usuarioData, 
+                          cliente: {...usuarioData.cliente!, dni: e.target.value}
+                        })}
+                        disabled={!editando}
+                        className={`font-mono ${editando ? "" : "bg-muted"}`}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Teléfono</Label>
+                      <div className="flex items-center gap-2">
+                        <Phone className="h-4 w-4 text-muted-foreground" />
+                        <Input 
+                          value={usuarioData.cliente.numero_telefono}
+                          onChange={(e) => setUsuarioData({
+                            ...usuarioData, 
+                            cliente: {...usuarioData.cliente!, numero_telefono: e.target.value}
+                          })}
+                          disabled={!editando}
+                          className={`flex-1 ${editando ? "" : "bg-muted"}`}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Plan Contratado</Label>
+                      <Input 
+                        value={usuarioData.cliente.plan_name}
+                        disabled 
+                        className="bg-muted" 
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Fecha de Nacimiento</Label>
+                      {editando ? (
+                        <Input 
+                          type="date"
+                          value={usuarioData.cliente.fecha_nacimiento}
+                          onChange={(e) => setUsuarioData({
+                            ...usuarioData, 
+                            cliente: {...usuarioData.cliente!, fecha_nacimiento: e.target.value}
+                          })}
+                        />
+                      ) : (
+                        <Input 
+                          value={new Date(usuarioData.cliente.fecha_nacimiento).toLocaleDateString()}
+                          disabled 
+                          className="bg-muted" 
+                        />
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Género</Label>
+                      {editando ? (
+                        <Select
+                          value={usuarioData.cliente.genero}
+                          onValueChange={(value) => setUsuarioData({
+                            ...usuarioData, 
+                            cliente: {...usuarioData.cliente!, genero: value}
+                          })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="masculino">Masculino</SelectItem>
+                            <SelectItem value="femenino">Femenino</SelectItem>
+                            <SelectItem value="otro">Otro</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Input 
+                          value={usuarioData.cliente.genero}
+                          disabled 
+                          className="bg-muted capitalize" 
+                        />
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Estado</Label>
+                      <Input 
+                        value={usuarioData.cliente.estado}
+                        disabled 
+                        className={`bg-muted capitalize ${
+                          usuarioData.cliente.estado === 'activo' ? 'text-green-600' : 'text-gray-600'
+                        }`}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Fecha de Inscripción</Label>
+                      <Input 
+                        value={new Date(usuarioData.cliente.fecha_inscripcion).toLocaleDateString()}
+                        disabled 
+                        className="bg-muted" 
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Creado</Label>
+                      <Input 
+                        value={usuarioData.cliente.created_at ? new Date(usuarioData.cliente.created_at).toLocaleString() : 'No disponible'}
+                        disabled 
+                        className="bg-muted text-xs" 
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Última Actualización</Label>
+                      <Input 
+                        value={usuarioData.cliente.updated_at ? new Date(usuarioData.cliente.updated_at).toLocaleString() : 'No disponible'}
+                        disabled 
+                        className="bg-muted text-xs" 
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Mensaje para usuarios sin plan */}
+            {usuarioData.role === "usuario" && (
+              <div className="border-t pt-6">
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2 text-yellow-800">
+                    <AlertCircle className="h-5 w-5" />
+                    <span className="font-medium">Usuario sin plan</span>
+                  </div>
+                  <p className="text-yellow-700 mt-1">
+                    Este usuario no ha contratado ningún plan de gimnasio aún.
+                  </p>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

@@ -6,12 +6,61 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Users, ArrowLeft, UserCheck, Crown, Dumbbell, Filter } from "lucide-react"
+import { Users, ArrowLeft, UserCheck, Crown, Dumbbell, Filter, Loader2, AlertCircle, Mail, MailCheck } from "lucide-react"
+
+interface Cliente {
+  id: number
+  dni: string
+  numero_telefono: string
+  plan_id: number
+  plan_name: string
+  fecha_nacimiento: string
+  genero: string
+  fecha_inscripcion: string
+  estado: string
+  created_at: string
+  updated_at: string
+}
+
+interface Usuario {
+  id: number
+  name: string
+  email: string
+  role: string
+  email_verified: boolean
+  created_at?: string
+  updated_at?: string
+  cliente?: Cliente
+}
+
+interface Stats {
+  total: number
+  admin: number
+  entrenador: number
+  cliente: number
+  clientepro: number
+  usuario: number
+  verified: number
+  unverified: number
+}
 
 export default function UsuariosPage() {
   const { user } = useAuth()
   const router = useRouter()
   const [filtroRol, setFiltroRol] = useState<string>("todos")
+  const [usuarios, setUsuarios] = useState<Usuario[]>([])
+  const [stats, setStats] = useState<Stats>({
+    total: 0,
+    admin: 0,
+    entrenador: 0,
+    cliente: 0,
+    clientepro: 0,
+    usuario: 0,
+    verified: 0,
+    unverified: 0
+  })
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!user || (user.role !== "admin" && user.role !== "administrador")) {
@@ -19,19 +68,86 @@ export default function UsuariosPage() {
     }
   }, [user, router])
 
+  // Función para cargar usuarios
+  const fetchUsuarios = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      
+      const response = await fetch(`/api/admin/users?_t=${Date.now()}`, {
+        method: 'GET',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      })
+      if (!response.ok) {
+        throw new Error('Error al cargar los usuarios')
+      }
+      
+      const data = await response.json()
+      console.log('🔍 [LISTA] Datos recibidos del servidor:', data)
+      console.log('👥 [LISTA] Usuarios recibidos:', data.users)
+      console.log('📊 [LISTA] Usuario 8 en la lista:', data.users?.find((u: any) => u.id === 8))
+      setUsuarios(data.users || [])
+      setStats(data.stats || {})
+    } catch (error) {
+      console.error('Error fetching usuarios:', error)
+      setError('No se pudieron cargar los usuarios')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Cargar usuarios desde la API
+  useEffect(() => {
+    if (user && (user.role === "admin" || user.role === "administrador")) {
+      fetchUsuarios()
+    }
+  }, [user])
+
+  // Debugging: monitorear cambios en la lista de usuarios
+  useEffect(() => {
+    const usuario8 = usuarios.find(u => u.id === 8)
+    if (usuario8) {
+      console.log('📊 [LISTA] Usuario 8 en estado actual:', usuario8)
+      console.log('👤 [LISTA] Nombre de usuario 8:', usuario8.name)
+    }
+  }, [usuarios])
+
+  // Detectar cuando volvemos de editar un usuario
+  useEffect(() => {
+    const handleFocus = () => {
+      const userUpdated = sessionStorage.getItem('userUpdated')
+      if (userUpdated) {
+        fetchUsuarios()
+        sessionStorage.removeItem('userUpdated')
+      }
+    }
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        const userUpdated = sessionStorage.getItem('userUpdated')
+        if (userUpdated) {
+          fetchUsuarios()
+          sessionStorage.removeItem('userUpdated')
+        }
+      }
+    }
+
+    window.addEventListener('focus', handleFocus)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    
+    return () => {
+      window.removeEventListener('focus', handleFocus)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [])
+
   if (!user || (user.role !== "admin" && user.role !== "administrador")) {
     return null
   }
-
-  // Datos de ejemplo con el nuevo rol clientepro y básico
-  const usuarios = [
-    { id: 1, nombre: "Usuario", correo: "usuario@email.com", role: "usuario" },
-    { id: 2, nombre: "Cliente", correo: "cliente@email.com", role: "cliente" },
-    { id: 3, nombre: "ClientePro", correo: "clientepro@email.com", role: "clientepro", entrenador: "Carlos López" },
-    { id: 4, nombre: "Admin", correo: "admin@email.com", role: "admin" },
-    { id: 5, nombre: "Carlos López", correo: "carlos@email.com", role: "entrenador" },
-    { id: 6, nombre: "Elena Moreno", correo: "elena@email.com", role: "entrenador" },
-  ]
 
   const usuariosFiltrados = filtroRol === "todos" ? usuarios : usuarios.filter((usuario) => usuario.role === filtroRol)
 
@@ -99,97 +215,122 @@ export default function UsuariosPage() {
                 <p className="text-white/90">Administra todos los usuarios del gimnasio</p>
               </div>
             </div>
-            <Button
-              onClick={() => router.push("/admin")}
-              variant="outline"
-              className="border-white/30 text-white hover:bg-white/10 bg-transparent"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Volver
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                onClick={fetchUsuarios}
+                variant="outline"
+                className="border-white/30 text-white hover:bg-white/10 bg-transparent"
+                disabled={loading}
+              >
+                <svg className="h-4 w-4 mr-2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M21 12C21 16.9706 16.9706 21 12 21C9.69494 21 7.59227 20.1334 6 18.7083L3 16M3 12C3 7.02944 7.02944 3 12 3C14.3051 3 16.4077 3.86656 18 5.29168L21 8M21 8V3M21 8H16M3 16V21M3 16H8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                {loading ? 'Cargando...' : 'Actualizar'}
+              </Button>
+              <Button
+                onClick={() => router.push("/admin")}
+                variant="outline"
+                className="border-white/30 text-white hover:bg-white/10 bg-transparent"
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Volver
+              </Button>
+            </div>
           </div>
         </div>
 
         {/* Estadísticas rápidas */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-          <Card className="bg-card border-border shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="bg-green-100 p-3 rounded-full">
-                  <Users className="h-6 w-6 text-green-600" />
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <Card key={i} className="bg-card border-border shadow-lg">
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-4">
+                    <div className="bg-gray-100 p-3 rounded-full animate-pulse">
+                      <div className="h-6 w-6 bg-gray-300 rounded"></div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="h-4 w-16 bg-gray-300 rounded animate-pulse"></div>
+                      <div className="h-6 w-8 bg-gray-300 rounded animate-pulse"></div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+            <Card className="bg-card border-border shadow-lg">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-4">
+                  <div className="bg-green-100 p-3 rounded-full">
+                    <Users className="h-6 w-6 text-green-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Clientes</p>
+                    <p className="text-2xl font-bold text-green-600">{stats.cliente}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Clientes</p>
-                  <p className="text-2xl font-bold text-green-600">
-                    {usuarios.filter((u) => u.role === "cliente").length}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <Card className="bg-card border-border shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="bg-purple-100 p-3 rounded-full">
-                  <UserCheck className="h-6 w-6 text-purple-600" />
+            <Card className="bg-card border-border shadow-lg">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-4">
+                  <div className="bg-purple-100 p-3 rounded-full">
+                    <UserCheck className="h-6 w-6 text-purple-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Clientes Pro</p>
+                    <p className="text-2xl font-bold text-purple-600">{stats.clientepro}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Clientes Pro</p>
-                  <p className="text-2xl font-bold text-purple-600">
-                    {usuarios.filter((u) => u.role === "clientepro").length}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <Card className="bg-card border-border shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="bg-blue-100 p-3 rounded-full">
-                  <Dumbbell className="h-6 w-6 text-blue-600" />
+            <Card className="bg-card border-border shadow-lg">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-4">
+                  <div className="bg-blue-100 p-3 rounded-full">
+                    <Dumbbell className="h-6 w-6 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Entrenadores</p>
+                    <p className="text-2xl font-bold text-blue-600">{stats.entrenador}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Entrenadores</p>
-                  <p className="text-2xl font-bold text-blue-600">
-                    {usuarios.filter((u) => u.role === "entrenador").length}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <Card className="bg-card border-border shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="bg-gray-100 p-3 rounded-full">
-                  <Users className="h-6 w-6 text-gray-600" />
+            <Card className="bg-card border-border shadow-lg">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-4">
+                  <div className="bg-gray-100 p-3 rounded-full">
+                    <Users className="h-6 w-6 text-gray-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Usuarios</p>
+                    <p className="text-2xl font-bold text-gray-600">{stats.usuario}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Usuarios</p>
-                  <p className="text-2xl font-bold text-gray-600">
-                    {usuarios.filter((u) => u.role === "usuario").length}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <Card className="bg-card border-border shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="bg-red-100 p-3 rounded-full">
-                  <Crown className="h-6 w-6 text-red-600" />
+            <Card className="bg-card border-border shadow-lg">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-4">
+                  <div className="bg-red-100 p-3 rounded-full">
+                    <Crown className="h-6 w-6 text-red-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Admins</p>
+                    <p className="text-2xl font-bold text-red-600">{stats.admin}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Admins</p>
-                  <p className="text-2xl font-bold text-red-600">{usuarios.filter((u) => u.role === "admin").length}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* Grid de usuarios */}
         <Card className="bg-card border-border shadow-lg">
@@ -204,52 +345,89 @@ export default function UsuariosPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="text-left p-4 font-semibold">ID</th>
-                    <th className="text-left p-4 font-semibold">Nombre</th>
-                    <th className="text-left p-4 font-semibold">Correo</th>
-                    <th className="text-left p-4 font-semibold">
-                      <div className="flex items-center gap-2">
-                        Rol
-                        <div className="flex items-center gap-1">
-                          <Filter className="h-4 w-4 text-muted-foreground" />
-                          <select
-                            value={filtroRol}
-                            onChange={(e) => setFiltroRol(e.target.value)}
-                            className="px-2 py-1 border border-border rounded-md bg-background text-xs"
-                          >
-                            <option value="todos">Todos</option>
-                            <option value="admin">Admin</option>
-                            <option value="entrenador">Entrenador</option>
-                            <option value="clientepro">Cliente Pro</option>
-                            <option value="cliente">Cliente</option>
-                            <option value="usuario">Usuario</option>
-                            <option value="basico">Básico</option>
-                          </select>
+            {error ? (
+              <div className="flex items-center justify-center py-8 text-red-600">
+                <AlertCircle className="h-8 w-8" />
+                <span className="ml-2">{error}</span>
+              </div>
+            ) : loading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <span className="ml-2">Cargando usuarios...</span>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="text-left p-4 font-semibold">ID</th>
+                      <th className="text-left p-4 font-semibold">Nombre</th>
+                      <th className="text-left p-4 font-semibold">Correo</th>
+                      <th className="text-left p-4 font-semibold">Estado</th>
+                      <th className="text-left p-4 font-semibold">
+                        <div className="flex items-center gap-2">
+                          Rol
+                          <div className="flex items-center gap-1">
+                            <Filter className="h-4 w-4 text-muted-foreground" />
+                            <select
+                              value={filtroRol}
+                              onChange={(e) => setFiltroRol(e.target.value)}
+                              className="px-2 py-1 border border-border rounded-md bg-background text-xs"
+                            >
+                              <option value="todos">Todos</option>
+                              <option value="admin">Admin</option>
+                              <option value="administrador">Administrador</option>
+                              <option value="entrenador">Entrenador</option>
+                              <option value="clientepro">Cliente Pro</option>
+                              <option value="cliente">Cliente</option>
+                              <option value="usuario">Usuario</option>
+                            </select>
+                          </div>
                         </div>
-                      </div>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {usuariosFiltrados.map((usuario) => (
-                    <tr
-                      key={usuario.id}
-                      className="border-b border-border hover:bg-muted/50 transition-colors cursor-pointer"
-                      onClick={() => router.push(`/admin/usuarios/${usuario.id}`)}
-                    >
-                      <td className="p-4 font-mono text-sm">{usuario.id.toString().padStart(3, "0")}</td>
-                      <td className="p-4 font-medium">{usuario.nombre}</td>
-                      <td className="p-4 text-muted-foreground">{usuario.correo}</td>
-                      <td className="p-4">{getRoleBadge(usuario.role)}</td>
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {usuariosFiltrados.map((usuario) => (
+                      <tr
+                        key={usuario.id}
+                        className="border-b border-border hover:bg-muted/50 transition-colors cursor-pointer"
+                        onClick={() => router.push(`/admin/usuarios/${usuario.id}`)}
+                      >
+                        <td className="p-4 font-mono text-sm">{usuario.id.toString().padStart(3, "0")}</td>
+                        <td className="p-4 font-medium">{usuario.name}</td>
+                        <td className="p-4 text-muted-foreground">
+                          <div className="flex items-center gap-2">
+                            {usuario.email}
+                            {usuario.email_verified ? (
+                              <div title="Email verificado">
+                                <MailCheck className="h-4 w-4 text-green-600" />
+                              </div>
+                            ) : (
+                              <div title="Email no verificado">
+                                <Mail className="h-4 w-4 text-gray-400" />
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          {usuario.email_verified ? (
+                            <Badge variant="secondary" className="bg-green-100 text-green-800">
+                              Verificado
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
+                              Pendiente
+                            </Badge>
+                          )}
+                        </td>
+                        <td className="p-4">{getRoleBadge(usuario.role)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
