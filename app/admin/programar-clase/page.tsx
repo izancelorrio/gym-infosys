@@ -16,11 +16,23 @@ interface ClaseProgramada {
   instructor: string
 }
 
+interface GymClase {
+  id: number
+  nombre: string
+  descripcion: string
+  duracion_minutos: number
+  nivel: string
+  max_participantes: number
+  created_at: string
+  updated_at: string
+}
+
 export default function ProgramarClasePage() {
   const { user, isAdmin, isAuthenticated } = useAuth()
   const router = useRouter()
 
   const [clases, setClases] = useState<ClaseProgramada[]>([])
+  const [tiposDeClase, setTiposDeClase] = useState<GymClase[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   const nextWeekDates = useMemo(() => {
@@ -39,20 +51,7 @@ export default function ProgramarClasePage() {
     return dates
   }, [])
 
-  const tiposDeClase = [
-    "Pilates",
-    "Zumba",
-    "CrossFit",
-    "Spinning",
-    "Yoga",
-    "Aeróbicos",
-    "Funcional",
-    "Boxing",
-    "Aqua Aeróbicos",
-    "Body Pump",
-    "Body Combat",
-    "Stretching",
-  ]
+
 
   const instructoresDisponibles = [
     "Ana García",
@@ -87,6 +86,35 @@ export default function ProgramarClasePage() {
     "22:00",
   ]
 
+  const cargarTiposDeClase = async () => {
+    try {
+      const timestamp = new Date().getTime()
+      console.log(`[${timestamp}] Cargando tipos de clase...`)
+      
+      const response = await fetch(`/api/gym-clases?_t=${timestamp}`, {
+        method: 'GET',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error(`Error al cargar tipos de clase: ${response.status}`)
+      }
+
+      const data = await response.json()
+      console.log(`[${timestamp}] Tipos de clase cargados:`, data.length)
+      setTiposDeClase(data)
+      
+    } catch (error) {
+      console.error('Error al cargar tipos de clase:', error)
+      // En caso de error, mantener array vacío 
+      setTiposDeClase([])
+    }
+  }
+
   useEffect(() => {
     console.log("[v0] Programar clase - Admin:", user?.name)
 
@@ -100,17 +128,25 @@ export default function ProgramarClasePage() {
       return
     }
 
-    setClases([
-      {
-        id: Date.now().toString(),
-        fecha: "",
-        hora: "",
-        tipoClase: "",
-        instructor: "",
-      },
-    ])
+    const inicializarDatos = async () => {
+      // Cargar tipos de clase desde la base de datos
+      await cargarTiposDeClase()
+      
+      // Inicializar con una clase vacía
+      setClases([
+        {
+          id: Date.now().toString(),
+          fecha: "",
+          hora: "",
+          tipoClase: "",
+          instructor: "",
+        },
+      ])
 
-    setIsLoading(false)
+      setIsLoading(false)
+    }
+
+    inicializarDatos()
   }, [isAuthenticated, isAdmin, router, user])
 
   const agregarClase = () => {
@@ -274,8 +310,8 @@ export default function ProgramarClasePage() {
                       </SelectTrigger>
                       <SelectContent>
                         {tiposDeClase.map((tipo) => (
-                          <SelectItem key={tipo} value={tipo}>
-                            {tipo}
+                          <SelectItem key={tipo.id} value={tipo.nombre}>
+                            {tipo.nombre}
                           </SelectItem>
                         ))}
                       </SelectContent>

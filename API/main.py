@@ -913,3 +913,57 @@ def update_user(user_id: int, req: UpdateUserRequest, response: Response):
         conn.close()
         print(f"[ERROR] Error al actualizar usuario: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error al actualizar usuario: {str(e)}")
+
+# ----------------------------------------------------
+# ENDPOINTS DE TIPOS DE CLASES GIMNASIO
+# ----------------------------------------------------
+
+@app.get("/gym-clases")
+async def get_gym_clases(response: Response):
+    """
+    Obtener todos los tipos de clases activas del gimnasio
+    """
+    # Headers anti-cache
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache" 
+    response.headers["Expires"] = "0"
+    
+    try:
+        print(f"[DEBUG] Obteniendo tipos de clases del gimnasio...")
+        
+        conn = sqlite3.connect('users.db')
+        cursor = conn.cursor()
+        
+        # Obtener todos los tipos de clases activas
+        cursor.execute("""
+            SELECT id, nombre, descripcion, duracion_minutos, nivel, max_participantes, 
+                   created_at, updated_at
+            FROM gym_clases 
+            WHERE activo = 1 
+            ORDER BY nombre
+        """)
+        
+        clases = cursor.fetchall()
+        conn.close()
+        
+        # Formatear los datos
+        gym_clases = []
+        for clase in clases:
+            gym_clases.append({
+                "id": clase[0],
+                "nombre": clase[1], 
+                "descripcion": clase[2],
+                "duracion_minutos": clase[3],
+                "nivel": clase[4],
+                "max_participantes": clase[5],
+                "created_at": clase[6],
+                "updated_at": clase[7]
+            })
+        
+        print(f"[DEBUG] Se encontraron {len(gym_clases)} tipos de clases activas")
+        
+        return gym_clases
+        
+    except Exception as e:
+        print(f"[ERROR] Error al obtener tipos de clases: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al obtener tipos de clases: {str(e)}")
