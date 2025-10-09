@@ -12,7 +12,7 @@ interface ClaseProgramada {
   id: string
   fecha: string
   hora: string
-  tipoClase: string
+  idClase: number
   instructor: string
 }
 
@@ -27,25 +27,51 @@ interface GymClase {
   updated_at: string
 }
 
+interface Entrenador {
+  id: number
+  name: string
+  email: string
+  role: string
+  created_at: string
+  updated_at: string
+}
+
+interface ClaseProgramadaDB {
+  id: number
+  fecha: string
+  hora: string
+  tipo_clase: string
+  color?: string             // Color de la clase
+  id_clase: number           // ID de la clase en gym_clases  
+  instructor_id: number
+  instructor_nombre: string  // Viene del JOIN con users.name
+  capacidad_maxima: number
+  participantes_actuales: number  // Calculado dinámicamente desde reservas
+  plazas_libres: number           // Calculado dinámicamente  
+  estado: string
+  created_at: string
+  updated_at: string
+  descripcion?: string            // Campo opcional del backend
+  duracion_minutos?: number       // Campo opcional del backend
+}
+
 export default function ProgramarClasePage() {
   const { user, isAdmin, isAuthenticated } = useAuth()
   const router = useRouter()
 
   const [clases, setClases] = useState<ClaseProgramada[]>([])
   const [tiposDeClase, setTiposDeClase] = useState<GymClase[]>([])
+  const [entrenadores, setEntrenadores] = useState<Entrenador[]>([])
+  const [clasesProgramadas, setClasesProgramadas] = useState<ClaseProgramadaDB[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
-  const nextWeekDates = useMemo(() => {
+  const availableDates = useMemo(() => {
     const dates = []
     const today = new Date()
 
-    // Encontrar el próximo lunes
-    const daysUntilNextMonday = (8 - today.getDay()) % 7 || 7
-    const nextMonday = new Date(today.getTime() + daysUntilNextMonday * 24 * 60 * 60 * 1000)
-
-    // Generar los 7 días de la semana empezando desde el lunes
-    for (let i = 0; i < 7; i++) {
-      const date = new Date(nextMonday.getTime() + i * 24 * 60 * 60 * 1000)
+    // Generar los próximos 14 días empezando desde hoy
+    for (let i = 0; i < 14; i++) {
+      const date = new Date(today.getTime() + i * 24 * 60 * 60 * 1000)
       dates.push(date.toISOString().split("T")[0])
     }
     return dates
@@ -53,18 +79,7 @@ export default function ProgramarClasePage() {
 
 
 
-  const instructoresDisponibles = [
-    "Ana García",
-    "Carlos López", 
-    "María Rodríguez",
-    "José Martín",
-    "Laura Fernández",
-    "David Ruiz",
-    "Carmen Silva",
-    "Miguel Torres",
-    "Elena Moreno",
-    "Pablo Jiménez"
-  ]
+
 
   const horariosDisponibles = [
     "06:00",
@@ -115,6 +130,64 @@ export default function ProgramarClasePage() {
     }
   }
 
+  const cargarEntrenadores = async () => {
+    try {
+      const timestamp = new Date().getTime()
+      console.log(`[${timestamp}] Cargando entrenadores...`)
+      
+      const response = await fetch(`/api/entrenadores?_t=${timestamp}`, {
+        method: 'GET',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error(`Error al cargar entrenadores: ${response.status}`)
+      }
+
+      const data = await response.json()
+      console.log(`[${timestamp}] Entrenadores cargados:`, data.length)
+      setEntrenadores(data)
+      
+    } catch (error) {
+      console.error('Error al cargar entrenadores:', error)
+      // En caso de error, mantener array vacío 
+      setEntrenadores([])
+    }
+  }
+
+  const cargarClasesProgramadas = async () => {
+    try {
+      const timestamp = new Date().getTime()
+      console.log(`[${timestamp}] Cargando clases programadas...`)
+      
+      const response = await fetch(`/api/clases-programadas?_t=${timestamp}`, {
+        method: 'GET',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error(`Error al cargar clases programadas: ${response.status}`)
+      }
+
+      const data = await response.json()
+      console.log(`[${timestamp}] Clases programadas cargadas:`, data.length)
+      setClasesProgramadas(data)
+      
+    } catch (error) {
+      console.error('Error al cargar clases programadas:', error)
+      // En caso de error, mantener array vacío 
+      setClasesProgramadas([])
+    }
+  }
+
   useEffect(() => {
     console.log("[v0] Programar clase - Admin:", user?.name)
 
@@ -129,8 +202,10 @@ export default function ProgramarClasePage() {
     }
 
     const inicializarDatos = async () => {
-      // Cargar tipos de clase desde la base de datos
+      // Cargar datos desde la base de datos
       await cargarTiposDeClase()
+      await cargarEntrenadores()
+      await cargarClasesProgramadas()
       
       // Inicializar con una clase vacía
       setClases([
@@ -138,7 +213,7 @@ export default function ProgramarClasePage() {
           id: Date.now().toString(),
           fecha: "",
           hora: "",
-          tipoClase: "",
+          idClase: 0,
           instructor: "",
         },
       ])
@@ -154,7 +229,7 @@ export default function ProgramarClasePage() {
       id: Date.now().toString(),
       fecha: "",
       hora: "",
-      tipoClase: "",
+      idClase: 0,
       instructor: "",
     }
     setClases([...clases, nuevaClase])
@@ -164,14 +239,90 @@ export default function ProgramarClasePage() {
     setClases(clases.filter((c) => c.id !== id))
   }
 
-  const actualizarClase = (id: string, campo: keyof ClaseProgramada, valor: string) => {
+  // Función para verificar si un horario está ocupado por un instructor
+  const isHorarioOcupado = (instructorName: string, fecha: string, hora: string): boolean => {
+    if (!instructorName || !fecha || !hora) return false
+    
+    return clasesProgramadas.some((clase: ClaseProgramadaDB) => 
+      clase.instructor_nombre === instructorName && 
+      clase.fecha === fecha && 
+      clase.hora === hora &&
+      (clase.estado === 'programada' || clase.estado === 'activa')
+    )
+  }
+
+  const actualizarClase = (id: string, campo: keyof ClaseProgramada, valor: string | number) => {
     setClases(clases.map((c) => (c.id === id ? { ...c, [campo]: valor } : c)))
   }
 
-  const guardarClases = () => {
-    console.log("[v0] Guardando clases programadas:", clases)
-    // TODO: Implementar guardado en backend
-    router.push("/admin")
+  const guardarClases = async () => {
+    try {
+      const timestamp = new Date().getTime()
+      console.log(`[${timestamp}] Guardando clases programadas:`, clases)
+
+      // Filtrar solo las clases que tienen todos los campos completados
+      const clasesCompletas = clases.filter(clase => 
+        clase.fecha && clase.hora && clase.idClase > 0 && clase.instructor
+      )
+
+      if (clasesCompletas.length === 0) {
+        alert("No hay clases completas para guardar. Asegúrate de llenar todos los campos.")
+        return
+      }
+
+      console.log(`[${timestamp}] Clases completas a guardar:`, clasesCompletas.length)
+
+      // Preparar datos para enviar al backend
+      const datosGuardar = {
+        clases: clasesCompletas.map(clase => ({
+          fecha: clase.fecha,
+          hora: clase.hora,
+          idClase: clase.idClase,
+          instructor: clase.instructor
+        }))
+      }
+
+      const response = await fetch(`/api/clases-programadas?_t=${timestamp}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        },
+        body: JSON.stringify(datosGuardar)
+      })
+
+      const resultado = await response.json()
+
+      if (!response.ok) {
+        throw new Error(resultado.details || resultado.error || 'Error al guardar clases')
+      }
+
+      console.log(`[${timestamp}] Resultado del guardado:`, resultado)
+
+      // Mostrar mensaje de éxito/error
+      if (resultado.success) {
+        const mensaje = `✅ ${resultado.total_guardadas} clases guardadas correctamente`
+        const errores = resultado.total_errores > 0 ? `\n⚠️ ${resultado.total_errores} clases con errores` : ''
+        const detalleErrores = resultado.clases_con_error?.length > 0 
+          ? `\n\nErrores:\n${resultado.clases_con_error.map((e: any) => `• ${e.clase}: ${e.error}`).join('\n')}`
+          : ''
+        
+        alert(mensaje + errores + detalleErrores)
+        
+        // Si todas las clases se guardaron correctamente, volver al admin
+        if (resultado.total_errores === 0) {
+          router.push("/admin")
+        }
+      } else {
+        throw new Error(resultado.error || 'Error desconocido al guardar clases')
+      }
+
+    } catch (error) {
+      console.error('Error al guardar clases:', error)
+      alert(`❌ Error al guardar clases: ${error instanceof Error ? error.message : 'Error desconocido'}`)
+    }
   }
 
   if (isLoading) {
@@ -256,10 +407,10 @@ export default function ProgramarClasePage() {
           <CardContent className="p-6">
             <div className="space-y-4">
               <div className="grid grid-cols-13 gap-4 p-4 bg-primary/5 rounded-lg border border-primary/20">
+                <div className="col-span-4 font-semibold text-foreground">Instructor</div>
+                <div className="col-span-3 font-semibold text-foreground">Tipo de Clase</div>
                 <div className="col-span-3 font-semibold text-foreground">Fecha</div>
                 <div className="col-span-2 font-semibold text-foreground">Hora</div>
-                <div className="col-span-3 font-semibold text-foreground">Tipo de Clase</div>
-                <div className="col-span-4 font-semibold text-foreground">Instructor</div>
                 <div className="col-span-1 font-semibold text-foreground">Acción</div>
               </div>
 
@@ -268,55 +419,6 @@ export default function ProgramarClasePage() {
                   key={clase.id}
                   className="grid grid-cols-13 gap-4 p-4 border border-border rounded-lg bg-card hover:border-primary/50 transition-all duration-200"
                 >
-                  <div className="col-span-3">
-                    <Select value={clase.fecha} onValueChange={(value) => actualizarClase(clase.id, "fecha", value)}>
-                      <SelectTrigger className="bg-background border-border text-foreground">
-                        <SelectValue placeholder="Seleccionar fecha" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {nextWeekDates.map((fecha) => (
-                          <SelectItem key={fecha} value={fecha}>
-                            {new Date(fecha).toLocaleDateString("es-ES", {
-                              weekday: "short",
-                              day: "numeric",
-                              month: "short",
-                            })}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="col-span-2">
-                    <Select value={clase.hora} onValueChange={(value) => actualizarClase(clase.id, "hora", value)}>
-                      <SelectTrigger className="bg-background border-border text-foreground">
-                        <SelectValue placeholder="Hora" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {horariosDisponibles.map((hora) => (
-                          <SelectItem key={hora} value={hora}>
-                            {hora}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="col-span-3">
-                    <Select
-                      value={clase.tipoClase}
-                      onValueChange={(value) => actualizarClase(clase.id, "tipoClase", value)}
-                    >
-                      <SelectTrigger className="bg-background border-border text-foreground">
-                        <SelectValue placeholder="Tipo de clase" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {tiposDeClase.map((tipo) => (
-                          <SelectItem key={tipo.id} value={tipo.nombre}>
-                            {tipo.nombre}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
                   <div className="col-span-4">
                     <Select
                       value={clase.instructor}
@@ -326,11 +428,78 @@ export default function ProgramarClasePage() {
                         <SelectValue placeholder="Seleccionar instructor" />
                       </SelectTrigger>
                       <SelectContent>
-                        {instructoresDisponibles.map((instructor) => (
-                          <SelectItem key={instructor} value={instructor}>
-                            {instructor}
+                        {entrenadores.map((entrenador) => (
+                          <SelectItem key={entrenador.id} value={entrenador.name}>
+                            {entrenador.name}
                           </SelectItem>
                         ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="col-span-3">
+                    <Select
+                      value={clase.idClase ? clase.idClase.toString() : ""}
+                      onValueChange={(value) => actualizarClase(clase.id, "idClase", parseInt(value))}
+                    >
+                      <SelectTrigger className="bg-background border-border text-foreground">
+                        <SelectValue placeholder="Tipo de clase" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {tiposDeClase.map((tipo) => (
+                          <SelectItem key={tipo.id} value={tipo.id.toString()}>
+                            {tipo.nombre}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="col-span-3">
+                    <Select value={clase.fecha} onValueChange={(value) => actualizarClase(clase.id, "fecha", value)}>
+                      <SelectTrigger className="bg-background border-border text-foreground">
+                        <SelectValue placeholder="Seleccionar fecha" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableDates.map((fecha) => {
+                          const isOcupado = clase.instructor && isHorarioOcupado(clase.instructor, fecha, clase.hora)
+                          return (
+                            <SelectItem 
+                              key={fecha} 
+                              value={fecha}
+                              disabled={!!isOcupado}
+                              className={isOcupado ? "text-red-500 bg-red-50" : ""}
+                            >
+                              {new Date(fecha).toLocaleDateString("es-ES", {
+                                weekday: "short",
+                                day: "numeric",
+                                month: "short",
+                              })}
+                              {isOcupado && " (Ocupado)"}
+                            </SelectItem>
+                          )
+                        })}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="col-span-2">
+                    <Select value={clase.hora} onValueChange={(value) => actualizarClase(clase.id, "hora", value)}>
+                      <SelectTrigger className="bg-background border-border text-foreground">
+                        <SelectValue placeholder="Hora" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {horariosDisponibles.map((hora) => {
+                          const isOcupado = clase.instructor && clase.fecha && isHorarioOcupado(clase.instructor, clase.fecha, hora)
+                          return (
+                            <SelectItem 
+                              key={hora} 
+                              value={hora}
+                              disabled={!!isOcupado}
+                              className={isOcupado ? "text-red-500 bg-red-50" : ""}
+                            >
+                              {hora}
+                              {isOcupado && " (Ocupado)"}
+                            </SelectItem>
+                          )
+                        })}
                       </SelectContent>
                     </Select>
                   </div>

@@ -8,112 +8,138 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Calendar, Clock, Users, ArrowLeft, MapPin, User2, CheckCircle } from "lucide-react"
 
-// Datos de ejemplo de clases disponibles con plazas libres
-const clasesDisponibles = [
-  {
-    id: 1,
-    tipo: "Pilates",
-    instructor: "Ana García",
-    fecha: "2025-09-26",
-    hora: "09:00",
-    duracion: 60,
-    participantes: 12,
-    maxParticipantes: 15,
-    descripcion: "Clase de Pilates enfocada en el fortalecimiento del core y la mejora de la flexibilidad.",
-    ubicacion: "Sala A",
-    plazasLibres: 3
-  },
-  {
-    id: 2,
-    tipo: "CrossFit",
-    instructor: "Carlos López",
-    fecha: "2025-09-26",
-    hora: "18:00",
-    duracion: 60,
-    participantes: 8,
-    maxParticipantes: 12,
-    descripcion: "Entrenamiento funcional de alta intensidad para mejorar fuerza y resistencia.",
-    ubicacion: "Sala CrossFit",
-    plazasLibres: 4
-  },
-  {
-    id: 3,
-    tipo: "Yoga",
-    instructor: "María Rodríguez",
-    fecha: "2025-09-27",
-    hora: "08:00",
-    duracion: 75,
-    participantes: 10,
-    maxParticipantes: 15,
-    descripcion: "Sesión de Yoga Hatha para principiantes y nivel intermedio.",
-    ubicacion: "Sala B",
-    plazasLibres: 5
-  },
-  {
-    id: 4,
-    tipo: "Spinning",
-    instructor: "David Ruiz",
-    fecha: "2025-09-27",
-    hora: "19:30",
-    duracion: 45,
-    participantes: 15,
-    maxParticipantes: 20,
-    descripcion: "Clase de spinning con música energética y diferentes niveles de intensidad.",
-    ubicacion: "Sala Spinning",
-    plazasLibres: 5
-  },
-  {
-    id: 5,
-    tipo: "Zumba",
-    instructor: "Laura Fernández",
-    fecha: "2025-09-28",
-    hora: "10:30",
-    duracion: 45,
-    participantes: 18,
-    maxParticipantes: 25,
-    descripcion: "Baile fitness con ritmos latinos para quemar calorías divirtiéndote.",
-    ubicacion: "Sala Principal",
-    plazasLibres: 7
-  },
-  {
-    id: 6,
-    tipo: "CrossFit",
-    instructor: "José Martín",
-    fecha: "2025-09-28",
-    hora: "07:00",
-    duracion: 60,
-    participantes: 6,
-    maxParticipantes: 12,
-    descripcion: "Sesión matutina de CrossFit para empezar el día con energía.",
-    ubicacion: "Sala CrossFit",
-    plazasLibres: 6
-  },
-  {
-    id: 7,
-    tipo: "Pilates",
-    instructor: "Ana García",
-    fecha: "2025-09-29",
-    hora: "17:00",
-    duracion: 60,
-    participantes: 11,
-    maxParticipantes: 15,
-    descripcion: "Pilates avanzado con implementos y ejercicios de equilibrio.",
-    ubicacion: "Sala A",
-    plazasLibres: 4
-  }
-]
+// Interfaces para las clases programadas
+interface ClaseProgramada {
+  id: number
+  tipo: string
+  instructor: string
+  fecha: string
+  hora: string
+  color?: string
+  capacidad_maxima?: number
+  participantes_actuales?: number
+  plazas_libres?: number
+  descripcion?: string
+  ubicacion?: string
+  duracion_minutos?: number
+}
 
-const tiposClase = ["Todos", "Pilates", "CrossFit", "Yoga", "Spinning", "Zumba"]
+interface TipoClase {
+  id: number
+  nombre: string
+  descripcion: string
+  color: string
+}
 
 export default function ReservarClasePage() {
   const { user, isAuthenticated } = useAuth()
   const router = useRouter()
   const [filtroTipo, setFiltroTipo] = useState("Todos")
   const [clasesReservadas, setClasesReservadas] = useState<number[]>([])
+  const [clasesProgramadas, setClasesProgramadas] = useState<ClaseProgramada[]>([])
+  const [tiposClase, setTiposClase] = useState<string[]>(["Todos"])
+  const [loading, setLoading] = useState(true)
+  const [reservasCliente, setReservasCliente] = useState<any[]>([])
+
+  // Cargar reservas existentes del cliente
+  const cargarReservasCliente = async () => {
+    if (!user?.cliente?.id) return
+
+    try {
+      const timestamp = new Date().getTime()
+      console.log(`[${timestamp}] Cargando reservas del cliente...`)
+
+      const response = await fetch(`/api/reservas?cliente_id=${user.cliente.id}&_t=${timestamp}`, {
+        method: 'GET',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      })
+
+      if (response.ok) {
+        const reservas = await response.json()
+        const clasesReservadasIds = reservas.map((reserva: any) => reserva.id_clase_programada)
+        setClasesReservadas(clasesReservadasIds)
+        setReservasCliente(reservas) // Guardar las reservas completas para obtener IDs
+        console.log(`[${timestamp}] Reservas cargadas:`, clasesReservadasIds)
+      }
+    } catch (error) {
+      console.error('Error al cargar reservas:', error)
+    }
+  }
+
+  // Cargar clases programadas desde la API
+  const cargarClasesProgramadas = async () => {
+    try {
+      const timestamp = new Date().getTime()
+      console.log(`[${timestamp}] Cargando clases programadas para cliente...`)
+
+      const response = await fetch(`/api/clases-programadas?_t=${timestamp}`, {
+        method: 'GET',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error('Error al cargar las clases programadas')
+      }
+
+      const data = await response.json()
+      console.log(`[${timestamp}] Clases programadas cargadas:`, data.length, data)
+      
+      // Procesar datos para agregar información adicional
+      const clasesConDatos = data.map((clase: any) => {
+        console.log('Procesando clase:', clase)
+        return {
+          id: clase.id,
+          tipo: clase.tipo_clase || clase.tipo, // Usar tipo_clase de la API
+          instructor: clase.instructor_nombre || clase.instructor, // Usar instructor_nombre de la API
+          fecha: clase.fecha,
+          hora: clase.hora,
+          color: clase.color,
+          capacidad_maxima: clase.capacidad_maxima || 15,
+          participantes_actuales: clase.participantes_actuales || 0, // Usar datos reales de la API
+          plazas_libres: clase.plazas_libres || 0, // Usar plazas reales calculadas en la API
+          descripcion: clase.descripcion || `Clase de ${clase.tipo_clase || clase.tipo} impartida por ${clase.instructor_nombre || clase.instructor}`,
+          ubicacion: "Sala Principal", // Por defecto, se podría agregar a la BD
+          duracion_minutos: clase.duracion_minutos || 60
+        }
+      })
+
+      setClasesProgramadas(clasesConDatos)
+      
+      // Extraer tipos únicos para los filtros
+      const tiposSet = new Set<string>()
+      tiposSet.add("Todos")
+      data.forEach((clase: any) => {
+        const tipoClase = clase.tipo_clase || clase.tipo
+        if (tipoClase && typeof tipoClase === 'string') {
+          tiposSet.add(tipoClase)
+        }
+      })
+      setTiposClase(Array.from(tiposSet))
+      
+    } catch (error) {
+      console.error('Error al cargar clases programadas:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
     if (!isAuthenticated || user?.role !== "cliente") {
       router.push("/")
+    } else {
+      const cargarDatos = async () => {
+        await cargarClasesProgramadas()
+        await cargarReservasCliente()
+      }
+      cargarDatos()
     }
   }, [isAuthenticated, user, router])
 
@@ -121,14 +147,144 @@ export default function ReservarClasePage() {
     return null
   }
 
-  const clasesFiltradas = clasesDisponibles.filter(clase => 
+  // Filtrar clases basándose en el tipo seleccionado
+  const clasesFiltradas = clasesProgramadas.filter((clase: ClaseProgramada) => 
     filtroTipo === "Todos" || clase.tipo === filtroTipo
   )
 
-  const reservarClase = (claseId: number) => {
-    setClasesReservadas([...clasesReservadas, claseId])
-    // Aquí se implementaría la llamada a la API para reservar
-    console.log(`Reservando clase ${claseId}`)
+  const reservarClase = async (claseId: number) => {
+    try {
+      // Obtener el ID del cliente del usuario autenticado
+      if (!user?.cliente?.id) {
+        alert("❌ Error: No se pudo obtener la información del cliente")
+        return
+      }
+
+      const timestamp = new Date().getTime()
+      console.log(`[${timestamp}] Reservando clase ${claseId} para cliente ${user.cliente.id}`)
+
+      const response = await fetch(`/api/reservas?_t=${timestamp}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        },
+        body: JSON.stringify({
+          id_cliente: user.cliente.id,
+          id_clase_programada: claseId
+        })
+      })
+
+      const resultado = await response.json()
+
+      if (!response.ok) {
+        throw new Error(resultado.detail || 'Error al reservar la clase')
+      }
+
+      console.log(`[${timestamp}] Clase reservada exitosamente:`, resultado)
+      
+      // Agregar a la lista local de clases reservadas
+      setClasesReservadas([...clasesReservadas, claseId])
+      
+      // Mostrar mensaje de éxito
+      alert(`✅ ¡RESERVA CONFIRMADA!\n\nClase: ${resultado.clase_info.tipo}\nFecha: ${resultado.clase_info.fecha}\nHora: ${resultado.clase_info.hora}\n\n¡Nos vemos en la clase!`)
+      
+      // Recargar las clases para actualizar la ocupación
+      await cargarClasesProgramadas()
+      
+    } catch (error) {
+      console.error('Error al reservar clase:', error)
+      alert(`❌ Error al reservar la clase: ${error instanceof Error ? error.message : 'Error desconocido'}`)
+    }
+  }
+
+  const anularReserva = async (claseId: number, tipoClase: string, fecha: string, hora: string) => {
+    try {
+      // Recargar las reservas del cliente para obtener datos actualizados
+      if (!user?.cliente?.id) {
+        alert("❌ Error: No se pudo obtener la información del cliente")
+        return
+      }
+
+      // Obtener la reserva directamente del backend
+      const ts = new Date().getTime()
+      const reservasResponse = await fetch(`/api/reservas?cliente_id=${user.cliente.id}&_t=${ts}`, {
+        method: 'GET',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      })
+
+      if (!reservasResponse.ok) {
+        throw new Error('No se pudieron cargar las reservas')
+      }
+
+      const reservasActualizadas = await reservasResponse.json()
+      const reserva = reservasActualizadas.find((r: any) => r.id_clase_programada === claseId)
+      
+      if (!reserva) {
+        alert("❌ Error: No se pudo encontrar la reserva activa para esta clase")
+        return
+      }
+
+      // Pedir confirmación al usuario
+      const fechaFormateada = new Date(fecha).toLocaleDateString('es-ES', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      })
+      
+      const confirmacion = window.confirm(
+        `🗑️ ANULAR RESERVA\n\n` +
+        `Clase: ${tipoClase}\n` +
+        `Fecha: ${fechaFormateada}\n` +
+        `Hora: ${hora}\n\n` +
+        `¿Estás seguro de que quieres anular esta reserva?`
+      )
+      
+      if (!confirmacion) {
+        return
+      }
+
+      const timestampDelete = new Date().getTime()
+      console.log(`[${timestampDelete}] Anulando reserva ${reserva.id} para clase ${claseId}`)
+
+      const response = await fetch(`/api/reservas/${reserva.id}?_t=${timestampDelete}`, {
+        method: 'DELETE',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      })
+
+      const resultado = await response.json()
+
+      if (!response.ok) {
+        throw new Error(resultado.detail || 'Error al anular la reserva')
+      }
+
+      console.log(`[${timestampDelete}] Reserva anulada exitosamente:`, resultado)
+      
+      // Quitar de la lista local de clases reservadas
+      setClasesReservadas(clasesReservadas.filter(id => id !== claseId))
+      
+      // Mostrar mensaje de éxito
+      alert(`✅ RESERVA ANULADA\n\nLa reserva para la clase de ${tipoClase} del ${fechaFormateada} a las ${hora} ha sido anulada correctamente.`)
+      
+      // Recargar datos para actualizar la ocupación
+      await cargarClasesProgramadas()
+      await cargarReservasCliente()
+      
+    } catch (error) {
+      console.error('Error al anular reserva:', error)
+      alert(`❌ Error al anular la reserva: ${error instanceof Error ? error.message : 'Error desconocido'}`)
+    }
   }
 
   const formatearFecha = (fechaString: string) => {
@@ -140,7 +296,12 @@ export default function ReservarClasePage() {
     })
   }
 
-  const getColorTipo = (tipo: string) => {
+  const getColorTipo = (tipo: string, color?: string) => {
+    // Si hay color de la BD, usarlo, sino usar colores por defecto
+    if (color) {
+      return `${color} text-white`
+    }
+    
     const colores = {
       "Pilates": "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
       "CrossFit": "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
@@ -184,101 +345,110 @@ export default function ReservarClasePage() {
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-2">
-              {tiposClase.map((tipo) => (
-                <Button
-                  key={tipo}
-                  variant={filtroTipo === tipo ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setFiltroTipo(tipo)}
-                  className="mb-2"
-                >
-                  {tipo}
-                </Button>
-              ))}
+              {tiposClase.map((tipo) => {
+                const clasesDelTipo = tipo === "Todos" 
+                  ? clasesProgramadas.length 
+                  : clasesProgramadas.filter(c => c.tipo === tipo).length
+                
+                return (
+                  <Button
+                    key={tipo}
+                    variant={filtroTipo === tipo ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setFiltroTipo(tipo)}
+                    className="mb-2 flex items-center gap-2"
+                  >
+                    {tipo}
+                    <Badge variant="secondary" className="ml-1 text-xs">
+                      {clasesDelTipo}
+                    </Badge>
+                  </Button>
+                )
+              })}
             </div>
           </CardContent>
         </Card>
 
         {/* Lista de clases */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {clasesFiltradas.map((clase) => {
-            const yaReservada = clasesReservadas.includes(clase.id)
-            
-            return (
-              <Card key={clase.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <Badge className={getColorTipo(clase.tipo)}>
-                      {clase.tipo}
-                    </Badge>
-                    <div className="text-sm text-muted-foreground">
-                      {clase.plazasLibres} plazas libres
-                    </div>
-                  </div>
-                  <CardTitle className="text-xl">{clase.tipo}</CardTitle>
-                  <div className="text-sm text-muted-foreground">
+        {loading ? (
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Cargando clases disponibles...</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            {clasesFiltradas.map((clase: ClaseProgramada) => {
+              const yaReservada = clasesReservadas.includes(clase.id)
+              
+              return (
+                <div key={clase.id} className={`relative p-3 rounded border-2 ${clase.color || 'bg-gray-100 text-gray-800'} hover:shadow-md transition-all duration-200 flex flex-col h-48`}>
+                  {/* Fecha */}
+                  <div className="text-sm font-semibold mb-1 opacity-95">
                     {formatearFecha(clase.fecha)}
                   </div>
-                </CardHeader>
-                
-                <CardContent className="space-y-4">
+                  
+                  {/* Tipo de clase */}
+                  <div className="font-bold text-base mb-1">{clase.tipo}</div>
+                  
                   {/* Información básica */}
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-sm">
-                      <Clock className="h-4 w-4 text-muted-foreground" />
-                      <span>{clase.hora} - {clase.duracion} min</span>
+                  <div className="space-y-1 mb-2 flex-grow">
+                    <div className="flex items-center gap-1 text-sm">
+                      <Clock className="h-3 w-3" />
+                      {clase.hora} ({clase.duracion_minutos || 60}min)
                     </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <User2 className="h-4 w-4 text-muted-foreground" />
-                      <span>{clase.instructor}</span>
+                    <div className="flex items-center gap-1 text-sm">
+                      <User2 className="h-3 w-3" />
+                      {clase.instructor}
                     </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <MapPin className="h-4 w-4 text-muted-foreground" />
-                      <span>{clase.ubicacion}</span>
+                    <div className="flex items-center gap-1 text-sm">
+                      <Users className="h-3 w-3" />
+                      {clase.participantes_actuales || 0}/{clase.capacidad_maxima || 15}
                     </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <Users className="h-4 w-4 text-muted-foreground" />
-                      <span>{clase.participantes}/{clase.maxParticipantes} participantes</span>
-                    </div>
-                  </div>
-
-                  {/* Descripción */}
-                  <div className="text-sm text-muted-foreground">
-                    {clase.descripcion}
                   </div>
 
                   {/* Botón de reserva */}
-                  <div className="pt-2">
+                  <div className="flex justify-center mt-auto">
                     {yaReservada ? (
-                      <Button 
-                        disabled 
-                        className="w-full bg-green-600 text-white"
-                      >
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                        Reservada
-                      </Button>
-                    ) : clase.plazasLibres > 0 ? (
+                      <div className="flex items-center gap-2">
+                        <Button 
+                          disabled 
+                          size="sm"
+                          className="bg-green-600 text-white h-6 text-xs px-3"
+                        >
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                          Reservada
+                        </Button>
+                        <Button 
+                          onClick={() => anularReserva(clase.id, clase.tipo, clase.fecha, clase.hora)}
+                          size="sm"
+                          className="bg-red-600 text-white h-6 text-xs px-2 hover:bg-red-700"
+                        >
+                          Anular
+                        </Button>
+                      </div>
+                    ) : (clase.plazas_libres || 0) > 0 ? (
                       <Button
                         onClick={() => reservarClase(clase.id)}
-                        className="w-full bg-primary hover:bg-primary/90"
+                        size="sm"
+                        className="h-6 text-xs bg-primary text-primary-foreground hover:bg-primary/90 px-3"
                       >
-                        Reservar Clase
+                        Reservar
                       </Button>
                     ) : (
                       <Button 
                         disabled 
-                        variant="outline" 
-                        className="w-full"
+                        size="sm"
+                        className="bg-white text-black h-6 text-xs px-3 cursor-not-allowed font-semibold border border-gray-300"
                       >
-                        Sin plazas disponibles
+                        🚫 Sin plazas
                       </Button>
                     )}
                   </div>
-                </CardContent>
-              </Card>
-            )
-          })}
-        </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
 
         {clasesFiltradas.length === 0 && (
           <div className="text-center py-12">

@@ -47,6 +47,10 @@ print_server_ip()
 # GET    /admin/users        - Obtener todos los usuarios (solo admin)
 # GET    /admin/users/{id}   - Obtener usuario específico por ID (solo admin)
 # PUT    /admin/users/{id}   - Actualizar usuario específico (solo admin)
+# GET    /gym-clases         - Obtener todos los tipos de clases activas del gimnasio
+# GET    /entrenadores       - Obtener todos los usuarios con rol de entrenador
+# GET    /clases-programadas - Obtener todas las clases programadas activas
+# POST   /clases-programadas - Guardar múltiples clases programadas en el calendario
 # ----------------------------------------------------
 
 def get_db_connection():
@@ -144,6 +148,22 @@ class UpdateUserRequest(BaseModel):
     numero_telefono: str = None
     fecha_nacimiento: str = None
     genero: str = None
+
+class ClaseProgramadaRequest(BaseModel):
+    fecha: str
+    hora: str
+    idClase: int  # Cambiado de tipoClase a idClase
+    instructor: str
+
+class GuardarClasesRequest(BaseModel):
+    clases: list[ClaseProgramadaRequest]
+
+class CrearReservaRequest(BaseModel):
+    id_cliente: int
+    id_clase_programada: int
+
+class CancelarReservaRequest(BaseModel):
+    id_reserva: int
 
 def send_reset_email(to_email: str, reset_link: str):
     # Configura estos valores según tu servidor SMTP
@@ -931,13 +951,13 @@ async def get_gym_clases(response: Response):
     try:
         print(f"[DEBUG] Obteniendo tipos de clases del gimnasio...")
         
-        conn = sqlite3.connect('users.db')
+        conn = get_db_connection()
         cursor = conn.cursor()
         
         # Obtener todos los tipos de clases activas
         cursor.execute("""
             SELECT id, nombre, descripcion, duracion_minutos, nivel, max_participantes, 
-                   created_at, updated_at
+                   created_at, updated_at, color
             FROM gym_clases 
             WHERE activo = 1 
             ORDER BY nombre
@@ -957,7 +977,8 @@ async def get_gym_clases(response: Response):
                 "nivel": clase[4],
                 "max_participantes": clase[5],
                 "created_at": clase[6],
-                "updated_at": clase[7]
+                "updated_at": clase[7],
+                "color": clase[8]
             })
         
         print(f"[DEBUG] Se encontraron {len(gym_clases)} tipos de clases activas")
@@ -967,3 +988,491 @@ async def get_gym_clases(response: Response):
     except Exception as e:
         print(f"[ERROR] Error al obtener tipos de clases: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error al obtener tipos de clases: {str(e)}")
+
+@app.get("/entrenadores")
+async def get_entrenadores(response: Response):
+    """
+    Obtener todos los usuarios con rol de entrenador
+    """
+    # Headers anti-cache
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache" 
+    response.headers["Expires"] = "0"
+    
+    try:
+        print(f"[DEBUG] Obteniendo entrenadores...")
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Obtener todos los usuarios con rol entrenador
+        cursor.execute("""
+            SELECT id, name, email, role, created_at, updated_at
+            FROM users 
+            WHERE role = 'entrenador' 
+            ORDER BY name
+        """)
+        
+        entrenadores_data = cursor.fetchall()
+        conn.close()
+        
+        # Formatear los datos
+        entrenadores = []
+        for entrenador in entrenadores_data:
+            entrenadores.append({
+                "id": entrenador[0],
+                "name": entrenador[1], 
+                "email": entrenador[2],
+                "role": entrenador[3],
+                "created_at": entrenador[4],
+                "updated_at": entrenador[5]
+            })
+        
+        print(f"[DEBUG] Se encontraron {len(entrenadores)} entrenadores")
+        
+        return entrenadores
+        
+    except Exception as e:
+        print(f"[ERROR] Error al obtener entrenadores: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al obtener entrenadores: {str(e)}")
+
+@app.post("/clases-programadas")
+async def guardar_clases_programadas(request: GuardarClasesRequest, response: Response):
+    """
+    Guardar múltiples clases programadas en el calendario
+    """
+    # Headers anti-cache
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache" 
+    response.headers["Expires"] = "0"
+    
+    try:
+        print(f"[DEBUG] Guardando {len(request.clases)} clases programadas...")
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        clases_guardadas = []
+        clases_con_error = []
+        
+        for clase in request.clases:
+            try:
+                # Validar que los campos obligatorios no estén vacíos
+                if not all([clase.fecha, clase.hora, clase.idClase, clase.instructor]):
+                    clases_con_error.append({
+                        "clase": f"{clase.fecha} {clase.hora} - ID:{clase.idClase}",
+                        "error": "Campos obligatorios faltantes"
+                    })
+                    continue
+                
+                # Buscar el ID del instructor por su nombre
+                cursor.execute("SELECT id FROM users WHERE name = ? AND role = 'entrenador'", (clase.instructor,))
+                instructor_result = cursor.fetchone()
+                
+                if not instructor_result:
+                    clases_con_error.append({
+                        "clase": f"{clase.fecha} {clase.hora} - ID:{clase.idClase}",
+                        "error": f"Instructor '{clase.instructor}' no encontrado"
+                    })
+                    continue
+                
+                id_instructor = instructor_result[0]
+                
+                # Obtener información de capacidad desde gym_clases usando ID
+                cursor.execute("SELECT max_participantes, nombre FROM gym_clases WHERE id = ?", (clase.idClase,))
+                capacidad_result = cursor.fetchone()
+                if not capacidad_result:
+                    clases_con_error.append({
+                        "clase": f"{clase.fecha} {clase.hora} - ID:{clase.idClase}",
+                        "error": f"Tipo de clase con ID {clase.idClase} no encontrado"
+                    })
+                    continue
+                
+                capacidad_maxima = capacidad_result[0]
+                nombre_clase = capacidad_result[1]
+                
+                # Verificar si ya existe una clase con el mismo instructor, fecha y hora
+                cursor.execute("""
+                    SELECT id FROM clases_programadas 
+                    WHERE fecha = ? AND hora = ? AND id_instructor = ? AND estado = 'programada'
+                """, (clase.fecha, clase.hora, id_instructor))
+                
+                if cursor.fetchone():
+                    clases_con_error.append({
+                        "clase": f"{clase.fecha} {clase.hora} - {nombre_clase}",
+                        "error": f"El instructor {clase.instructor} ya tiene una clase programada a esta hora"
+                    })
+                    continue
+                
+                # Insertar la clase con el nuevo esquema
+                cursor.execute("""
+                    INSERT INTO clases_programadas 
+                    (fecha, hora, id_clase, id_instructor, capacidad_maxima)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (clase.fecha, clase.hora, clase.idClase, id_instructor, capacidad_maxima))
+                
+                clase_id = cursor.lastrowid
+                clases_guardadas.append({
+                    "id": clase_id,
+                    "fecha": clase.fecha,
+                    "hora": clase.hora,
+                    "id_clase": clase.idClase,
+                    "tipo_clase": nombre_clase,
+                    "instructor": clase.instructor,
+                    "capacidad_maxima": capacidad_maxima
+                })
+                
+            except Exception as e:
+                clases_con_error.append({
+                    "clase": f"{clase.fecha} {clase.hora} - ID:{clase.idClase}",
+                    "error": str(e)
+                })
+        
+        conn.commit()
+        conn.close()
+        
+        print(f"[DEBUG] Guardadas: {len(clases_guardadas)} clases, Errores: {len(clases_con_error)}")
+        
+        return {
+            "success": True,
+            "message": f"Proceso completado. {len(clases_guardadas)} clases guardadas",
+            "clases_guardadas": clases_guardadas,
+            "clases_con_error": clases_con_error,
+            "total_guardadas": len(clases_guardadas),
+            "total_errores": len(clases_con_error)
+        }
+        
+    except Exception as e:
+        if 'conn' in locals():
+            conn.close()
+        print(f"[ERROR] Error al guardar clases programadas: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al guardar clases: {str(e)}")
+
+@app.get("/clases-programadas")
+async def get_clases_programadas(response: Response):
+    """
+    Obtener todas las clases programadas activas
+    """
+    # Headers anti-cache
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache" 
+    response.headers["Expires"] = "0"
+    
+    try:
+        print(f"[DEBUG] Obteniendo clases programadas...")
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Obtener todas las clases programadas activas con JOIN a gym_clases y users
+        # Incluir el conteo real de reservas activas calculado dinámicamente
+        cursor.execute("""
+            SELECT cp.id, cp.fecha, cp.hora, cp.id_clase, gc.nombre as tipo_clase, gc.color,
+                   cp.id_instructor, u.name as instructor_nombre,
+                   cp.capacidad_maxima, cp.estado, 
+                   cp.created_at, cp.updated_at, gc.descripcion, gc.duracion_minutos,
+                   COALESCE(r.reservas_activas, 0) as reservas_activas
+            FROM clases_programadas cp
+            JOIN gym_clases gc ON cp.id_clase = gc.id
+            JOIN users u ON cp.id_instructor = u.id
+            LEFT JOIN (
+                SELECT id_clase_programada, COUNT(*) as reservas_activas
+                FROM reservas 
+                WHERE estado = 'activa'
+                GROUP BY id_clase_programada
+            ) r ON cp.id = r.id_clase_programada
+            WHERE cp.estado IN ('activa', 'programada', 'completada')
+            ORDER BY cp.fecha, cp.hora
+        """)
+        
+        clases_data = cursor.fetchall()
+        conn.close()
+        
+        # Formatear los datos
+        clases_programadas = []
+        for clase in clases_data:
+            capacidad_maxima = clase[8] or 15  # Default 15 si no está definida
+            reservas_activas = clase[14]  # Número real de reservas activas (índice actualizado)
+            plazas_libres = capacidad_maxima - reservas_activas
+            
+            clases_programadas.append({
+                "id": clase[0],
+                "fecha": clase[1],
+                "hora": clase[2],
+                "id_clase": clase[3],
+                "tipo_clase": clase[4],
+                "color": clase[5],
+                "id_instructor": clase[6],
+                "instructor_nombre": clase[7],
+                "capacidad_maxima": capacidad_maxima,
+                "participantes_actuales": reservas_activas,  # Calculado dinámicamente desde reservas
+                "plazas_libres": plazas_libres,
+                "estado": clase[9],  # índice actualizado
+                "created_at": clase[10],  # índice actualizado
+                "updated_at": clase[11],  # índice actualizado 
+                "descripcion": clase[12],  # índice actualizado
+                "duracion_minutos": clase[13]  # índice actualizado
+            })
+        
+        print(f"[DEBUG] Se encontraron {len(clases_programadas)} clases programadas")
+        
+        return clases_programadas
+        
+    except Exception as e:
+        print(f"[ERROR] Error al obtener clases programadas: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al obtener clases programadas: {str(e)}")
+
+@app.delete("/clases-programadas/{clase_id}")
+async def eliminar_clase_programada(clase_id: int, response: Response):
+    """
+    Eliminar una clase programada específica por su ID
+    """
+    # Headers anti-cache
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache" 
+    response.headers["Expires"] = "0"
+    
+    try:
+        print(f"[DEBUG] Eliminando clase programada con ID: {clase_id}")
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Verificar que la clase existe antes de eliminarla
+        cursor.execute("SELECT id, fecha, hora, id_clase FROM clases_programadas WHERE id = ?", (clase_id,))
+        clase_existente = cursor.fetchone()
+        
+        if not clase_existente:
+            conn.close()
+            raise HTTPException(status_code=404, detail=f"Clase programada con ID {clase_id} no encontrada")
+        
+        # Eliminar la clase programada
+        cursor.execute("DELETE FROM clases_programadas WHERE id = ?", (clase_id,))
+        filas_afectadas = cursor.rowcount
+        
+        conn.commit()
+        conn.close()
+        
+        if filas_afectadas > 0:
+            print(f"[DEBUG] Clase programada {clase_id} eliminada exitosamente")
+            return {
+                "success": True,
+                "message": f"Clase programada eliminada correctamente",
+                "id": clase_id,
+                "fecha": clase_existente[1],
+                "hora": clase_existente[2]
+            }
+        else:
+            raise HTTPException(status_code=500, detail="No se pudo eliminar la clase programada")
+        
+    except HTTPException:
+        # Re-lanzar HTTPExceptions sin modificar
+        raise
+    except Exception as e:
+        print(f"[ERROR] Error al eliminar clase programada: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al eliminar clase programada: {str(e)}")
+
+## Endpoints para reservas de clases
+
+@app.post("/reservas")
+async def crear_reserva(request: CrearReservaRequest, response: Response):
+    """
+    Crear nueva reserva de clase
+    """
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    
+    try:
+        print(f"[DEBUG] Creando reserva - Cliente: {request.id_cliente}, Clase: {request.id_clase_programada}")
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Verificar que el cliente existe
+        cursor.execute("SELECT id FROM clientes WHERE id = ?", (request.id_cliente,))
+        cliente_existente = cursor.fetchone()
+        if not cliente_existente:
+            conn.close()
+            raise HTTPException(status_code=404, detail="Cliente no encontrado")
+        
+        # Verificar que la clase existe y obtener información
+        cursor.execute("""
+            SELECT cp.id, cp.capacidad_maxima, gc.nombre as tipo_clase, cp.fecha, cp.hora
+            FROM clases_programadas cp
+            JOIN gym_clases gc ON cp.id_clase = gc.id
+            WHERE cp.id = ? AND cp.estado IN ('activa', 'programada')
+        """, (request.id_clase_programada,))
+        clase_existente = cursor.fetchone()
+        
+        if not clase_existente:
+            conn.close()
+            raise HTTPException(status_code=404, detail="Clase programada no encontrada")
+        
+        # Contar reservas actuales para esta clase
+        cursor.execute("""
+            SELECT COUNT(*) FROM reservas 
+            WHERE id_clase_programada = ? AND estado = 'activa'
+        """, (request.id_clase_programada,))
+        reservas_actuales = cursor.fetchone()[0]
+        
+        capacidad_maxima = clase_existente[1] or 15  # Default 15 si no está definida
+        
+        # Verificar si hay plazas disponibles
+        if reservas_actuales >= capacidad_maxima:
+            conn.close()
+            raise HTTPException(status_code=400, detail="No hay plazas disponibles para esta clase")
+        
+        # Verificar que el cliente no tenga ya una reserva para esta clase
+        cursor.execute("""
+            SELECT id FROM reservas 
+            WHERE id_cliente = ? AND id_clase_programada = ? AND estado = 'activa'
+        """, (request.id_cliente, request.id_clase_programada))
+        reserva_existente = cursor.fetchone()
+        
+        if reserva_existente:
+            conn.close()
+            raise HTTPException(status_code=400, detail="Ya tienes una reserva activa para esta clase")
+        
+        # Crear la reserva
+        cursor.execute("""
+            INSERT INTO reservas (id_cliente, id_clase_programada, estado)
+            VALUES (?, ?, 'activa')
+        """, (request.id_cliente, request.id_clase_programada))
+        
+        reserva_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        
+        print(f"[DEBUG] Reserva creada exitosamente - ID: {reserva_id}")
+        
+        return {
+            "success": True,
+            "message": "Reserva creada exitosamente",
+            "reserva_id": reserva_id,
+            "clase_info": {
+                "tipo": clase_existente[2],
+                "fecha": clase_existente[3],
+                "hora": clase_existente[4]
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[ERROR] Error al crear reserva: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al crear reserva: {str(e)}")
+
+@app.get("/reservas/{cliente_id}")
+async def get_reservas_cliente(cliente_id: int, response: Response):
+    """
+    Obtener todas las reservas de un cliente
+    """
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    
+    try:
+        print(f"[DEBUG] Obteniendo reservas del cliente {cliente_id}")
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Obtener reservas del cliente con información de la clase
+        cursor.execute("""
+            SELECT r.id, r.id_clase_programada, r.estado,
+                   cp.fecha, cp.hora, gc.nombre as tipo_clase, gc.color,
+                   u.name as instructor_nombre
+            FROM reservas r
+            JOIN clases_programadas cp ON r.id_clase_programada = cp.id
+            JOIN gym_clases gc ON cp.id_clase = gc.id
+            JOIN users u ON cp.id_instructor = u.id
+            WHERE r.id_cliente = ?
+            ORDER BY cp.fecha, cp.hora
+        """, (cliente_id,))
+        
+        reservas_data = cursor.fetchall()
+        conn.close()
+        
+        # Formatear los datos
+        reservas = []
+        for reserva in reservas_data:
+            reservas.append({
+                "id": reserva[0],
+                "id_clase_programada": reserva[1],
+                "estado": reserva[2],
+                "clase": {
+                    "fecha": reserva[3],
+                    "hora": reserva[4],
+                    "tipo": reserva[5],
+                    "color": reserva[6],
+                    "instructor": reserva[7]
+                }
+            })
+        
+        print(f"[DEBUG] Se encontraron {len(reservas)} reservas para el cliente {cliente_id}")
+        
+        return reservas
+        
+    except Exception as e:
+        print(f"[ERROR] Error al obtener reservas: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al obtener reservas: {str(e)}")
+
+@app.delete("/reservas/{reserva_id}")
+async def cancelar_reserva(reserva_id: int, response: Response):
+    """
+    Cancelar una reserva
+    """
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    
+    try:
+        print(f"[DEBUG] Cancelando reserva {reserva_id}")
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Verificar que la reserva existe y está activa
+        cursor.execute("""
+            SELECT r.id, r.id_cliente, cp.fecha, cp.hora, gc.nombre as tipo_clase
+            FROM reservas r
+            JOIN clases_programadas cp ON r.id_clase_programada = cp.id
+            JOIN gym_clases gc ON cp.id_clase = gc.id
+            WHERE r.id = ? AND r.estado = 'activa'
+        """, (reserva_id,))
+        reserva_existente = cursor.fetchone()
+        
+        if not reserva_existente:
+            conn.close()
+            raise HTTPException(status_code=404, detail="Reserva no encontrada o ya cancelada")
+        
+        # Eliminar la reserva completamente
+        cursor.execute("""
+            DELETE FROM reservas WHERE id = ?
+        """, (reserva_id,))
+        
+        filas_afectadas = cursor.rowcount
+        conn.commit()
+        conn.close()
+        
+        if filas_afectadas > 0:
+            print(f"[DEBUG] Reserva {reserva_id} eliminada exitosamente")
+            return {
+                "success": True,
+                "message": "Reserva anulada exitosamente",
+                "reserva_id": reserva_id,
+                "clase_info": {
+                    "tipo": reserva_existente[4],
+                    "fecha": reserva_existente[2],
+                    "hora": reserva_existente[3]
+                }
+            }
+        else:
+            raise HTTPException(status_code=500, detail="No se pudo anular la reserva")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[ERROR] Error al anular reserva: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al anular reserva: {str(e)}")

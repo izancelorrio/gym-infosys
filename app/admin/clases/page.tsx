@@ -5,171 +5,43 @@ import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Calendar, Clock, Users, ArrowLeft, ChevronLeft, ChevronRight, BookOpen } from "lucide-react"
+import { Calendar, Clock, Users, ArrowLeft, ChevronLeft, ChevronRight, BookOpen, Trash2 } from "lucide-react"
 
-// Datos de ejemplo de clases programadas
-const clasesEjemplo = [
-  {
-    id: 1,
-    tipo: "Pilates",
-    hora: "09:00",
-    duracion: 60,
-    participantes: 12,
-    maxParticipantes: 15,
-    dia: 0,
-    instructor: "Ana García",
-  },
-  {
-    id: 2,
-    tipo: "Zumba",
-    hora: "10:30",
-    duracion: 45,
-    participantes: 20,
-    maxParticipantes: 25,
-    dia: 0,
-    instructor: "Laura Fernández",
-  },
-  {
-    id: 15,
-    tipo: "CrossFit",
-    hora: "16:00",
-    duracion: 60,
-    participantes: 10,
-    maxParticipantes: 12,
-    dia: 0,
-    instructor: "Carlos López",
-  },
-  {
-    id: 16,
-    tipo: "Spinning",
-    hora: "18:30",
-    duracion: 45,
-    participantes: 18,
-    maxParticipantes: 20,
-    dia: 0,
-    instructor: "David Ruiz",
-  },
-  {
-    id: 3,
-    tipo: "CrossFit",
-    hora: "18:00",
-    duracion: 60,
-    participantes: 8,
-    maxParticipantes: 12,
-    dia: 1,
-    instructor: "Carlos López",
-  },
-  {
-    id: 4,
-    tipo: "Spinning",
-    hora: "19:30",
-    duracion: 45,
-    participantes: 15,
-    maxParticipantes: 20,
-    dia: 1,
-    instructor: "Miguel Torres",
-  },
-  {
-    id: 5,
-    tipo: "Yoga",
-    hora: "08:00",
-    duracion: 75,
-    participantes: 10,
-    maxParticipantes: 15,
-    dia: 2,
-    instructor: "María Rodríguez",
-  },
-  {
-    id: 6,
-    tipo: "Pilates",
-    hora: "17:00",
-    duracion: 60,
-    participantes: 14,
-    maxParticipantes: 15,
-    dia: 2,
-    instructor: "Ana García",
-  },
-  {
-    id: 7,
-    tipo: "CrossFit",
-    hora: "07:00",
-    duracion: 60,
-    participantes: 6,
-    maxParticipantes: 12,
-    dia: 3,
-    instructor: "José Martín",
-  },
-  {
-    id: 8,
-    tipo: "Zumba",
-    hora: "19:00",
-    duracion: 45,
-    participantes: 18,
-    maxParticipantes: 25,
-    dia: 3,
-    instructor: "Carmen Silva",
-  },
-  {
-    id: 9,
-    tipo: "Spinning",
-    hora: "18:30",
-    duracion: 45,
-    participantes: 12,
-    maxParticipantes: 20,
-    dia: 4,
-    instructor: "Elena Moreno",
-  },
-  {
-    id: 10,
-    tipo: "Yoga",
-    hora: "20:00",
-    duracion: 75,
-    participantes: 8,
-    maxParticipantes: 15,
-    dia: 4,
-    instructor: "María Rodríguez",
-  },
-  {
-    id: 11,
-    tipo: "Pilates",
-    hora: "10:00",
-    duracion: 60,
-    participantes: 11,
-    maxParticipantes: 15,
-    dia: 5,
-    instructor: "Ana García",
-  },
-  {
-    id: 12,
-    tipo: "CrossFit",
-    hora: "11:30",
-    duracion: 60,
-    participantes: 9,
-    maxParticipantes: 12,
-    dia: 5,
-    instructor: "José Martín",
-  },
-  {
-    id: 13,
-    tipo: "Zumba",
-    hora: "12:00",
-    duracion: 45,
-    participantes: 22,
-    maxParticipantes: 25,
-    dia: 6,
-    instructor: "Pablo Jiménez",
-  },
-  {
-    id: 14,
-    tipo: "Yoga",
-    hora: "17:30",
-    duracion: 75,
-    participantes: 13,
-    maxParticipantes: 15,
-    dia: 6,
-    instructor: "María Rodríguez",
-  },
-]
+// Interfaces para los datos de la base de datos
+interface ClaseProgramadaDB {
+  id: number
+  fecha: string
+  hora: string
+  id_clase: number
+  tipo_clase: string
+  color: string
+  id_instructor: number
+  instructor_nombre: string
+  capacidad_maxima: number
+  participantes_actuales: number  // Calculado dinámicamente desde reservas
+  plazas_libres: number          // Calculado dinámicamente
+  estado: string
+  created_at: string
+  updated_at: string
+  descripcion?: string           // Campo opcional del backend
+  duracion_minutos?: number      // Campo opcional del backend
+}
+
+// Interface para el formato del calendario
+interface ClaseCalendario {
+  id: number
+  tipo: string
+  color: string
+  hora: string
+  duracion: number
+  participantes: number
+  maxParticipantes: number
+  dia: number
+  instructor: string
+  fecha: string
+}
+
+
 
 const diasSemana = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
 
@@ -177,17 +49,89 @@ export default function CalendarioClasesPage() {
   const { user } = useAuth()
   const router = useRouter()
   const [semanaActual, setSemanaActual] = useState(new Date())
+  const [clasesProgramadas, setClasesProgramadas] = useState<ClaseProgramadaDB[]>([])
+  const [clasesCalendario, setClasesCalendario] = useState<ClaseCalendario[]>([])
 
-  useEffect(() => {
-    if (!user || user.role !== "admin") {
-      router.push("/")
+  const [isLoading, setIsLoading] = useState(true)
+
+
+
+  // Función para cargar clases programadas desde la API
+  const cargarClasesProgramadas = async () => {
+    try {
+      const timestamp = new Date().getTime()
+      console.log(`[${timestamp}] Cargando clases programadas para calendario...`)
+      
+      const response = await fetch(`/api/clases-programadas?_t=${timestamp}`, {
+        method: 'GET',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error(`Error al cargar clases programadas: ${response.status}`)
+      }
+
+      const data: ClaseProgramadaDB[] = await response.json()
+      console.log(`[${timestamp}] Clases programadas cargadas:`, data.length)
+      setClasesProgramadas(data)
+      
+    } catch (error) {
+      console.error('Error al cargar clases programadas:', error)
+      setClasesProgramadas([])
     }
-  }, [user, router])
-
-  if (!user || user.role !== "admin") {
-    return null
   }
 
+  // Función para obtener duración estimada por tipo de clase
+  const obtenerDuracionPorTipo = (tipo: string): number => {
+    const duraciones: { [key: string]: number } = {
+      'Pilates': 50,
+      'Zumba': 45,
+      'CrossFit': 60,
+      'Spinning': 45,
+      'Yoga': 60,
+      'Aeróbicos': 45,
+      'Funcional': 50,
+      'Boxing': 45,
+      'Aqua Aeróbicos': 45,
+      'Body Pump': 55,
+      'Body Combat': 50,
+      'Stretching': 30
+    }
+    return duraciones[tipo] || 45
+  }
+
+  // Función para convertir datos de BD al formato del calendario
+  const convertirAFormatoCalendario = (clasesBD: ClaseProgramadaDB[], fechasSemana: Date[]): ClaseCalendario[] => {
+    return clasesBD
+      .filter(clase => clase.estado === 'activa' || clase.estado === 'programada') // Solo clases programadas o activas
+      .map(clase => {
+        // Encontrar el día de la semana (0=Lunes, 6=Domingo)
+        const fechaClase = new Date(clase.fecha)
+        const diaEncontrado = fechasSemana.findIndex(fecha => 
+          fecha.toDateString() === fechaClase.toDateString()
+        )
+        
+        return {
+          id: clase.id,
+          tipo: clase.tipo_clase,
+          color: clase.color,
+          hora: clase.hora,
+          duracion: obtenerDuracionPorTipo(clase.tipo_clase),
+          participantes: clase.participantes_actuales,
+          maxParticipantes: clase.capacidad_maxima,
+          dia: diaEncontrado >= 0 ? diaEncontrado : -1, // -1 si no está en la semana actual
+          instructor: clase.instructor_nombre,
+          fecha: clase.fecha
+        }
+      })
+      .filter(clase => clase.dia >= 0) // Solo clases de la semana actual
+  }
+
+  // Función para obtener las fechas de la semana
   const obtenerFechasSemana = (fecha: Date) => {
     const fechas = []
     const inicioSemana = new Date(fecha)
@@ -203,6 +147,40 @@ export default function CalendarioClasesPage() {
     return fechas
   }
 
+  useEffect(() => {
+    if (!user || user.role !== "admin") {
+      router.push("/")
+      return
+    }
+    
+    // Cargar datos al inicio
+    const inicializarDatos = async () => {
+      await cargarClasesProgramadas()
+      setIsLoading(false)
+    }
+    
+    inicializarDatos()
+  }, [user, router])
+
+  // Actualizar calendario cuando cambien las clases o la semana
+  useEffect(() => {
+    const fechasSemana = obtenerFechasSemana(semanaActual)
+    const clasesConvertidas = convertirAFormatoCalendario(clasesProgramadas, fechasSemana)
+    setClasesCalendario(clasesConvertidas)
+  }, [clasesProgramadas, semanaActual])
+
+  if (!user || user.role !== "admin") {
+    return null
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-lg">Cargando calendario...</div>
+      </div>
+    )
+  }
+
   const fechasSemana = obtenerFechasSemana(semanaActual)
 
   const cambiarSemana = (direccion: number) => {
@@ -212,18 +190,63 @@ export default function CalendarioClasesPage() {
   }
 
   const obtenerClasesPorDia = (dia: number) => {
-    return clasesEjemplo.filter((clase) => clase.dia === dia)
+    return clasesCalendario.filter((clase) => clase.dia === dia)
   }
 
-  const getColorClase = (tipo: string) => {
-    const colores: { [key: string]: string } = {
-      Pilates: "bg-blue-100 border-blue-300 text-blue-800",
-      Zumba: "bg-pink-100 border-pink-300 text-pink-800",
-      CrossFit: "bg-red-100 border-red-300 text-red-800",
-      Spinning: "bg-green-100 border-green-300 text-green-800",
-      Yoga: "bg-purple-100 border-purple-300 text-purple-800",
+  const eliminarClase = async (id: number, tipo: string, fecha: string, hora: string) => {
+    // Formatear la fecha para mejor legibilidad
+    const fechaFormateada = new Date(fecha).toLocaleDateString('es-ES', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    })
+    
+    // Pedir confirmación al usuario
+    const confirmacion = window.confirm(
+      `🗑️ ELIMINAR CLASE\n\n` +
+      `Clase: ${tipo}\n` +
+      `Fecha: ${fechaFormateada}\n` +
+      `Hora: ${hora}\n\n` +
+      `⚠️ Esta acción no se puede deshacer.\n\n` +
+      `¿Estás seguro de que quieres eliminar esta clase?`
+    )
+    
+    if (!confirmacion) {
+      return
     }
-    return colores[tipo] || "bg-gray-100 border-gray-300 text-gray-800"
+
+    try {
+      const timestamp = new Date().getTime()
+      console.log(`[${timestamp}] Eliminando clase ID: ${id}`)
+
+      const response = await fetch(`/api/clases-programadas/${id}?_t=${timestamp}`, {
+        method: 'DELETE',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      })
+
+      const resultado = await response.json()
+
+      if (!response.ok) {
+        throw new Error(resultado.detail || 'Error al eliminar la clase')
+      }
+
+      console.log(`[${timestamp}] Clase eliminada:`, resultado)
+      
+      // Mostrar mensaje de éxito
+      alert(`✅ CLASE ELIMINADA\n\nLa clase de ${tipo} del ${fechaFormateada} a las ${hora} ha sido eliminada correctamente.`)
+      
+      // Recargar las clases para actualizar el calendario
+      await cargarClasesProgramadas()
+      
+    } catch (error) {
+      console.error('Error al eliminar clase:', error)
+      alert(`❌ Error al eliminar la clase: ${error}`)
+    }
   }
 
   return (
@@ -300,7 +323,7 @@ export default function CalendarioClasesPage() {
                     </div>
                   ) : (
                     clasesDia.map((clase) => (
-                      <div key={clase.id} className={`p-3 rounded-lg border-2 ${getColorClase(clase.tipo)}`}>
+                      <div key={clase.id} className={`relative p-3 rounded-lg border-2 ${clase.color}`}>
                         <div className="font-semibold text-sm mb-1">{clase.tipo}</div>
                         <div className="flex items-center gap-1 text-xs mb-1">
                           <Clock className="h-3 w-3" />
@@ -314,6 +337,15 @@ export default function CalendarioClasesPage() {
                           <BookOpen className="h-3 w-3" />
                           {clase.instructor}
                         </div>
+                        
+                        {/* Botón de eliminar en la esquina inferior derecha */}
+                        <button
+                          onClick={() => eliminarClase(clase.id, clase.tipo, clase.fecha, clase.hora)}
+                          className="absolute bottom-0 right-0 p-0.5 hover:bg-red-100/50 rounded-tl transition-all duration-200 group"
+                          title="Eliminar clase"
+                        >
+                          <Trash2 className="h-3 w-3 text-red-500 group-hover:text-red-700" />
+                        </button>
                       </div>
                     ))
                   )}
@@ -333,7 +365,7 @@ export default function CalendarioClasesPage() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Total Clases</p>
-                  <p className="text-xl font-bold text-primary">{clasesEjemplo.length}</p>
+                  <p className="text-xl font-bold text-primary">{clasesCalendario.length}</p>
                 </div>
               </div>
             </CardContent>
@@ -348,7 +380,7 @@ export default function CalendarioClasesPage() {
                 <div>
                   <p className="text-sm text-muted-foreground">Participantes</p>
                   <p className="text-xl font-bold text-primary">
-                    {clasesEjemplo.reduce((total, clase) => total + clase.participantes, 0)}
+                    {clasesCalendario.reduce((total, clase) => total + clase.participantes, 0)}
                   </p>
                 </div>
               </div>
@@ -364,7 +396,7 @@ export default function CalendarioClasesPage() {
                 <div>
                   <p className="text-sm text-muted-foreground">Horas Totales</p>
                   <p className="text-xl font-bold text-primary">
-                    {Math.round(clasesEjemplo.reduce((total, clase) => total + clase.duracion, 0) / 60)}h
+                    {Math.round(clasesCalendario.reduce((total, clase) => total + clase.duracion, 0) / 60)}h
                   </p>
                 </div>
               </div>
@@ -380,11 +412,11 @@ export default function CalendarioClasesPage() {
                 <div>
                   <p className="text-sm text-muted-foreground">Ocupación</p>
                   <p className="text-xl font-bold text-primary">
-                    {Math.round(
-                      (clasesEjemplo.reduce((total, clase) => total + clase.participantes, 0) /
-                        clasesEjemplo.reduce((total, clase) => total + clase.maxParticipantes, 0)) *
+                    {clasesCalendario.length > 0 ? Math.round(
+                      (clasesCalendario.reduce((total, clase) => total + clase.participantes, 0) /
+                        clasesCalendario.reduce((total, clase) => total + clase.maxParticipantes, 0)) *
                         100,
-                    )}
+                    ) : 0}
                     %
                   </p>
                 </div>

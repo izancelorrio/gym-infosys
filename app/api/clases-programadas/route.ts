@@ -1,0 +1,94 @@
+import { NextRequest, NextResponse } from 'next/server'
+
+export async function GET(request: NextRequest) {
+  try {
+    // Agregar timestamp para prevenir cache
+    const timestamp = new Date().getTime()
+    console.log(`[${timestamp}] API /clases-programadas GET - Obteniendo clases programadas`)
+
+    const response = await fetch(`http://localhost:8000/clases-programadas?_t=${timestamp}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      },
+    })
+
+    if (!response.ok) {
+      console.error(`[${timestamp}] Error en API clases-programadas GET:`, response.status, response.statusText)
+      throw new Error(`Error del backend: ${response.status}`)
+    }
+
+    const data = await response.json()
+    console.log(`[${timestamp}] Clases programadas obtenidas:`, data.length)
+
+    return NextResponse.json(data, {
+      status: 200,
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
+    })
+
+  } catch (error) {
+    console.error('Error al obtener clases programadas:', error)
+    return NextResponse.json(
+      { error: 'Error interno del servidor' }, 
+      { status: 500 }
+    )
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    // Agregar timestamp para prevenir cache
+    const timestamp = new Date().getTime()
+    console.log(`[${timestamp}] API /clases-programadas - Guardando clases`)
+
+    const body = await request.json()
+    console.log(`[${timestamp}] Clases a guardar:`, body.clases?.length || 0)
+
+    const response = await fetch(`http://localhost:8000/clases-programadas?_t=${timestamp}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      },
+      body: JSON.stringify(body)
+    })
+
+    if (!response.ok) {
+      console.error(`[${timestamp}] Error en API clases-programadas:`, response.status, response.statusText)
+      const errorData = await response.json().catch(() => ({ error: 'Error desconocido' }))
+      throw new Error(`Error del backend: ${response.status} - ${errorData.detail || errorData.error}`)
+    }
+
+    const data = await response.json()
+    console.log(`[${timestamp}] Clases guardadas:`, data.total_guardadas, 'Errores:', data.total_errores)
+
+    return NextResponse.json(data, {
+      status: 200,
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
+    })
+
+  } catch (error) {
+    console.error('Error al guardar clases programadas:', error)
+    return NextResponse.json(
+      { 
+        success: false,
+        error: 'Error interno del servidor',
+        details: error instanceof Error ? error.message : 'Error desconocido'
+      }, 
+      { status: 500 }
+    )
+  }
+}
