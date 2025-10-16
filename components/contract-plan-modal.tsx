@@ -18,12 +18,16 @@ interface Plan {
   precio_mensual: number
   precio_anual?: number
   caracteristicas: string[]
+  acceso_entrenador: boolean
+  activo: boolean
+  color_tema: string
+  orden_display: number
+  // Campos calculados/compatibilidad
   limite_clases?: number
   acceso_nutricionista: boolean
   acceso_entrenador_personal: boolean
   acceso_areas_premium: boolean
   popular: boolean
-  color_tema: string
 }
 
 interface ContractPlanModalProps {
@@ -57,7 +61,14 @@ export function ContractPlanModal({ isOpen, onClose }: ContractPlanModalProps) {
         setLoading(true)
         setError(null)
         
-        const response = await fetch('/api/planes')
+        const response = await fetch(`/api/planes?_t=${Date.now()}`, {
+          method: 'GET',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          }
+        })
         if (!response.ok) {
           throw new Error('Error al cargar los planes')
         }
@@ -327,11 +338,6 @@ export function ContractPlanModal({ isOpen, onClose }: ContractPlanModalProps) {
                                 <div className="flex items-center gap-2">
                                   <span className="font-medium">{planSeleccionado.nombre}</span>
                                   <span className="text-sm font-bold text-primary">€{planSeleccionado.precio_mensual}/mes</span>
-                                  {planSeleccionado.popular && (
-                                    <span className="text-xs bg-yellow-100 text-yellow-800 px-1.5 py-0.5 rounded">
-                                      ⭐ Popular
-                                    </span>
-                                  )}
                                 </div>
                               </div>
                             </div>
@@ -347,17 +353,10 @@ export function ContractPlanModal({ isOpen, onClose }: ContractPlanModalProps) {
                                 <div className="flex items-center gap-2 mb-1">
                                   <span className="font-medium">{plan.nombre}</span>
                                   <span className="text-sm font-bold text-primary">€{plan.precio_mensual}/mes</span>
-                                  {plan.popular && (
-                                    <span className="text-xs bg-yellow-100 text-yellow-800 px-1.5 py-0.5 rounded">
-                                      ⭐ Popular
-                                    </span>
-                                  )}
                                 </div>
                                 <div className="text-xs text-muted-foreground">
-                                  {plan.limite_clases ? `${plan.limite_clases} clases` : 'Ilimitado'}
-                                  {plan.acceso_nutricionista && ' • Nutricionista'}
-                                  {plan.acceso_entrenador_personal && ' • Entrenador'}
-                                  {plan.acceso_areas_premium && ' • Premium'}
+                                  {plan.caracteristicas.slice(0, 2).join(' • ')}
+                                  {plan.caracteristicas.length > 2 && '...'}
                                 </div>
                               </div>
                             </div>
@@ -373,12 +372,6 @@ export function ContractPlanModal({ isOpen, onClose }: ContractPlanModalProps) {
                         <div className="flex items-center gap-2">
                           {getPlanIcon(planSeleccionado)}
                           <span className="font-semibold text-lg">{planSeleccionado.nombre}</span>
-                          {planSeleccionado.popular && (
-                            <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 text-xs">
-                              <Star className="h-3 w-3 mr-1" />
-                              Popular
-                            </Badge>
-                          )}
                         </div>
                         <span className="text-xl font-bold text-primary">€{planSeleccionado.precio_mensual}/mes</span>
                       </div>
@@ -389,56 +382,15 @@ export function ContractPlanModal({ isOpen, onClose }: ContractPlanModalProps) {
                       <div className="space-y-2">
                         <h4 className="font-medium text-sm">Características incluidas:</h4>
                         <div className="grid grid-cols-1 gap-1 text-xs">
-                          {planSeleccionado.limite_clases ? (
-                            <div className="flex items-center gap-2">
-                              <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
-                              {planSeleccionado.limite_clases} clases mensuales
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-2">
-                              <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
-                              Clases ilimitadas
-                            </div>
-                          )}
-                          {planSeleccionado.acceso_nutricionista && (
-                            <div className="flex items-center gap-2">
-                              <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
-                              Acceso a nutricionista
-                            </div>
-                          )}
-                          {planSeleccionado.acceso_entrenador_personal && (
-                            <div className="flex items-center gap-2">
-                              <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
-                              Entrenador personal incluido
-                            </div>
-                          )}
-                          {planSeleccionado.acceso_areas_premium && (
-                            <div className="flex items-center gap-2">
-                              <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
-                              Acceso a áreas premium
-                            </div>
-                          )}
-                          
                           {/* Mostrar todas las características del JSON */}
                           {planSeleccionado.caracteristicas.map((caracteristica, index) => (
                             <div key={index} className="flex items-center gap-2">
-                              <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
+                              <div className="w-1.5 h-1.5 bg-primary rounded-full"></div>
                               {caracteristica}
                             </div>
                           ))}
                         </div>
                       </div>
-                      
-                      {planSeleccionado.precio_anual && (
-                        <div className="mt-3 p-2 bg-green-50 border border-green-200 rounded-md">
-                          <div className="text-xs text-green-700 font-medium">
-                            💰 Plan anual disponible: €{planSeleccionado.precio_anual}/año
-                          </div>
-                          <div className="text-xs text-green-600">
-                            ¡Ahorra €{(planSeleccionado.precio_mensual * 12 - planSeleccionado.precio_anual).toFixed(2)} al año!
-                          </div>
-                        </div>
-                      )}
                     </div>
                   )}
                 </CardContent>

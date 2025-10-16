@@ -1,46 +1,15 @@
 -- =====================================================
 -- SCRIPT: 01_crear_usuarios.sql
--- DESCRIPCION: Crear tabla usuarios con estructura completa
--- FECHA: 2025-10-02
+-- DESCRIPCION: Migrado a crear_base_datos.sql
+-- FECHA: 2025-10-16
 -- AUTOR: Sistema Gym Management
 -- =====================================================
-
--- Eliminar tabla usuarios si existe (para recrearla)
-DROP TABLE IF EXISTS users;
-
--- Eliminar trigger si existe
-DROP TRIGGER IF EXISTS update_users_timestamp;
-
+-- 
+-- NOTA: La estructura de la tabla users ha sido migrada
+-- al archivo unificado crear_base_datos.sql
+-- Este archivo ahora solo contiene los datos de población
+-- 
 -- =====================================================
--- CREAR TABLA USUARIOS
--- =====================================================
-CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    email TEXT NOT NULL UNIQUE,
-    password TEXT NOT NULL,
-    email_verified INTEGER DEFAULT 0,
-    role TEXT NOT NULL CHECK (role IN ('admin', 'administrador', 'entrenador', 'cliente', 'clientepro', 'usuario')),
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
--- =====================================================
--- CREAR INDICES PARA OPTIMIZAR CONSULTAS
--- =====================================================
-CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
-CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
-CREATE INDEX IF NOT EXISTS idx_users_email_verified ON users(email_verified);
-CREATE INDEX IF NOT EXISTS idx_users_updated_at ON users(updated_at);
-
--- =====================================================
--- CREAR TRIGGER PARA ACTUALIZAR updated_at
--- =====================================================
-CREATE TRIGGER update_users_timestamp 
-    AFTER UPDATE ON users 
-BEGIN 
-    UPDATE users SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id; 
-END;
 
 -- =====================================================
 -- POBLAR DATOS INICIALES
@@ -52,7 +21,7 @@ INSERT INTO users (id, name, email, password, email_verified, role, created_at, 
 
 -- Usuarios Entrenadores
 INSERT INTO users (id, name, email, password, email_verified, role, created_at, updated_at) VALUES
-(9, 'Izan', 'izan.celorrio.caballero@gmail.com', '$2b$12$W7BG35v33HLbeWPUplyyouc4kUDKR1U/swk71s/n2YJ46aqltBpCC', 1, 'entrenador', '2024-01-01 00:00:00', '2024-01-01 00:00:00'),
+(9, 'Izan2', 'izan@unizar.es', '$2b$12$W7BG35v33HLbeWPUplyyouc4kUDKR1U/swk71s/n2YJ46aqltBpCC', 1, 'entrenador', '2024-01-01 00:00:00', '2024-01-01 00:00:00'),
 (35, 'Pedro Martín González', 'pedro.martin@email.com', '$2b$12$QklJzRYttpT5snjyUz8g6eNWIH64KOce2Qb5y6jo/Xkzbc6L3pl5i', 1, 'entrenador', '2024-01-01 00:00:00', '2024-01-01 00:00:00');
 
 -- Usuarios Clientes (con plan activo)

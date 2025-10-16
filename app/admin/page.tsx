@@ -2,14 +2,15 @@
 
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Users, Calendar, BarChart3, LogOut, UserCheck, Clock, TrendingUp } from "lucide-react"
+import { Users, Calendar, BarChart3, LogOut, UserCheck, Clock, TrendingUp, UserPlus } from "lucide-react"
 
 export default function AdminPage() {
   const { user, logout } = useAuth()
   const router = useRouter()
+
 
   useEffect(() => {
     if (!user || user.role !== "admin") {
@@ -129,6 +130,14 @@ export default function AdminPage() {
                   <Users className="h-4 w-4 mr-2" />
                   Ver Todos los Usuarios
                 </Button>
+                <Button
+                  className="w-full justify-start bg-transparent"
+                  variant="outline"
+                  onClick={() => router.push("/admin/asignaciones")}
+                >
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Asignar Entrenador
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -191,6 +200,8 @@ export default function AdminPage() {
             </CardContent>
           </Card>
         </div>
+
+
       </div>
     </div>
   )

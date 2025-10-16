@@ -7,23 +7,81 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Activity, BarChart3, Calendar, Users, LogOut } from "lucide-react"
+import { Activity, BarChart3, Calendar, Users, LogOut, RefreshCw } from "lucide-react"
 
 interface Cliente {
   id: number
+  cliente_id: number
   name: string
   email: string
-  lastActivity: string
-  totalWorkouts: number
+  fecha_inscripcion: string
+  estado: string
+  plan_nombre: string
+  plan_color: string
+  fecha_asignacion: string
+  notas?: string
+  asignacion_id: number
+  last_activity: string
+  total_workouts: number
   status: "activo" | "inactivo"
   avatar?: string
+}
+
+interface EstadisticasEntrenador {
+  total_clientes: number
+  clientes_activos: number
+  clientes_inactivos: number
 }
 
 export default function EntrenadorPage() {
   const { user, isTrainer, isAuthenticated, logout } = useAuth()
   const router = useRouter()
   const [clientes, setClientes] = useState<Cliente[]>([])
+  const [estadisticas, setEstadisticas] = useState<EstadisticasEntrenador | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const fetchClientesData = async () => {
+    if (!user?.id) return
+
+    try {
+      setIsLoading(true)
+      setError(null)
+      
+      const response = await fetch(`http://localhost:8000/entrenador/${user.id}/clientes`, {
+        method: "GET",
+        headers: {
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          "Pragma": "no-cache",
+          "Expires": "0",
+        },
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || "Error al obtener clientes")
+      }
+
+      const data = await response.json()
+      
+      if (data.success) {
+        setClientes(data.clientes)
+        setEstadisticas(data.estadisticas)
+      } else {
+        throw new Error("Error en la respuesta del servidor")
+      }
+    } catch (error) {
+      console.error("Error al obtener clientes:", error)
+      setError(error instanceof Error ? error.message : "Error desconocido")
+      // Si es error de entrenador no encontrado, mostrar datos vacíos
+      if (error instanceof Error && error.message.includes("no encontrado")) {
+        setClientes([])
+        setEstadisticas({ total_clientes: 0, clientes_activos: 0, clientes_inactivos: 0 })
+      }
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -36,44 +94,8 @@ export default function EntrenadorPage() {
       return
     }
 
-    const clientesSimulados: Cliente[] = [
-      {
-        id: 1,
-        name: "Ana García",
-        email: "ana.garcia@email.com",
-        lastActivity: "2024-01-15",
-        totalWorkouts: 24,
-        status: "activo",
-      },
-      {
-        id: 2,
-        name: "Carlos López",
-        email: "carlos.lopez@email.com",
-        lastActivity: "2024-01-10",
-        totalWorkouts: 18,
-        status: "activo",
-      },
-      {
-        id: 3,
-        name: "María Rodríguez",
-        email: "maria.rodriguez@email.com",
-        lastActivity: "2023-12-28",
-        totalWorkouts: 8,
-        status: "inactivo",
-      },
-      {
-        id: 4,
-        name: "David Martín",
-        email: "david.martin@email.com",
-        lastActivity: "2024-01-14",
-        totalWorkouts: 31,
-        status: "activo",
-      },
-    ]
-
-    setClientes(clientesSimulados)
-    setIsLoading(false)
-  }, [isAuthenticated, isTrainer, router])
+    fetchClientesData()
+  }, [isAuthenticated, isTrainer, router, user?.id])
 
   const handleAsignarEntrenamiento = (clienteId: number) => {
     console.log("[v0] Asignar entrenamiento a cliente:", clienteId)
@@ -93,7 +115,29 @@ export default function EntrenadorPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-lg">Cargando panel de entrenador...</div>
+        <div className="text-center">
+          <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+          <div className="text-lg">Cargando panel de entrenador...</div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center max-w-md">
+          <div className="text-red-600 mb-4">{error}</div>
+          <Button onClick={fetchClientesData} className="mb-4">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Reintentar
+          </Button>
+          <div>
+            <Button variant="outline" onClick={() => router.push("/")}>
+              Volver al inicio
+            </Button>
+          </div>
+        </div>
       </div>
     )
   }
@@ -132,7 +176,7 @@ export default function EntrenadorPage() {
                   <Users className="h-5 w-5 text-white" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-primary">{clientes.length}</p>
+                  <p className="text-2xl font-bold text-primary">{estadisticas?.total_clientes || 0}</p>
                   <p className="text-sm text-muted-foreground">Clientes asignados</p>
                 </div>
               </div>
@@ -142,7 +186,7 @@ export default function EntrenadorPage() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-green-600">
-                    {clientes.filter((c) => c.status === "activo").length}
+                    {estadisticas?.clientes_activos || 0}
                   </p>
                   <p className="text-sm text-muted-foreground">Clientes activos</p>
                 </div>
@@ -153,7 +197,7 @@ export default function EntrenadorPage() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-red-600">
-                    {clientes.filter((c) => c.status === "inactivo").length}
+                    {estadisticas?.clientes_inactivos || 0}
                   </p>
                   <p className="text-sm text-muted-foreground">Clientes inactivos</p>
                 </div>
@@ -164,16 +208,35 @@ export default function EntrenadorPage() {
 
         <Card className="border-border shadow-lg bg-card rounded-lg">
           <CardHeader className="bg-gradient-to-r from-primary to-secondary text-white rounded-t-lg">
-            <CardTitle className="flex items-center space-x-2 text-white">
-              <div className="p-2 bg-white/20 rounded-full">
-                <Users className="h-4 w-4 text-white" />
+            <CardTitle className="flex items-center justify-between text-white">
+              <div className="flex items-center space-x-2">
+                <div className="p-2 bg-white/20 rounded-full">
+                  <Users className="h-4 w-4 text-white" />
+                </div>
+                <span>Mis Clientes</span>
               </div>
-              <span>Mis Clientes</span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-white/20 text-white hover:bg-white/10 bg-transparent"
+                onClick={fetchClientesData}
+                disabled={isLoading}
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
+                Actualizar
+              </Button>
             </CardTitle>
           </CardHeader>
           <CardContent className="p-6">
-            <div className="space-y-4">
-              {clientes.map((cliente) => (
+            {clientes.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <Users className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                <p className="text-lg font-medium mb-2">No tienes clientes asignados</p>
+                <p className="text-sm">Cuando se te asignen clientes, aparecerán aquí.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {clientes.map((cliente) => (
                 <div
                   key={cliente.id}
                   className="flex items-center justify-between p-4 border border-border rounded-lg bg-card hover:bg-muted hover:border-primary/50 transition-all duration-200 shadow-sm"
@@ -189,8 +252,9 @@ export default function EntrenadorPage() {
                       <h3 className="font-semibold text-foreground">{cliente.name}</h3>
                       <p className="text-sm text-muted-foreground">{cliente.email}</p>
                       <div className="flex items-center space-x-4 mt-1">
-                        <span className="text-xs text-muted-foreground">Última actividad: {cliente.lastActivity}</span>
-                        <span className="text-xs text-primary font-medium">{cliente.totalWorkouts} entrenamientos</span>
+                        <span className="text-xs text-muted-foreground">Asignado: {cliente.fecha_asignacion}</span>
+                        <span className="text-xs text-primary font-medium">Plan: {cliente.plan_nombre}</span>
+                        <span className="text-xs text-secondary font-medium">{cliente.total_workouts} entrenamientos</span>
                       </div>
                     </div>
                   </div>
@@ -226,8 +290,9 @@ export default function EntrenadorPage() {
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

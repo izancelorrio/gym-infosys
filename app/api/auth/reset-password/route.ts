@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
       const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.RESET_PASSWORD}`, {
         method: "POST",
         headers: API_CONFIG.HEADERS,
-        body: JSON.stringify({ token, new_password: newPassword }),
+        body: JSON.stringify({ token, newPassword }),
         signal: controller.signal,
       })
 

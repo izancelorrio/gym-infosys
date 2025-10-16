@@ -26,6 +26,13 @@ interface Entrenamiento {
   series: number
 }
 
+interface Ejercicio {
+  id: number
+  nombre: string
+  categoria: string
+  descripcion: string
+}
+
 export default function AsignarEntrenamientoPage() {
   const { user, isTrainer, isAuthenticated } = useAuth()
   const router = useRouter()
@@ -34,42 +41,22 @@ export default function AsignarEntrenamientoPage() {
 
   const [cliente, setCliente] = useState<Cliente | null>(null)
   const [entrenamientos, setEntrenamientos] = useState<Entrenamiento[]>([])
+  const [ejercicios, setEjercicios] = useState<Ejercicio[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
-  const nextWeekDates = useMemo(() => {
+  const availableDates = useMemo(() => {
     const dates = []
     const today = new Date()
 
-    // Encontrar el próximo lunes
-    const daysUntilNextMonday = (8 - today.getDay()) % 7 || 7
-    const nextMonday = new Date(today.getTime() + daysUntilNextMonday * 24 * 60 * 60 * 1000)
-
-    // Generar los 7 días de la semana empezando desde el lunes
-    for (let i = 0; i < 7; i++) {
-      const date = new Date(nextMonday.getTime() + i * 24 * 60 * 60 * 1000)
+    // Generar 15 días a partir de hoy
+    for (let i = 0; i < 15; i++) {
+      const date = new Date(today.getTime() + i * 24 * 60 * 60 * 1000)
       dates.push(date.toISOString().split("T")[0])
     }
     return dates
   }, [])
 
-  const ejerciciosDisponibles = [
-    "Press de banca",
-    "Sentadillas",
-    "Peso muerto",
-    "Press militar",
-    "Remo con barra",
-    "Dominadas",
-    "Fondos",
-    "Curl de bíceps",
-    "Extensiones de tríceps",
-    "Elevaciones laterales",
-    "Prensa de piernas",
-    "Curl femoral",
-    "Extensiones de cuádriceps",
-    "Caminadora",
-    "Bicicleta estática",
-    "Elíptica",
-  ]
+
 
   useEffect(() => {
     console.log("[v0] Asignar entrenamiento a cliente:", clienteId)
@@ -84,44 +71,78 @@ export default function AsignarEntrenamientoPage() {
       return
     }
 
-    const clientesSimulados: Cliente[] = [
-      {
-        id: 1,
-        name: "Ana García",
-        email: "ana.garcia@email.com",
-        lastActivity: "2024-01-15",
-        totalWorkouts: 24,
-        status: "activo",
-      },
-      {
-        id: 2,
-        name: "Carlos López",
-        email: "carlos.lopez@email.com",
-        lastActivity: "2024-01-10",
-        totalWorkouts: 18,
-        status: "activo",
-      },
-      {
-        id: 3,
-        name: "María Rodríguez",
-        email: "maria.rodriguez@email.com",
-        lastActivity: "2023-12-28",
-        totalWorkouts: 8,
-        status: "inactivo",
-      },
-      {
-        id: 4,
-        name: "David Martín",
-        email: "david.martin@email.com",
-        lastActivity: "2024-01-14",
-        totalWorkouts: 31,
-        status: "activo",
-      },
-    ]
+    const fetchData = async () => {
+      try {
+        // Obtener datos del entrenador y sus clientes
+        const clientesResponse = await fetch(`http://localhost:8000/entrenador/${user?.id}/clientes`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        })
 
-    const clienteEncontrado = clientesSimulados.find((c) => c.id === clienteId)
-    setCliente(clienteEncontrado || null)
+        if (!clientesResponse.ok) {
+          throw new Error(`Error HTTP al obtener clientes: ${clientesResponse.status}`)
+        }
 
+        const clientesData = await clientesResponse.json()
+        console.log("[DEBUG] Datos de clientes del entrenador:", clientesData)
+
+        if (clientesData.success && clientesData.clientes) {
+          // Buscar el cliente específico en la lista
+          const clienteEncontrado = clientesData.clientes.find((c: any) => c.id === clienteId)
+          
+          if (clienteEncontrado) {
+            const clienteFormateado: Cliente = {
+              id: clienteEncontrado.id,
+              name: clienteEncontrado.name,
+              email: clienteEncontrado.email,
+              lastActivity: clienteEncontrado.last_activity || clienteEncontrado.fecha_inscripcion,
+              totalWorkouts: clienteEncontrado.total_workouts || 0,
+              status: clienteEncontrado.status === "activo" ? "activo" : "inactivo",
+            }
+            setCliente(clienteFormateado)
+          } else {
+            console.error("[ERROR] Cliente no encontrado en la lista del entrenador")
+            setCliente(null)
+          }
+        } else {
+          console.error("[ERROR] Respuesta inválida del servidor:", clientesData)
+          setCliente(null)
+        }
+
+        // Obtener ejercicios disponibles
+        const ejerciciosResponse = await fetch("http://localhost:8000/ejercicios", {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        })
+
+        if (!ejerciciosResponse.ok) {
+          throw new Error(`Error HTTP al obtener ejercicios: ${ejerciciosResponse.status}`)
+        }
+
+        const ejerciciosData = await ejerciciosResponse.json()
+        console.log("[DEBUG] Datos de ejercicios:", ejerciciosData)
+
+        if (ejerciciosData.success && ejerciciosData.ejercicios) {
+          setEjercicios(ejerciciosData.ejercicios)
+        } else {
+          console.error("[ERROR] Respuesta inválida del servidor para ejercicios:", ejerciciosData)
+          setEjercicios([])
+        }
+
+      } catch (error) {
+        console.error("[ERROR] Error al obtener datos:", error)
+        setCliente(null)
+        setEjercicios([])
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    // Inicializar entrenamientos
     setEntrenamientos([
       {
         id: Date.now().toString(),
@@ -131,8 +152,8 @@ export default function AsignarEntrenamientoPage() {
       },
     ])
 
-    setIsLoading(false)
-  }, [isAuthenticated, isTrainer, router, clienteId, nextWeekDates]) // nextWeekDates is now stable
+    fetchData()
+  }, [isAuthenticated, isTrainer, router, clienteId, user?.id]) // nextWeekDates is now stable
 
   const agregarEntrenamiento = () => {
     const nuevoEntrenamiento: Entrenamiento = {
@@ -152,10 +173,49 @@ export default function AsignarEntrenamientoPage() {
     setEntrenamientos(entrenamientos.map((e) => (e.id === id ? { ...e, [campo]: valor } : e)))
   }
 
-  const guardarEntrenamientos = () => {
-    console.log("[v0] Guardando entrenamientos:", entrenamientos)
-    // TODO: Implementar guardado en backend
-    router.push("/entrenador")
+  const guardarEntrenamientos = async () => {
+    try {
+      // Validar que todos los entrenamientos tengan datos completos
+      const entrenamientosCompletos = entrenamientos.filter(e => 
+        e.fecha && e.ejercicio && e.series > 0
+      )
+
+      if (entrenamientosCompletos.length === 0) {
+        alert("Por favor, completa al menos un entrenamiento con fecha, ejercicio y series")
+        return
+      }
+
+      console.log("[DEBUG] Guardando entrenamientos:", entrenamientosCompletos)
+
+      const response = await fetch(`http://localhost:8000/entrenador/${user?.id}/cliente/${clienteId}/plan-entrenamiento`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          entrenamientos: entrenamientosCompletos
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || `Error HTTP: ${response.status}`)
+      }
+
+      const data = await response.json()
+      console.log("[DEBUG] Respuesta del servidor:", data)
+
+      if (data.success) {
+        alert(`Plan de entrenamiento guardado exitosamente. ${data.total} entrenamientos asignados.`)
+        router.push("/entrenador")
+      } else {
+        throw new Error(data.message || "Error al guardar el plan")
+      }
+
+    } catch (error) {
+      console.error("[ERROR] Error al guardar entrenamientos:", error)
+      alert(`Error al guardar el plan de entrenamiento: ${error instanceof Error ? error.message : 'Error desconocido'}`)
+    }
   }
 
   if (isLoading) {
@@ -272,7 +332,7 @@ export default function AsignarEntrenamientoPage() {
                         <SelectValue placeholder="Seleccionar fecha" />
                       </SelectTrigger>
                       <SelectContent>
-                        {nextWeekDates.map((fecha) => (
+                        {availableDates.map((fecha: string) => (
                           <SelectItem key={fecha} value={fecha}>
                             {new Date(fecha).toLocaleDateString("es-ES", {
                               weekday: "long",
@@ -294,9 +354,9 @@ export default function AsignarEntrenamientoPage() {
                         <SelectValue placeholder="Seleccionar ejercicio" />
                       </SelectTrigger>
                       <SelectContent>
-                        {ejerciciosDisponibles.map((ejercicio) => (
-                          <SelectItem key={ejercicio} value={ejercicio}>
-                            {ejercicio}
+                        {ejercicios.map((ejercicio: Ejercicio) => (
+                          <SelectItem key={ejercicio.id} value={ejercicio.nombre}>
+                            {ejercicio.nombre}
                           </SelectItem>
                         ))}
                       </SelectContent>

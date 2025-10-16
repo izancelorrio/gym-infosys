@@ -7,19 +7,49 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Activity, Users, Plus, Save, ArrowLeft, Trash2 } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Activity, Users, Plus, Save, ArrowLeft, Trash2, CheckCircle2, Clock, Calendar, Check } from "lucide-react"
 
 interface Ejercicio {
   id: string
   fecha: string
-  tipo?: "clase" | "fuerza" // Hacer opcional para permitir estado inicial sin tipo
-  actividad: string
-  // Campos para ejercicios de fuerza
-  series?: number
+  actividad: string // Nombre del ejercicio
+  ejercicio_id?: number // ID del ejercicio en la tabla ejercicios
+  // Campos para registro detallado
+  series_realizadas?: number
   repeticiones?: number
-  peso?: number
-  // Campo para clases
-  duracion?: number
+  peso_kg?: number
+  tiempo_minutos?: number
+  distancia_metros?: number
+  notas?: string
+  valoracion?: number // 1-10
+}
+
+interface EntrenamientoPendiente {
+  id: number
+  fecha_entrenamiento: string
+  series_planificadas: number
+  ejercicio: {
+    id: number
+    nombre: string
+    categoria: string
+    descripcion: string
+  }
+  entrenador_nombre: string
+}
+
+interface ClaseReservada {
+  id: number
+  id_clase_programada: number
+  estado: string
+  clase: {
+    fecha: string
+    hora: string
+    tipo: string
+    color: string
+    instructor: string
+  }
 }
 
 export default function RegistrarEjercicioPage() {
@@ -27,6 +57,9 @@ export default function RegistrarEjercicioPage() {
   const router = useRouter()
 
   const [ejercicios, setEjercicios] = useState<Ejercicio[]>([])
+  const [ejerciciosDisponibles, setEjerciciosDisponibles] = useState<any[]>([])
+  const [entrenamientosPendientes, setEntrenamientosPendientes] = useState<EntrenamientoPendiente[]>([])
+  const [clasesReservadas, setClasesReservadas] = useState<ClaseReservada[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   // Generar fechas del último mes hasta hoy
@@ -53,43 +86,10 @@ export default function RegistrarEjercicioPage() {
     return fechas
   }, [])
 
-  const clasesDisponibles = [
-    "Pilates",
-    "Zumba", 
-    "CrossFit",
-    "Spinning",
-    "Yoga",
-    "Aeróbicos",
-    "Funcional",
-    "Boxing",
-    "Aqua Aeróbicos",
-    "Body Pump",
-    "Body Combat",
-    "Stretching"
-  ]
-
-  const ejerciciosDisponibles = [
-    "Press de banca",
-    "Sentadillas",
-    "Peso muerto",
-    "Press militar",
-    "Remo con barra",
-    "Dominadas",
-    "Fondos",
-    "Curl de bíceps",
-    "Extensiones de tríceps",
-    "Elevaciones laterales",
-    "Prensa de piernas",
-    "Curl femoral",
-    "Extensiones de cuádriceps",
-    "Caminadora",
-    "Bicicleta estática",
-    "Elíptica",
-  ]
-
-  const duracionesClase = [30, 45, 60, 90] // en minutos
-  const repeticionesDisponibles = [5, 6, 7, 8, 9, 10, 12, 15, 20]
-  const pesosDisponibles = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 110, 120]
+  // Debug: observar cambios en los estados
+  useEffect(() => {
+    console.log("[DEBUG] Estados actualizados - Entrenamientos:", entrenamientosPendientes.length, "Clases:", clasesReservadas.length)
+  }, [entrenamientosPendientes, clasesReservadas])
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -101,6 +101,13 @@ export default function RegistrarEjercicioPage() {
       router.push("/")
       return
     }
+
+    if (!user?.id) {
+      console.log("[DEBUG] Usuario ID no disponible aún, esperando...")
+      return
+    }
+
+    console.log("[DEBUG] Iniciando carga de datos para usuario:", user.id)
 
     // Verificar si hay datos existentes en localStorage
     const ejerciciosGuardados = localStorage.getItem(`ejercicios-${user?.email}`)
@@ -128,8 +135,111 @@ export default function RegistrarEjercicioPage() {
       },
     ])
 
+    // Cargar entrenamientos pendientes
+    const cargarEntrenamientosPendientes = async () => {
+      try {
+        const response = await fetch(`http://localhost:8000/cliente/${user?.id}/entrenamientos-pendientes`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success) {
+            setEntrenamientosPendientes(data.entrenamientos_pendientes || [])
+            console.log("[DEBUG] Entrenamientos pendientes cargados:", data.entrenamientos_pendientes)
+          }
+        } else {
+          console.error("[ERROR] Error al cargar entrenamientos pendientes:", response.status)
+        }
+      } catch (error) {
+        console.error("[ERROR] Error al cargar entrenamientos pendientes:", error)
+      }
+    }
+
+    // Cargar ejercicios disponibles
+    const cargarEjerciciosDisponibles = async () => {
+      try {
+        const response = await fetch("http://localhost:8000/ejercicios", {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success) {
+            setEjerciciosDisponibles(data.ejercicios || [])
+            console.log("[DEBUG] Ejercicios disponibles cargados:", data.ejercicios)
+          }
+        } else {
+          console.error("[ERROR] Error al cargar ejercicios:", response.status)
+        }
+      } catch (error) {
+        console.error("[ERROR] Error al cargar ejercicios:", error)
+      }
+    }
+
+    // Cargar clases reservadas
+    const cargarClasesReservadas = async () => {
+      try {
+        console.log("[DEBUG] Usuario completo:", user)
+        console.log("[DEBUG] ID del usuario:", user?.id)
+        console.log("[DEBUG] Cargando clases reservadas para usuario:", user?.id)
+        
+        if (!user?.id) {
+          console.error("[ERROR] No hay user.id disponible")
+          return
+        }
+        
+        const url = `http://localhost:8000/user/${user.id}/reservas`
+        console.log("[DEBUG] URL de la petición:", url)
+        
+        const response = await fetch(url, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        })
+
+        console.log("[DEBUG] Respuesta status:", response.status)
+
+        if (response.ok) {
+          const data = await response.json()
+          console.log("[DEBUG] Respuesta API reservas:", data)
+          console.log("[DEBUG] Tipo de data:", typeof data, "Es array:", Array.isArray(data))
+          
+          if (!Array.isArray(data)) {
+            console.error("[ERROR] La respuesta no es un array:", data)
+            return
+          }
+          
+          // Filtrar solo las clases activas (no completadas)
+          const clasesActivas = data.filter((reserva: ClaseReservada) => {
+            console.log("[DEBUG] Procesando reserva:", reserva.id, "estado:", reserva.estado)
+            return reserva.estado === 'activa'
+          })
+          console.log("[DEBUG] Clases activas filtradas:", clasesActivas)
+          setClasesReservadas(clasesActivas || [])
+          console.log("[DEBUG] Estado actualizado - clases reservadas:", clasesActivas.length)
+        } else {
+          console.error("[ERROR] Error al cargar clases reservadas:", response.status)
+          const errorText = await response.text()
+          console.error("[ERROR] Detalle del error:", errorText)
+        }
+      } catch (error) {
+        console.error("[ERROR] Error al cargar clases reservadas:", error)
+      }
+    }
+
+    cargarEntrenamientosPendientes()
+    cargarEjerciciosDisponibles()
+    cargarClasesReservadas()
     setIsLoading(false)
-  }, [isAuthenticated, router, user?.role, user?.email])
+  }, [isAuthenticated, router, user?.role, user?.id])
 
   const agregarEjercicio = () => {
     // Usar la fecha de hoy formateada
@@ -158,10 +268,94 @@ export default function RegistrarEjercicioPage() {
     setEjercicios(ejercicios.map((e) => (e.id === id ? { ...e, ...campos } : e)))
   }
 
-  const guardarEjercicios = () => {
-    // Filtrar ejercicios que tienen tipo y actividad seleccionados
+  const registrarActividadPlanificada = async (entrenamiento: EntrenamientoPendiente, datosCompletados: any) => {
+    try {
+      const actividadData = {
+        id_ejercicio: entrenamiento.ejercicio.id,
+        id_entrenamiento_asignado: entrenamiento.id,
+        fecha_realizacion: new Date().toISOString().split('T')[0], // Fecha de hoy
+        series_realizadas: datosCompletados.series_realizadas,
+        repeticiones: datosCompletados.repeticiones || null,
+        peso_kg: datosCompletados.peso_kg || null,
+        tiempo_segundos: datosCompletados.tiempo_segundos || null,
+        distancia_metros: datosCompletados.distancia_metros || null,
+        notas: datosCompletados.notas || "",
+        valoracion: datosCompletados.valoracion || null
+      }
+
+      console.log("[DEBUG] Registrando actividad planificada:", actividadData)
+
+      const response = await fetch(`http://localhost:8000/cliente/${user?.id}/registrar-actividad`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(actividadData)
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || `Error HTTP: ${response.status}`)
+      }
+
+      const data = await response.json()
+      console.log("[DEBUG] Actividad registrada:", data)
+
+      if (data.success) {
+        alert("¡Actividad registrada exitosamente!")
+        // Remover el entrenamiento de la lista de pendientes
+        setEntrenamientosPendientes(prev => prev.filter(e => e.id !== entrenamiento.id))
+      } else {
+        throw new Error(data.message || "Error al registrar actividad")
+      }
+
+    } catch (error) {
+      console.error("[ERROR] Error al registrar actividad:", error)
+      alert(`Error al registrar actividad: ${error instanceof Error ? error.message : 'Error desconocido'}`)
+    }
+  }
+
+  const registrarAsistenciaClase = async (claseReservada: ClaseReservada) => {
+    try {
+      console.log("[DEBUG] Registrando asistencia a clase:", claseReservada)
+
+      const response = await fetch(`http://localhost:8000/reservas/${claseReservada.id}/registrar-asistencia`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        }
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || `Error HTTP: ${response.status}`)
+      }
+
+      const data = await response.json()
+      console.log("[DEBUG] Asistencia registrada:", data)
+
+      if (data.success) {
+        alert(`¡Asistencia a ${claseReservada.clase.tipo} registrada exitosamente!`)
+        // Remover la clase de la lista de reservadas activas
+        setClasesReservadas(prev => prev.filter(c => c.id !== claseReservada.id))
+      } else if (data.already_registered) {
+        alert("Ya se registró la asistencia a esta clase")
+        // También remover de la lista si ya fue registrada
+        setClasesReservadas(prev => prev.filter(c => c.id !== claseReservada.id))
+      } else {
+        throw new Error(data.message || "Error al registrar asistencia")
+      }
+
+    } catch (error) {
+      console.error("[ERROR] Error al registrar asistencia:", error)
+      alert(`Error al registrar asistencia: ${error instanceof Error ? error.message : 'Error desconocido'}`)
+    }
+  }
+
+  const guardarEjercicios = async () => {
+    // Filtrar ejercicios que tienen actividad seleccionada
     const ejerciciosCompletos = ejercicios.filter(
-      (e) => e.tipo && e.actividad && e.actividad.trim() !== ""
+      (e) => e.actividad && e.actividad.trim() !== ""
     )
     
     if (ejerciciosCompletos.length === 0) {
@@ -169,30 +363,78 @@ export default function RegistrarEjercicioPage() {
       return
     }
 
-    console.log("[v0] Guardando ejercicios:", ejerciciosCompletos)
-    
-    // Cargar ejercicios existentes del localStorage
-    const ejerciciosExistentes = localStorage.getItem(`ejercicios-${user?.email}`)
-    let todosLosEjercicios: Ejercicio[] = []
-    
-    if (ejerciciosExistentes) {
-      try {
-        todosLosEjercicios = JSON.parse(ejerciciosExistentes)
-      } catch (error) {
-        console.error("Error al cargar ejercicios existentes:", error)
-        todosLosEjercicios = []
+    try {
+      console.log("[DEBUG] Guardando ejercicios en base de datos:", ejerciciosCompletos)
+      
+      const actividadesRegistradas = []
+      
+      for (const ejercicio of ejerciciosCompletos) {
+        const actividadData = {
+          id_ejercicio: ejercicio.ejercicio_id, // ID del ejercicio seleccionado
+          id_entrenamiento_asignado: null, // NULL porque es actividad libre
+          fecha_realizacion: ejercicio.fecha,
+          series_realizadas: ejercicio.series_realizadas || null,
+          repeticiones: ejercicio.repeticiones || null,
+          peso_kg: ejercicio.peso_kg || null,
+          tiempo_segundos: ejercicio.tiempo_minutos ? ejercicio.tiempo_minutos * 60 : null,
+          distancia_metros: ejercicio.distancia_metros || null,
+          notas: ejercicio.notas || "",
+          valoracion: ejercicio.valoracion || null
+        }
+
+        const response = await fetch(`http://localhost:8000/cliente/${user?.id}/registrar-actividad`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(actividadData)
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.detail || `Error HTTP: ${response.status}`)
+        }
+
+        const data = await response.json()
+        if (data.success) {
+          actividadesRegistradas.push(data)
+        }
       }
+      
+      alert(`Se registraron ${actividadesRegistradas.length} actividades correctamente en la base de datos.`)
+      router.push("/cliente/agenda")
+      
+    } catch (error) {
+      console.error("[ERROR] Error al guardar ejercicios:", error)
+      alert(`Error al guardar actividades: ${error instanceof Error ? error.message : 'Error desconocido'}`)
     }
-    
-    // Combinar con los nuevos ejercicios
-    const ejerciciosActualizados = [...todosLosEjercicios, ...ejerciciosCompletos]
-    
-    // Guardar en localStorage
-    localStorage.setItem(`ejercicios-${user?.email}`, JSON.stringify(ejerciciosActualizados))
-    
-    alert(`Se guardaron ${ejerciciosCompletos.length} actividades correctamente.`)
-    router.push("/cliente/agenda")
   }
+
+  // Combinar entrenamientos pendientes y clases reservadas, ordenados por fecha
+  const actividadesPendientes = useMemo(() => {
+    const actividades: Array<{tipo: 'entrenamiento' | 'clase', fecha: string, data: EntrenamientoPendiente | ClaseReservada}> = []
+    
+    // Agregar entrenamientos pendientes
+    entrenamientosPendientes.forEach(entrenamiento => {
+      actividades.push({
+        tipo: 'entrenamiento',
+        fecha: entrenamiento.fecha_entrenamiento,
+        data: entrenamiento
+      })
+    })
+    
+    // Agregar clases reservadas
+    clasesReservadas.forEach(clase => {
+      actividades.push({
+        tipo: 'clase',
+        fecha: clase.clase.fecha,
+        data: clase
+      })
+    })
+    
+    // Ordenar por fecha
+    return actividades.sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime())
+  }, [entrenamientosPendientes, clasesReservadas])
 
   if (isLoading) {
     return (
@@ -201,6 +443,14 @@ export default function RegistrarEjercicioPage() {
       </div>
     )
   }
+
+  // Debug final antes del render
+  console.log("[DEBUG RENDER] Estados finales:", {
+    entrenamientosPendientes: entrenamientosPendientes.length,
+    clasesReservadas: clasesReservadas.length,
+    actividadesPendientes: actividadesPendientes.length,
+    userId: user?.id
+  })
 
   return (
     <div className="min-h-screen bg-background p-6">
@@ -264,6 +514,40 @@ export default function RegistrarEjercicioPage() {
           </CardContent>
         </Card>
 
+        {/* Card de Entrenamientos Planificados */}
+        {actividadesPendientes.length > 0 && (
+          <Card className="border-border shadow-lg bg-card">
+            <CardHeader className="bg-gradient-to-r from-green-500/10 to-blue-500/10 border-b border-border">
+              <CardTitle className="flex items-center space-x-2 text-foreground">
+                <Clock className="h-5 w-5" />
+                <span>Actividades Planificadas</span>
+                <span className="text-sm text-muted-foreground">
+                  ({entrenamientosPendientes.length} entrenamientos, {clasesReservadas.length} clases)
+                </span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="space-y-4">
+                {actividadesPendientes.map((actividad, index) => (
+                  <div key={`${actividad.tipo}-${index}`}>
+                    {actividad.tipo === 'entrenamiento' ? (
+                      <EntrenamientoPendienteCard 
+                        entrenamiento={actividad.data as EntrenamientoPendiente}
+                        onRegistrar={registrarActividadPlanificada}
+                      />
+                    ) : (
+                      <ClaseReservadaCard 
+                        claseReservada={actividad.data as ClaseReservada}
+                        onRegistrar={registrarAsistenciaClase}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <Card className="border-border shadow-lg bg-card">
           <CardHeader className="bg-gradient-to-r from-primary/10 to-secondary/10 border-b border-border">
             <div className="flex items-center justify-between">
@@ -311,130 +595,28 @@ export default function RegistrarEjercicioPage() {
                     </div>
                     
                     <div className="col-span-8">
-                      {/* Selector único que cambia según el contexto */}
-                      {ejercicio.tipo === "clase" ? (
-                        // Mostrar selector de clases y duración
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <label className="text-sm font-medium text-foreground mb-2 block">Clase</label>
-                            <Select
-                              value={ejercicio.actividad}
-                              onValueChange={(value) => {
-                                actualizarEjercicio(ejercicio.id, "actividad", value)
-                              }}
-                            >
-                              <SelectTrigger className="bg-background border-border text-foreground">
-                                <SelectValue placeholder="Seleccionar clase" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {clasesDisponibles.map((clase) => (
-                                  <SelectItem key={clase} value={clase}>
-                                    {clase}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          
-                          <div>
-                            <label className="text-sm font-medium text-foreground mb-2 block">Duración</label>
-                            <Select
-                              value={ejercicio.duracion?.toString() || ""}
-                              onValueChange={(value) => actualizarEjercicio(ejercicio.id, "duracion", Number(value))}
-                            >
-                              <SelectTrigger className="bg-background border-border text-foreground">
-                                <SelectValue placeholder="Seleccionar duración" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {duracionesClase.map((duracion) => (
-                                  <SelectItem key={duracion} value={duracion.toString()}>
-                                    {duracion} min
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                      ) : ejercicio.tipo === "fuerza" ? (
-                        // Mostrar selector de ejercicios de fuerza
-                        <div>
-                          <label className="text-sm font-medium text-foreground mb-2 block">Ejercicio de Fuerza</label>
-                          <Select
-                            value={ejercicio.actividad}
-                            onValueChange={(value) => {
-                              actualizarEjercicio(ejercicio.id, "actividad", value)
-                            }}
-                          >
-                            <SelectTrigger className="bg-background border-border text-foreground">
-                              <SelectValue placeholder="Seleccionar ejercicio" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {ejerciciosDisponibles.map((ejercicio) => (
-                                <SelectItem key={ejercicio} value={ejercicio}>
-                                  {ejercicio}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      ) : (
-                        // Selector inicial para elegir tipo
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <label className="text-sm font-medium text-foreground mb-2 block">Clases</label>
-                            <Select
-                              value={ejercicio.tipo === "clase" ? ejercicio.actividad : ""}
-                              onValueChange={(value) => {
-                                actualizarEjercicioMultiple(ejercicio.id, {
-                                  tipo: "clase",
-                                  actividad: value,
-                                  // Limpiar campos de fuerza
-                                  series: undefined,
-                                  repeticiones: undefined,
-                                  peso: undefined
-                                })
-                              }}
-                            >
-                              <SelectTrigger className="bg-background border-border text-foreground">
-                                <SelectValue placeholder="Seleccionar clase" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {clasesDisponibles.map((clase) => (
-                                  <SelectItem key={clase} value={clase}>
-                                    {clase}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          
-                          <div>
-                            <label className="text-sm font-medium text-foreground mb-2 block">Ejercicios de Fuerza</label>
-                            <Select
-                              value={ejercicio.tipo === "fuerza" ? ejercicio.actividad : ""}
-                              onValueChange={(value) => {
-                                actualizarEjercicioMultiple(ejercicio.id, {
-                                  tipo: "fuerza",
-                                  actividad: value,
-                                  // Limpiar campo de clase
-                                  duracion: undefined
-                                })
-                              }}
-                            >
-                              <SelectTrigger className="bg-background border-border text-foreground">
-                                <SelectValue placeholder="Seleccionar ejercicio" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {ejerciciosDisponibles.map((ejercicio) => (
-                                  <SelectItem key={ejercicio} value={ejercicio}>
-                                    {ejercicio}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                      )}
+                      <label className="text-sm font-medium text-foreground mb-2 block">Ejercicio</label>
+                      <Select
+                        value={ejercicio.actividad}
+                        onValueChange={(value) => {
+                          const ejercicioSeleccionado = ejerciciosDisponibles.find(e => e.nombre === value)
+                          actualizarEjercicioMultiple(ejercicio.id, {
+                            actividad: value,
+                            ejercicio_id: ejercicioSeleccionado?.id
+                          })
+                        }}
+                      >
+                        <SelectTrigger className="bg-background border-border text-foreground">
+                          <SelectValue placeholder="Seleccionar ejercicio" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ejerciciosDisponibles.map((ejercicio_item) => (
+                            <SelectItem key={ejercicio_item.id} value={ejercicio_item.nombre}>
+                              {ejercicio_item.nombre} ({ejercicio_item.categoria})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     
                     <div className="col-span-1">
@@ -449,66 +631,102 @@ export default function RegistrarEjercicioPage() {
                     </div>
                   </div>
 
-                  {/* Segunda fila: Campos condicionales solo para ejercicios de fuerza */}
-                  {ejercicio.actividad && ejercicio.tipo === "fuerza" && (
-                    <div className="pt-2 border-t border-border">
-                      <div className="grid grid-cols-3 gap-4">
-                        <div>
-                          <label className="text-sm font-medium text-foreground mb-2 block">Series</label>
-                          <Select
-                            value={ejercicio.series?.toString() || ""}
-                            onValueChange={(value) => actualizarEjercicio(ejercicio.id, "series", Number(value))}
-                          >
-                            <SelectTrigger className="bg-background border-border text-foreground">
-                              <SelectValue placeholder="Seleccionar series" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {[1, 2, 3, 4, 5].map((serie) => (
-                                <SelectItem key={serie} value={serie.toString()}>
-                                  {serie} serie{serie > 1 ? "s" : ""}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                  {/* Segunda fila: Campos de registro detallado */}
+                  {ejercicio.actividad && (
+                    <div className="pt-4 border-t border-border">
+                      <div className="grid grid-cols-2 gap-6">
+                        {/* Columna izquierda */}
+                        <div className="space-y-4">
+                          <div>
+                            <label className="text-sm font-medium text-foreground mb-2 block">Series realizadas</label>
+                            <Input
+                              type="number"
+                              placeholder="Número de series"
+                              value={ejercicio.series_realizadas || ""}
+                              onChange={(e) => actualizarEjercicio(ejercicio.id, "series_realizadas", Number(e.target.value))}
+                              className="bg-background border-border text-foreground"
+                            />
+                          </div>
+                          
+                          <div>
+                            <label className="text-sm font-medium text-foreground mb-2 block">Repeticiones</label>
+                            <Input
+                              type="number"
+                              placeholder="Repeticiones por serie"
+                              value={ejercicio.repeticiones || ""}
+                              onChange={(e) => actualizarEjercicio(ejercicio.id, "repeticiones", Number(e.target.value))}
+                              className="bg-background border-border text-foreground"
+                            />
+                          </div>
+                          
+                          <div>
+                            <label className="text-sm font-medium text-foreground mb-2 block">Peso (kg)</label>
+                            <Input
+                              type="number"
+                              step="0.1"
+                              placeholder="Peso utilizado"
+                              value={ejercicio.peso_kg || ""}
+                              onChange={(e) => actualizarEjercicio(ejercicio.id, "peso_kg", Number(e.target.value))}
+                              className="bg-background border-border text-foreground"
+                            />
+                          </div>
                         </div>
                         
-                        <div>
-                          <label className="text-sm font-medium text-foreground mb-2 block">Repeticiones</label>
-                          <Select
-                            value={ejercicio.repeticiones?.toString() || ""}
-                            onValueChange={(value) => actualizarEjercicio(ejercicio.id, "repeticiones", Number(value))}
-                          >
-                            <SelectTrigger className="bg-background border-border text-foreground">
-                              <SelectValue placeholder="Seleccionar repeticiones" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {repeticionesDisponibles.map((rep) => (
-                                <SelectItem key={rep} value={rep.toString()}>
-                                  {rep} reps
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                        {/* Columna derecha */}
+                        <div className="space-y-4">
+                          <div>
+                            <label className="text-sm font-medium text-foreground mb-2 block">Tiempo (minutos)</label>
+                            <Input
+                              type="number"
+                              placeholder="Duración en minutos"
+                              value={ejercicio.tiempo_minutos || ""}
+                              onChange={(e) => actualizarEjercicio(ejercicio.id, "tiempo_minutos", Number(e.target.value))}
+                              className="bg-background border-border text-foreground"
+                            />
+                          </div>
+                          
+                          <div>
+                            <label className="text-sm font-medium text-foreground mb-2 block">Distancia (metros)</label>
+                            <Input
+                              type="number"
+                              placeholder="Distancia recorrida"
+                              value={ejercicio.distancia_metros || ""}
+                              onChange={(e) => actualizarEjercicio(ejercicio.id, "distancia_metros", Number(e.target.value))}
+                              className="bg-background border-border text-foreground"
+                            />
+                          </div>
+                          
+                          <div>
+                            <label className="text-sm font-medium text-foreground mb-2 block">Valoración (1-10)</label>
+                            <Select
+                              value={ejercicio.valoracion?.toString() || ""}
+                              onValueChange={(value) => actualizarEjercicio(ejercicio.id, "valoracion", Number(value))}
+                            >
+                              <SelectTrigger className="bg-background border-border text-foreground">
+                                <SelectValue placeholder="Califica tu ejercicio" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((rating) => (
+                                  <SelectItem key={rating} value={rating.toString()}>
+                                    {rating} - {rating <= 3 ? 'Difícil' : rating <= 6 ? 'Moderado' : rating <= 8 ? 'Bueno' : 'Excelente'}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
                         </div>
-                        
-                        <div>
-                          <label className="text-sm font-medium text-foreground mb-2 block">Peso (kg)</label>
-                          <Select
-                            value={ejercicio.peso?.toString() || ""}
-                            onValueChange={(value) => actualizarEjercicio(ejercicio.id, "peso", Number(value))}
-                          >
-                            <SelectTrigger className="bg-background border-border text-foreground">
-                              <SelectValue placeholder="Seleccionar peso" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {pesosDisponibles.map((peso) => (
-                                <SelectItem key={peso} value={peso.toString()}>
-                                  {peso} kg
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
+                      </div>
+                      
+                      {/* Notas - ocupa toda la fila */}
+                      <div className="mt-4">
+                        <label className="text-sm font-medium text-foreground mb-2 block">Notas adicionales</label>
+                        <textarea
+                          placeholder="Observaciones sobre el ejercicio..."
+                          value={ejercicio.notas || ""}
+                          onChange={(e) => actualizarEjercicio(ejercicio.id, "notas", e.target.value)}
+                          className="w-full p-3 bg-background border border-border rounded-md text-foreground placeholder-muted-foreground resize-none"
+                          rows={2}
+                        />
                       </div>
                     </div>
                   )}
@@ -525,6 +743,225 @@ export default function RegistrarEjercicioPage() {
           </CardContent>
         </Card>
       </div>
+    </div>
+  )
+}
+
+// Componente para mostrar cada clase reservada
+interface ClaseReservadaCardProps {
+  claseReservada: ClaseReservada
+  onRegistrar: (claseReservada: ClaseReservada) => void
+}
+
+function ClaseReservadaCard({ claseReservada, onRegistrar }: ClaseReservadaCardProps) {
+  const fechaClase = new Date(claseReservada.clase.fecha)
+  const horaClase = claseReservada.clase.hora
+
+  return (
+    <div className="border border-border rounded-lg p-4 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center space-x-3">
+          <div className="p-2 bg-purple-500 rounded-full">
+            <Calendar className="h-4 w-4 text-white" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-lg">{claseReservada.clase.tipo}</h3>
+            <p className="text-sm text-muted-foreground">
+              {fechaClase.toLocaleDateString('es-ES')} • {horaClase} • Instructor: {claseReservada.clase.instructor}
+            </p>
+            <p className="text-xs text-purple-600">Clase reservada</p>
+          </div>
+        </div>
+        <Button
+          onClick={() => onRegistrar(claseReservada)}
+          className="bg-purple-500 hover:bg-purple-600 text-white"
+          size="sm"
+        >
+          <Check className="h-4 w-4 mr-1" />
+          Registrar Asistencia
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+// Componente para mostrar cada entrenamiento pendiente
+interface EntrenamientoPendienteCardProps {
+  entrenamiento: EntrenamientoPendiente
+  onRegistrar: (entrenamiento: EntrenamientoPendiente, datos: any) => void
+}
+
+function EntrenamientoPendienteCard({ entrenamiento, onRegistrar }: EntrenamientoPendienteCardProps) {
+  const [mostrarFormulario, setMostrarFormulario] = useState(false)
+  const [datosActividad, setDatosActividad] = useState({
+    series_realizadas: entrenamiento.series_planificadas,
+    repeticiones: '',
+    peso_kg: '',
+    tiempo_segundos: '',
+    distancia_metros: '',
+    notas: '',
+    valoracion: ''
+  })
+
+  const handleRegistrar = () => {
+    // Validar datos obligatorios
+    if (!datosActividad.series_realizadas || datosActividad.series_realizadas <= 0) {
+      alert("Por favor, ingresa el número de series realizadas")
+      return
+    }
+
+    // Convertir strings a números donde sea necesario
+    const datosParaEnviar = {
+      series_realizadas: Number(datosActividad.series_realizadas),
+      repeticiones: datosActividad.repeticiones ? Number(datosActividad.repeticiones) : null,
+      peso_kg: datosActividad.peso_kg ? Number(datosActividad.peso_kg) : null,
+      tiempo_segundos: datosActividad.tiempo_segundos ? Number(datosActividad.tiempo_segundos) : null,
+      distancia_metros: datosActividad.distancia_metros ? Number(datosActividad.distancia_metros) : null,
+      notas: datosActividad.notas,
+      valoracion: datosActividad.valoracion ? Number(datosActividad.valoracion) : null
+    }
+
+    onRegistrar(entrenamiento, datosParaEnviar)
+  }
+
+  return (
+    <div className="border border-border rounded-lg p-4 bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center space-x-3">
+          <div className="p-2 bg-green-500 rounded-full">
+            <Activity className="h-4 w-4 text-white" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-lg">{entrenamiento.ejercicio.nombre}</h3>
+            <p className="text-sm text-muted-foreground">
+              {entrenamiento.ejercicio.categoria} • {entrenamiento.series_planificadas} series • {new Date(entrenamiento.fecha_entrenamiento).toLocaleDateString('es-ES')}
+            </p>
+            <p className="text-xs text-green-600">Asignado por: {entrenamiento.entrenador_nombre}</p>
+          </div>
+        </div>
+        <Button
+          size="sm"
+          onClick={() => setMostrarFormulario(!mostrarFormulario)}
+          className="bg-green-600 hover:bg-green-700 text-white"
+        >
+          {mostrarFormulario ? "Cancelar" : "Registrar"}
+        </Button>
+      </div>
+
+      {entrenamiento.ejercicio.descripcion && (
+        <p className="text-sm text-muted-foreground mb-3 italic">
+          {entrenamiento.ejercicio.descripcion}
+        </p>
+      )}
+
+      {mostrarFormulario && (
+        <div className="mt-4 p-4 bg-white dark:bg-gray-800 rounded-lg border">
+          <h4 className="font-medium mb-3">Completar registro de actividad</h4>
+          
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+            <div>
+              <label className="text-sm font-medium mb-1 block">Series realizadas *</label>
+              <Input
+                type="number"
+                min="1"
+                value={datosActividad.series_realizadas}
+                onChange={(e) => setDatosActividad(prev => ({ ...prev, series_realizadas: Number(e.target.value) }))}
+                placeholder="Ej: 3"
+              />
+            </div>
+            
+            <div>
+              <label className="text-sm font-medium mb-1 block">Repeticiones</label>
+              <Input
+                type="number"
+                min="1"
+                value={datosActividad.repeticiones}
+                onChange={(e) => setDatosActividad(prev => ({ ...prev, repeticiones: e.target.value }))}
+                placeholder="Ej: 12"
+              />
+            </div>
+            
+            <div>
+              <label className="text-sm font-medium mb-1 block">Peso (kg)</label>
+              <Input
+                type="number"
+                min="0"
+                step="0.5"
+                value={datosActividad.peso_kg}
+                onChange={(e) => setDatosActividad(prev => ({ ...prev, peso_kg: e.target.value }))}
+                placeholder="Ej: 20"
+              />
+            </div>
+            
+            <div>
+              <label className="text-sm font-medium mb-1 block">Tiempo (segundos)</label>
+              <Input
+                type="number"
+                min="1"
+                value={datosActividad.tiempo_segundos}
+                onChange={(e) => setDatosActividad(prev => ({ ...prev, tiempo_segundos: e.target.value }))}
+                placeholder="Ej: 300"
+              />
+            </div>
+            
+            <div>
+              <label className="text-sm font-medium mb-1 block">Distancia (metros)</label>
+              <Input
+                type="number"
+                min="1"
+                value={datosActividad.distancia_metros}
+                onChange={(e) => setDatosActividad(prev => ({ ...prev, distancia_metros: e.target.value }))}
+                placeholder="Ej: 1000"
+              />
+            </div>
+            
+            <div>
+              <label className="text-sm font-medium mb-1 block">Valoración (1-5)</label>
+              <Select
+                value={datosActividad.valoracion}
+                onValueChange={(value) => setDatosActividad(prev => ({ ...prev, valoracion: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Califica tu entrenamiento" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">⭐ - Muy difícil</SelectItem>
+                  <SelectItem value="2">⭐⭐ - Difícil</SelectItem>
+                  <SelectItem value="3">⭐⭐⭐ - Normal</SelectItem>
+                  <SelectItem value="4">⭐⭐⭐⭐ - Bien</SelectItem>
+                  <SelectItem value="5">⭐⭐⭐⭐⭐ - Excelente</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          
+          <div className="mb-4">
+            <label className="text-sm font-medium mb-1 block">Notas</label>
+            <Textarea
+              value={datosActividad.notas}
+              onChange={(e) => setDatosActividad(prev => ({ ...prev, notas: e.target.value }))}
+              placeholder="¿Cómo te sentiste? ¿Algo que destacar?"
+              rows={2}
+            />
+          </div>
+          
+          <div className="flex space-x-2">
+            <Button
+              onClick={handleRegistrar}
+              className="bg-green-600 hover:bg-green-700 text-white"
+            >
+              <CheckCircle2 className="h-4 w-4 mr-2" />
+              Completar Entrenamiento
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setMostrarFormulario(false)}
+            >
+              Cancelar
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -1,22 +1,14 @@
--- Tabla de clientes
-CREATE TABLE IF NOT EXISTS clientes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    id_usuario INTEGER NOT NULL UNIQUE,
-    dni VARCHAR(20) UNIQUE NOT NULL,
-    numero_telefono VARCHAR(20),
-    plan_id INTEGER,
-    fecha_nacimiento DATE,
-    genero VARCHAR(10), -- 'masculino', 'femenino', 'otro'
-    num_tarjeta VARCHAR(19), -- formato xxxx-xxxx-xxxx-xxxx
-    fecha_tarjeta VARCHAR(7), -- formato MM/YYYY
-    cvv VARCHAR(4), -- 3 o 4 dígitos
-    fecha_inscripcion DATE DEFAULT CURRENT_DATE,
-    estado VARCHAR(20) DEFAULT 'activo', -- 'activo', 'inactivo', 'suspendido'
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (id_usuario) REFERENCES usuarios(id) ON DELETE CASCADE,
-    FOREIGN KEY (plan_id) REFERENCES planes(id)
-);
+-- =====================================================
+-- SCRIPT: 03_crear_clientes.sql
+-- DESCRIPCION: Datos de población para tabla clientes
+-- FECHA: 2025-10-16
+-- AUTOR: Sistema Gym Management
+-- =====================================================
+-- 
+-- NOTA: La estructura de la tabla clientes está en crear_base_datos.sql
+-- Este archivo contiene solo los datos de población
+-- 
+-- =====================================================
 
 -- Insertar datos de clientes basados en usuarios existentes
 INSERT INTO clientes (id_usuario, dni, numero_telefono, plan_id, fecha_nacimiento, genero, num_tarjeta, fecha_tarjeta, cvv, fecha_inscripcion, estado) VALUES
@@ -31,10 +23,3 @@ INSERT INTO clientes (id_usuario, dni, numero_telefono, plan_id, fecha_nacimient
 (29, '90123456I', '+34-600-111-009', 2, '1993-06-25', 'femenino', '6759-6498-2643-8453', '07/2025', '567', '2024-02-20', 'activo'),
 (30, '01234567J', '+34-600-111-010', 1, '1989-10-12', 'masculino', '4242-4242-4242-4242', '10/2026', '890', '2024-03-05', 'activo'),
 (31, '11234567K', '+34-600-111-011', 2, '1996-01-03', 'femenino', '5200-8282-8282-8210', '05/2027', '123', '2024-03-20', 'activo');
-
--- Crear trigger para actualizar updated_at automáticamente
-CREATE TRIGGER IF NOT EXISTS update_clientes_timestamp 
-    AFTER UPDATE ON clientes
-BEGIN
-    UPDATE clientes SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
-END;
