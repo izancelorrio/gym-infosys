@@ -18,22 +18,23 @@ FRONTEND_BASE_URL = "http://localhost:3000"  # Para desarrollo local
 
 app = FastAPI()
 
-# Configuración de CORS
+# Configuración de CORS para desarrollo local y Docker
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
         "http://127.0.0.1:3000",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
         "http://192.168.0.201:3000",   # Frontend en Docker
         "http://frontend:3000",        # Nombre del servicio en Docker
         "http://192.168.0.201:8000",   # Backend en Docker
         "http://api:8000",             # Nombre del servicio de API en Docker
-        "*"                            # Permitir todas las origenes en desarrollo
     ],
     allow_credentials=True,
-    allow_methods=["*"],               # Permitir todos los métodos
-    allow_headers=["*"],               # Permitir todos los headers
-    expose_headers=["*"]              # Exponer todos los headers
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"]
 )
 
 def print_server_ip():
@@ -84,13 +85,27 @@ def get_db_connection():
     return sqlite3.connect(db_path)
     """
     
-    # Conexión PostgreSQL
-    return psycopg2.connect(
-        host="192.168.0.201",
-        database="infosis_db",
-        user="icelorrio",
-        password="y^FL^@2KDqDv%H&x"
-    )
+    # Preferir DATABASE_URL si está presente (forma estándar para containers)
+    database_url = os.getenv("DATABASE_URL")
+    if database_url:
+        try:
+            print(f"[DEBUG] Connecting to Postgres using DATABASE_URL")
+            return psycopg2.connect(database_url)
+        except Exception as e:
+            print(f"[ERROR] Failed to connect using DATABASE_URL: {e}")
+
+    # Fallback: usar variables individuales o valores por defecto
+    host = os.getenv("DB_HOST", "localhost")
+    port = os.getenv("DB_PORT", "5432")
+    database = os.getenv("DB_NAME", "infosis_db")
+    user = os.getenv("DB_USER", "icelorrio")
+    password = os.getenv("DB_PASS", "y^FL^@2KDqDv%H&x")
+    try:
+        print(f"[DEBUG] Connecting to Postgres at {host}:{port}, db={database}, user={user}")
+        return psycopg2.connect(host=host, port=port, database=database, user=user, password=password)
+    except Exception as e:
+        print(f"[ERROR] Failed to connect to Postgres at {host}:{port} db={database} user={user}: {e}")
+        raise
 
 def hash_password(password: str) -> str:
     salt = bcrypt.gensalt()
@@ -220,11 +235,23 @@ async def log_request_body(request: Request, call_next):
 def login(req: LoginRequest):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT id, name, email, password, email_verified, role FROM users WHERE email=%s", (req.email,))
-    user = cursor.fetchone()
+    # Intento de obtener el usuario por email
+    try:
+        cursor.execute("SELECT id, name, email, password, email_verified, role FROM users WHERE email=%s", (req.email,))
+        user = cursor.fetchone()
+        print(f"[DEBUG] /login - queried email={req.email} -> result={'FOUND' if user else 'NOT_FOUND'}")
+        if user:
+            # No imprimir el password directamente en logs en producción; aquí es solo debug local
+            masked_pw = user[3][:6] + '...' if user[3] else None
+            print(f"[DEBUG] /login - user row id={user[0]} email={user[2]} password_preview={masked_pw} email_verified={user[4]} role={user[5]}")
+    except Exception as e:
+        print(f"[ERROR] /login - DB query failed for email={req.email}: {e}")
+        conn.close()
+        raise HTTPException(status_code=500, detail="Error interno al consultar usuario")
     
     if user and verify_password(req.password, user[3]):
         if not user[4]:
+            print(f"[INFO] /login - user {user[2]} attempted login but email not verified")
             conn.close()
             raise HTTPException(status_code=403, detail="Debes verificar tu email antes de iniciar sesión")
         
@@ -264,6 +291,11 @@ def login(req: LoginRequest):
         print("[DEBUG] Login response:", response)
         return response
     else:
+        # Log específico para distinguir user-not-found vs bad-password
+        if not user:
+            print(f"[WARN] /login - no user found for email={req.email}")
+        else:
+            print(f"[WARN] /login - password mismatch for user id={user[0]} email={user[2]}")
         conn.close()
         raise HTTPException(status_code=401, detail="Credenciales inválidas")
 
