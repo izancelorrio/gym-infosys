@@ -37,12 +37,10 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }: LoginModalPr
     setError("")
 
     try {
-      console.log("[DEBUG] Making login request through Next.js API route")
-      const response = await fetch("/api/auth/login", {
+      console.log("[DEBUG] Making login request to API")
+      const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.LOGIN}`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: API_CONFIG.HEADERS,
         body: JSON.stringify({ email, password }),
       })
 
@@ -79,11 +77,9 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }: LoginModalPr
     setResetMessage("")
 
     try {
-      const response = await fetch("/api/auth/send-reset-email", {
+      const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.SEND_RESET_EMAIL}`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: API_CONFIG.HEADERS,
         body: JSON.stringify({ email: resetEmail }),
       })
 
