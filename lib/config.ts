@@ -5,10 +5,12 @@ export const API_CONFIG = {
     REGISTER: "/register",
     CHANGE_PASSWORD: "/change-password",
     COUNT_MEMBERS: "/count-members",
+    HEALTH: "/health",
     VERIFY_EMAIL: "/verify-email",
     RESET_PASSWORD: "/reset-password",
     SEND_RESET_EMAIL: "/send-reset-email",
     PLANES: "/planes",
+    COUNT_TRAINERS: "/count-trainers",
   },
   HEADERS: {
     "Content-Type": "application/json",
@@ -17,8 +19,6 @@ export const API_CONFIG = {
   },
   TIMEOUT: 10000, // 10 segundos
 } as const
-
-export const API_DISPONIBLE = 1// 0 para usar API, 0 para modo offline
 
 export const USUARIOS_DEMO = [
   {

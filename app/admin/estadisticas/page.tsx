@@ -87,12 +87,12 @@ export default function EstadisticasPage() {
   const [seccionActiva, setSeccionActiva] = useState<string>("afluencia")
 
   useEffect(() => {
-    if (!user || (user.role !== "admin" && user.role !== "administrador")) {
+    if (!user || user.role !== "admin") {
       router.push("/")
     }
   }, [user, router])
 
-  if (!user || (user.role !== "admin" && user.role !== "administrador")) {
+  if (!user || user.role !== "admin") {
     return null
   }
 

@@ -38,7 +38,7 @@ interface Stats {
   admin: number
   entrenador: number
   cliente: number
-  clientepro: number
+
   usuario: number
   verified: number
   unverified: number
@@ -54,7 +54,7 @@ export default function UsuariosPage() {
     admin: 0,
     entrenador: 0,
     cliente: 0,
-    clientepro: 0,
+
     usuario: 0,
     verified: 0,
     unverified: 0
@@ -63,7 +63,7 @@ export default function UsuariosPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!user || (user.role !== "admin" && user.role !== "administrador")) {
+    if (!user || user.role !== "admin") {
       router.push("/")
     }
   }, [user, router])
@@ -102,7 +102,7 @@ export default function UsuariosPage() {
 
   // Cargar usuarios desde la API
   useEffect(() => {
-    if (user && (user.role === "admin" || user.role === "administrador")) {
+    if (user && user.role === "admin") {
       fetchUsuarios()
     }
   }, [user])
@@ -145,7 +145,7 @@ export default function UsuariosPage() {
     }
   }, [])
 
-  if (!user || (user.role !== "admin" && user.role !== "administrador")) {
+  if (!user || user.role !== "admin") {
     return null
   }
 
@@ -167,13 +167,7 @@ export default function UsuariosPage() {
             Entrenador
           </Badge>
         )
-      case "clientepro":
-        return (
-          <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-100">
-            <UserCheck className="h-3 w-3 mr-1" />
-            Cliente Pro
-          </Badge>
-        )
+
       case "cliente":
         return (
           <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
@@ -274,19 +268,7 @@ export default function UsuariosPage() {
               </CardContent>
             </Card>
 
-            <Card className="bg-card border-border shadow-lg">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="bg-purple-100 p-3 rounded-full">
-                    <UserCheck className="h-6 w-6 text-purple-600" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Clientes Pro</p>
-                    <p className="text-2xl font-bold text-purple-600">{stats.clientepro}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+
 
             <Card className="bg-card border-border shadow-lg">
               <CardContent className="p-6">
@@ -376,9 +358,7 @@ export default function UsuariosPage() {
                             >
                               <option value="todos">Todos</option>
                               <option value="admin">Admin</option>
-                              <option value="administrador">Administrador</option>
                               <option value="entrenador">Entrenador</option>
-                              <option value="clientepro">Cliente Pro</option>
                               <option value="cliente">Cliente</option>
                               <option value="usuario">Usuario</option>
                             </select>

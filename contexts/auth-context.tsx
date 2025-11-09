@@ -7,7 +7,7 @@ interface User {
   id: number
   email: string
   name: string
-  role: "usuario" | "cliente" | "clientepro" | "entrenador" | "administrador" | "admin"
+  role: "usuario" | "cliente" | "entrenador" | "admin"
   verified?: boolean
   cliente?: {
     id: number
@@ -168,7 +168,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setTimeout(() => {
           router.push("/entrenador")
         }, 100)
-      } else if (userWithRole.role === "administrador" || userWithRole.role === "admin") {
+      } else if (userWithRole.role === "admin") {
         console.log("[GymInfoSys] Redirecting admin to /admin")
         setTimeout(() => {
           router.push("/admin")
@@ -222,7 +222,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const isAdmin = () => {
-    return user?.role === "administrador" || user?.role === "admin"
+    return user?.role === "admin"
   }
 
   const isAuthenticated = !!user

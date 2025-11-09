@@ -1,15 +1,9 @@
 import { NextResponse } from "next/server"
-import { API_CONFIG, API_DISPONIBLE } from "@/lib/config"
+import { API_CONFIG } from "@/lib/config"
 
 export async function GET() {
   console.log("[DEBUG] count-members: Starting API route")
-  console.log("[DEBUG] count-members: API_DISPONIBLE:", API_DISPONIBLE)
-  
-  // Si la API no está disponible, devolver valor por defecto
-  if (API_DISPONIBLE === 0) {
-    console.log("[DEBUG] count-members: API not available, using default count")
-    return NextResponse.json({ count: 847, mode: "offline" })
-  }
+  console.log("[DEBUG] count-members: Starting count request")
   
   try {
     const fullUrl = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.COUNT_MEMBERS}`

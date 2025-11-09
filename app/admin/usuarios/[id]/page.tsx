@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Users, ArrowLeft, UserCheck, Crown, Dumbbell, Save, User, Loader2, AlertCircle, Mail, MailCheck, CreditCard, Phone, MapPin, Clock } from "lucide-react"
 
 interface Cliente {
@@ -23,6 +24,9 @@ interface Cliente {
   estado: string
   created_at: string
   updated_at: string
+  num_tarjeta?: string
+  fecha_tarjeta?: string
+  cvv?: string
 }
 
 interface Usuario {
@@ -47,12 +51,70 @@ export default function DetalleUsuarioPage() {
   const [error, setError] = useState<string | null>(null)
   const [editando, setEditando] = useState(false)
   const [guardando, setGuardando] = useState(false)
+  const [showErrorModal, setShowErrorModal] = useState(false)
+  const [planes, setPlanes] = useState<{id: number, nombre: string}[]>([])
+  const [loadingPlanes, setLoadingPlanes] = useState(false)
+
+  const closeErrorModal = () => {
+    setShowErrorModal(false)
+    setError(null)
+  }
 
   useEffect(() => {
-    if (!user || (user.role !== "admin" && user.role !== "administrador")) {
+    if (error) {
+      setShowErrorModal(true)
+    }
+  }, [error])
+
+  useEffect(() => {
+    if (!user || user.role !== "admin") {
       router.push("/")
     }
   }, [user, router])
+
+  // Cargar planes disponibles
+  const fetchPlanes = async () => {
+    try {
+      console.log('🔄 Iniciando carga de planes...')
+      setLoadingPlanes(true)
+      
+      const response = await fetch('/api/admin/planes', {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      })
+      
+      console.log('📝 Status de la respuesta:', response.status)
+      
+      if (!response.ok) {
+        throw new Error(`Error al cargar los planes: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      console.log('📝 Planes recibidos:', data)
+      
+      if (!data.planes || !Array.isArray(data.planes)) {
+        throw new Error('Formato de datos inválido')
+      }
+      
+      setPlanes(data.planes)
+      console.log('✅ Planes cargados correctamente')
+    } catch (error) {
+      console.error('❌ Error cargando planes:', error)
+      setError('Error al cargar los planes disponibles: ' + (error instanceof Error ? error.message : 'Error desconocido'))
+    } finally {
+      setLoadingPlanes(false)
+    }
+  }
+
+  // Cargar planes al montar el componente
+  useEffect(() => {
+    if (editando) {
+      fetchPlanes()
+    }
+  }, [editando])
 
   // Debugging: monitorear cambios en usuarioData
   useEffect(() => {
@@ -99,7 +161,7 @@ export default function DetalleUsuarioPage() {
 
   // Cargar datos del usuario desde la API
   useEffect(() => {
-    if (user && (user.role === "admin" || user.role === "administrador") && userId) {
+    if (user && user.role === "admin" && userId) {
       fetchUsuario()
     }
   }, [user, userId])
@@ -108,6 +170,35 @@ export default function DetalleUsuarioPage() {
     if (!usuarioData) return
     
     try {
+      // Validar campos requeridos cuando se cambia a cliente
+      if (usuarioData.role === "cliente" && !usuarioData.cliente?.id) {
+        // Validar DNI
+        if (!usuarioData.cliente?.dni) {
+          setError("El DNI/NIE es obligatorio para crear un cliente")
+          return
+        }
+        // Validar Plan
+        if (!usuarioData.cliente?.plan_id) {
+          setError("Debes seleccionar un plan para el cliente")
+          return
+        }
+        // Validar Fecha de nacimiento
+        if (!usuarioData.cliente?.fecha_nacimiento) {
+          setError("La fecha de nacimiento es obligatoria para crear un cliente")
+          return
+        }
+        // Validar Género
+        if (!usuarioData.cliente?.genero) {
+          setError("El género es obligatorio para crear un cliente")
+          return
+        }
+        // Validar Teléfono
+        if (!usuarioData.cliente?.numero_telefono) {
+          setError("El número de teléfono es obligatorio para crear un cliente")
+          return
+        }
+      }
+      
       setGuardando(true)
       setError(null)
       
@@ -118,9 +209,11 @@ export default function DetalleUsuarioPage() {
         // Incluir datos de cliente si aplica
         ...(usuarioData.cliente && {
           dni: usuarioData.cliente.dni,
-          numero_telefono: usuarioData.cliente.numero_telefono,
-          fecha_nacimiento: usuarioData.cliente.fecha_nacimiento,
-          genero: usuarioData.cliente.genero
+          plan_id: usuarioData.cliente.plan_id,
+          numero_telefono: usuarioData.cliente.numero_telefono || "",
+          fecha_nacimiento: usuarioData.cliente.fecha_nacimiento || null,
+          genero: usuarioData.cliente.genero || null,
+          crear_cliente: usuarioData.role === "cliente" && !usuarioData.cliente.id
         })
       }
       
@@ -138,6 +231,23 @@ export default function DetalleUsuarioPage() {
       const data = await response.json()
 
       if (!response.ok) {
+        // Si el error está en detail, es un error de validación de FastAPI
+        if (data.detail) {
+          let errorMessage: string
+          if (Array.isArray(data.detail)) {
+            errorMessage = data.detail.map((err: any) => {
+              if (typeof err === 'string') return err
+              return err.msg || JSON.stringify(err)
+            }).join('\n')
+          } else if (typeof data.detail === 'string') {
+            errorMessage = data.detail
+          } else if (typeof data.detail === 'object' && data.detail.msg) {
+            errorMessage = data.detail.msg
+          } else {
+            errorMessage = JSON.stringify(data.detail)
+          }
+          throw new Error(errorMessage)
+        }
         throw new Error(data.error || 'Error al actualizar el usuario')
       }
 
@@ -172,7 +282,7 @@ export default function DetalleUsuarioPage() {
     }
   }
 
-  if (!user || (user.role !== "admin" && user.role !== "administrador")) {
+  if (!user || user.role !== "admin") {
     return null
   }
 
@@ -187,12 +297,12 @@ export default function DetalleUsuarioPage() {
     )
   }
 
-  if (error || !usuarioData) {
+  if (!usuarioData) {
     return (
       <div className="min-h-screen bg-background p-6 flex items-center justify-center">
         <div className="flex items-center gap-3 text-red-600">
           <AlertCircle className="h-8 w-8" />
-          <span className="text-lg">{error || 'Usuario no encontrado'}</span>
+          <span className="text-lg">Usuario no encontrado</span>
         </div>
       </div>
     )
@@ -244,6 +354,27 @@ export default function DetalleUsuarioPage() {
 
   return (
     <div className="min-h-screen bg-background p-6">
+      {/* Modal de Error */}
+      {showErrorModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4 shadow-xl">
+            <div className="flex items-center gap-2 text-red-600 mb-4">
+              <AlertCircle className="h-5 w-5" />
+              <h3 className="font-semibold">Error</h3>
+            </div>
+            <p className="text-gray-600 mb-6">{error}</p>
+            <div className="flex justify-end">
+              <Button
+                variant="secondary"
+                onClick={closeErrorModal}
+              >
+                Aceptar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-4xl mx-auto space-y-8">
         {/* Header */}
         <div className="bg-gradient-to-r from-primary to-secondary text-white p-6 rounded-lg shadow-lg">
@@ -311,6 +442,171 @@ export default function DetalleUsuarioPage() {
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
+            {/* Campos de cliente cuando se cambia de usuario a cliente */}
+            {editando && usuarioData.role === "cliente" && !usuarioData.cliente?.id && (
+              <div className="border-b pb-6 mb-6">
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+                  <div className="flex items-center gap-2 text-yellow-800">
+                    <AlertCircle className="h-5 w-5" />
+                    <span className="font-medium">Información de cliente</span>
+                  </div>
+                  <p className="text-yellow-700 mt-1">
+                    Los campos marcados con * son obligatorios para crear un cliente.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Información personal */}
+                  <div className="md:col-span-2">
+                    <h3 className="text-lg font-semibold mb-4">Información Personal</h3>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="dni" className="font-medium flex items-center gap-1">
+                      DNI/NIE
+                      <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="dni"
+                      value={usuarioData.cliente?.dni || ""}
+                      onChange={(e) => setUsuarioData({
+                        ...usuarioData,
+                        cliente: { ...usuarioData.cliente!, dni: e.target.value }
+                      })}
+                      required
+                      className="font-mono"
+                      placeholder="12345678A"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="telefono" className="flex items-center gap-1">
+                      Teléfono
+                    </Label>
+                    <Input
+                      id="telefono"
+                      type="tel"
+                      value={usuarioData.cliente?.numero_telefono || ""}
+                      onChange={(e) => setUsuarioData({
+                        ...usuarioData,
+                        cliente: { ...usuarioData.cliente!, numero_telefono: e.target.value }
+                      })}
+                      placeholder="600123456"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="fechaNacimiento">Fecha de Nacimiento</Label>
+                    <Input
+                      id="fechaNacimiento"
+                      type="date"
+                      value={usuarioData.cliente?.fecha_nacimiento || ""}
+                      onChange={(e) => setUsuarioData({
+                        ...usuarioData,
+                        cliente: { ...usuarioData.cliente!, fecha_nacimiento: e.target.value }
+                      })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="genero">Género</Label>
+                    <Select
+                      value={usuarioData.cliente?.genero || ""}
+                      onValueChange={(value) => setUsuarioData({
+                        ...usuarioData,
+                        cliente: { ...usuarioData.cliente!, genero: value }
+                      })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona un género" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="masculino">Masculino</SelectItem>
+                        <SelectItem value="femenino">Femenino</SelectItem>
+                        <SelectItem value="otro">Otro</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Plan y Membresía */}
+                  <div className="md:col-span-2 mt-4">
+                    <h3 className="text-lg font-semibold mb-4">Plan y Membresía</h3>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="plan" className="font-medium flex items-center gap-1">
+                      Plan
+                      <span className="text-red-500">*</span>
+                    </Label>
+                    <Select
+                      value={usuarioData.cliente?.plan_id?.toString() || ""}
+                      onValueChange={(value) => setUsuarioData({
+                        ...usuarioData,
+                        cliente: { ...usuarioData.cliente!, plan_id: parseInt(value) }
+                      })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={loadingPlanes ? "Cargando planes..." : "Selecciona un plan"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {loadingPlanes ? (
+                          <SelectItem value="" disabled>Cargando planes...</SelectItem>
+                        ) : planes.length > 0 ? (
+                          planes.map(plan => (
+                            <SelectItem key={plan.id} value={plan.id.toString()}>
+                              {plan.nombre}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="" disabled>No hay planes disponibles</SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Información de Pago */}
+                  <div className="md:col-span-2 mt-4">
+                    <h3 className="text-lg font-semibold mb-4">Información de Pago</h3>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="numTarjeta">Número de Tarjeta</Label>
+                    <Input
+                      id="numTarjeta"
+                      value={usuarioData.cliente?.num_tarjeta || ""}
+                      onChange={(e) => setUsuarioData({
+                        ...usuarioData,
+                        cliente: { ...usuarioData.cliente!, num_tarjeta: e.target.value }
+                      })}
+                      className="font-mono"
+                      placeholder="1234 5678 9012 3456"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="fechaTarjeta">Fecha de Caducidad</Label>
+                    <Input
+                      id="fechaTarjeta"
+                      value={usuarioData.cliente?.fecha_tarjeta || ""}
+                      onChange={(e) => setUsuarioData({
+                        ...usuarioData,
+                        cliente: { ...usuarioData.cliente!, fecha_tarjeta: e.target.value }
+                      })}
+                      placeholder="MM/YY"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="cvv">CVV</Label>
+                    <Input
+                      id="cvv"
+                      type="text"
+                      maxLength={4}
+                      value={usuarioData.cliente?.cvv || ""}
+                      onChange={(e) => setUsuarioData({
+                        ...usuarioData,
+                        cliente: { ...usuarioData.cliente!, cvv: e.target.value }
+                      })}
+                      className="font-mono w-24"
+                      placeholder="123"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Información básica */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
@@ -352,7 +648,30 @@ export default function DetalleUsuarioPage() {
                 {editando ? (
                   <Select
                     value={usuarioData.role}
-                    onValueChange={(value) => setUsuarioData({...usuarioData, role: value})}
+                    onValueChange={(value) => {
+                      if (value === "cliente" && usuarioData.role === "usuario") {
+                        // Inicializar campos de cliente cuando se cambia a rol cliente
+                        setUsuarioData({
+                          ...usuarioData,
+                          role: value,
+                          cliente: {
+                            id: 0,
+                            dni: "",
+                            numero_telefono: "",
+                            plan_id: 0,
+                            plan_name: "",
+                            fecha_nacimiento: "",
+                            genero: "",
+                            fecha_inscripcion: new Date().toISOString().split('T')[0],
+                            estado: "activo",
+                            created_at: "",
+                            updated_at: ""
+                          }
+                        })
+                      } else {
+                        setUsuarioData({...usuarioData, role: value})
+                      }
+                    }}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -360,9 +679,7 @@ export default function DetalleUsuarioPage() {
                     <SelectContent>
                       <SelectItem value="usuario">Usuario</SelectItem>
                       <SelectItem value="cliente">Cliente</SelectItem>
-                      <SelectItem value="clientepro">Cliente Pro</SelectItem>
                       <SelectItem value="entrenador">Entrenador</SelectItem>
-                      <SelectItem value="administrador">Administrador</SelectItem>
                       <SelectItem value="admin">Admin</SelectItem>
                     </SelectContent>
                   </Select>
@@ -422,8 +739,8 @@ export default function DetalleUsuarioPage() {
               </div>
             </div>
 
-            {/* Información de cliente si aplica */}
-            {usuarioData.cliente && (
+            {/* Información de cliente si aplica y no está en modo edición */}
+            {usuarioData.cliente && !editando && (
               <div className="space-y-4">
                 <div className="border-t pt-6">
                   <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
@@ -433,89 +750,12 @@ export default function DetalleUsuarioPage() {
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     <div className="space-y-2">
-                      <Label>DNI/NIE</Label>
-                      <Input 
-                        value={usuarioData.cliente.dni}
-                        onChange={(e) => setUsuarioData({
-                          ...usuarioData, 
-                          cliente: {...usuarioData.cliente!, dni: e.target.value}
-                        })}
-                        disabled={!editando}
-                        className={`font-mono ${editando ? "" : "bg-muted"}`}
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Teléfono</Label>
-                      <div className="flex items-center gap-2">
-                        <Phone className="h-4 w-4 text-muted-foreground" />
-                        <Input 
-                          value={usuarioData.cliente.numero_telefono}
-                          onChange={(e) => setUsuarioData({
-                            ...usuarioData, 
-                            cliente: {...usuarioData.cliente!, numero_telefono: e.target.value}
-                          })}
-                          disabled={!editando}
-                          className={`flex-1 ${editando ? "" : "bg-muted"}`}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
                       <Label>Plan Contratado</Label>
                       <Input 
                         value={usuarioData.cliente.plan_name}
                         disabled 
                         className="bg-muted" 
                       />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Fecha de Nacimiento</Label>
-                      {editando ? (
-                        <Input 
-                          type="date"
-                          value={usuarioData.cliente.fecha_nacimiento}
-                          onChange={(e) => setUsuarioData({
-                            ...usuarioData, 
-                            cliente: {...usuarioData.cliente!, fecha_nacimiento: e.target.value}
-                          })}
-                        />
-                      ) : (
-                        <Input 
-                          value={new Date(usuarioData.cliente.fecha_nacimiento).toLocaleDateString()}
-                          disabled 
-                          className="bg-muted" 
-                        />
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Género</Label>
-                      {editando ? (
-                        <Select
-                          value={usuarioData.cliente.genero}
-                          onValueChange={(value) => setUsuarioData({
-                            ...usuarioData, 
-                            cliente: {...usuarioData.cliente!, genero: value}
-                          })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="masculino">Masculino</SelectItem>
-                            <SelectItem value="femenino">Femenino</SelectItem>
-                            <SelectItem value="otro">Otro</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <Input 
-                          value={usuarioData.cliente.genero}
-                          disabled 
-                          className="bg-muted capitalize" 
-                        />
-                      )}
                     </div>
 
                     <div className="space-y-2">

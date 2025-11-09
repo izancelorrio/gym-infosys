@@ -9,7 +9,7 @@ const API_CONFIG = {
 }
 
 // Verificar si la API está disponible
-const API_DISPONIBLE = process.env.API_DISPONIBLE === '1'
+
 
 export async function GET(
   request: NextRequest,

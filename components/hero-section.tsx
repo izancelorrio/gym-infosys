@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation"
 
 export function HeroSection() {
   const [membersCount, setMembersCount] = useState<number>(500)
+  const [trainersCount, setTrainersCount] = useState<number>(15)
   const [isLoading, setIsLoading] = useState(true)
   const [isContractModalOpen, setIsContractModalOpen] = useState(false)
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false)
@@ -20,39 +21,33 @@ export function HeroSection() {
   const router = useRouter()
 
   useEffect(() => {
-    const fetchMembersCount = async () => {
+    const fetchCounts = async () => {
       try {
-        const apiUrl = `/api${API_CONFIG.ENDPOINTS.COUNT_MEMBERS}`
-        console.log("[DEBUG] hero-section: Fetching members count from:", apiUrl)
-        console.log("[DEBUG] hero-section: API_CONFIG.ENDPOINTS.COUNT_MEMBERS:", API_CONFIG.ENDPOINTS.COUNT_MEMBERS)
-        
-        const response = await fetch(apiUrl)
-        console.log("[DEBUG] hero-section: Response status:", response.status, response.statusText)
-        
-        if (!response.ok) {
-          console.error("[DEBUG] hero-section: Response not ok:", response.status)
-          return
+        // Fetch members count
+        const membersResponse = await fetch(`/api${API_CONFIG.ENDPOINTS.COUNT_MEMBERS}`)
+        if (membersResponse.ok) {
+          const membersData = await membersResponse.json()
+          if (membersData.count !== undefined) {
+            setMembersCount(membersData.count)
+          }
         }
-        
-        const data = await response.json()
-        console.log("[DEBUG] hero-section: Response data:", data)
 
-        if (data.count !== undefined) {
-          setMembersCount(data.count)
-          console.log("[DEBUG] hero-section: Members count updated:", data.count)
-        } else {
-          console.warn("[DEBUG] hero-section: No count in response data")
+        // Fetch trainers count
+        const trainersResponse = await fetch(`/api${API_CONFIG.ENDPOINTS.COUNT_TRAINERS}`)
+        if (trainersResponse.ok) {
+          const trainersData = await trainersResponse.json()
+          if (trainersData.count !== undefined) {
+            setTrainersCount(trainersData.count)
+          }
         }
       } catch (error) {
-        console.error("[DEBUG] hero-section: Error fetching members count:", error)
-        // Mantener el valor por defecto de 500
+        console.error('Error fetching counts:', error)
       } finally {
         setIsLoading(false)
       }
     }
 
-    console.log("[DEBUG] hero-section: useEffect triggered, calling fetchMembersCount")
-    fetchMembersCount()
+    fetchCounts()
   }, [])
 
   return (
@@ -138,7 +133,7 @@ export function HeroSection() {
             <div className="text-sm sm:text-base text-gray-300">Miembros Activos</div>
           </div>
           <div>
-            <div className="text-3xl sm:text-4xl font-bold text-primary">15+</div>
+            <div className="text-3xl sm:text-4xl font-bold text-primary">{isLoading ? "..." : `${trainersCount}+`}</div>
             <div className="text-sm sm:text-base text-gray-300">Entrenadores Expertos</div>
           </div>
           <div>

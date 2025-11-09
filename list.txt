@@ -16,3 +16,10 @@ hacer bien la pantalla de gestion de asignsaciones entrenador cliente
 en la pantalla panel de entrenador habra que modificar del cliente el texto de debajo
 cuando registro actividad manualmente me klleva a la pantalla de agenda
 los estados de la tabla de reservas no estan definidos
+poner campos de las tablas castellano o todos ingles y lo mismo con el nombre de las tablas
+verificar los inserts de poblacon como los timestamp que hay algubnos a mano y deberian ser automaticos
+en algunas tablas mirar si el campo estado se usa para algo y si no se usa se quita
+intentar quitar al editar y pasar de usuario a cliente los campos de tiempo
+quitar mensajes de debuj al psar un usuario a cliente desde el admin
+que un unstructor no se pueda tener clases a la misma hora el mismo dia, que cuando depliegues la hora te aparezca en rojo la hora que no se pueda
+en registrar actividad que los ejercicios se agrupen por dias

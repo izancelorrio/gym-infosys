@@ -9,6 +9,7 @@ from email.mime.text import MIMEText
 from datetime import datetime, timedelta
 import socket
 import os
+import psycopg2
 
 # Configuración del entorno
 # Cambia esta URL según tu entorno: desarrollo local o producción
@@ -36,6 +37,11 @@ def print_server_ip():
 
 print_server_ip()
 
+@app.get("/health")
+def health_check():
+    """Simple health check endpoint that doesn't depend on database"""
+    return {"status": "ok", "message": "API is running"}
+
 # ----------------------------------------------------
 # RESUMEN DE ENDPOINTS DE ESTE FICHERO
 # ----------------------------------------------------
@@ -59,11 +65,23 @@ print_server_ip()
 # ----------------------------------------------------
 
 def get_db_connection():
-    """Obtiene la conexión a la base de datos users.db ubicada en la raíz del proyecto"""
+    """Obtiene la conexión a la base de datos PostgreSQL"""
+    
+    # Conexión SQLite (comentada)
+    """
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(script_dir)
     db_path = os.path.join(project_root, "users.db")
     return sqlite3.connect(db_path)
+    """
+    
+    # Conexión PostgreSQL
+    return psycopg2.connect(
+        host="192.168.0.201",
+        database="infosis_db",
+        user="icelorrio",
+        password="y^FL^@2KDqDv%H&x"
+    )
 
 def hash_password(password: str) -> str:
     salt = bcrypt.gensalt()
@@ -73,41 +91,7 @@ def hash_password(password: str) -> str:
 def verify_password(password: str, hashed: str) -> bool:
     return bcrypt.checkpw(password.encode("utf-8"), hashed.encode("utf-8"))
 
-# Inicializar la base de datos y crear la tabla si no existe
-def init_db():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            email TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL,
-            email_verified INTEGER DEFAULT 0
-        )
-    """)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS reset_tokens (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            token TEXT NOT NULL,
-            expires_at TEXT NOT NULL,
-            FOREIGN KEY(user_id) REFERENCES users(id)
-        )
-    """)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS email_verifications (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            token TEXT NOT NULL,
-            expires_at TEXT NOT NULL,
-            FOREIGN KEY(user_id) REFERENCES users(id)
-        )
-    """)
-    conn.commit()
-    conn.close()
 
-init_db()
 
 class LoginRequest(BaseModel):
     email: str
@@ -153,6 +137,11 @@ class UpdateUserRequest(BaseModel):
     numero_telefono: str = None
     fecha_nacimiento: str = None
     genero: str = None
+    num_tarjeta: str = None
+    fecha_tarjeta: str = None
+    cvv: str = None
+    plan_id: int = None
+    crear_cliente: bool = None
 
 class ClaseProgramadaRequest(BaseModel):
     fecha: str
@@ -222,7 +211,7 @@ async def log_request_body(request: Request, call_next):
 def login(req: LoginRequest):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT id, name, email, password, email_verified, role FROM users WHERE email=?", (req.email,))
+    cursor.execute("SELECT id, name, email, password, email_verified, role FROM users WHERE email=%s", (req.email,))
     user = cursor.fetchone()
     
     if user and verify_password(req.password, user[3]):
@@ -237,7 +226,7 @@ def login(req: LoginRequest):
             cursor.execute("""
                 SELECT id, dni, numero_telefono, plan_id, fecha_nacimiento, genero, 
                        num_tarjeta, fecha_tarjeta, cvv, fecha_inscripcion, estado 
-                FROM clientes WHERE id_usuario = ?
+                FROM clientes WHERE id_usuario = %s
             """, (user[0],))
             cliente_data = cursor.fetchone()
             
@@ -278,7 +267,7 @@ def register(req: RegisterRequest):
     hashed_pw = hash_password(req.password)
     try:
         cursor.execute(
-            "INSERT INTO users (name, email, password, role, created_at, updated_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+            "INSERT INTO users (name, email, password, role, created_at, updated_at) VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
             (req.name, req.email, hashed_pw, "usuario")
         )
         conn.commit()
@@ -289,7 +278,7 @@ def register(req: RegisterRequest):
         token = str(uuid.uuid4())
         expires_at = (datetime.utcnow() + timedelta(hours=24)).isoformat()
         cursor.execute(
-            "INSERT INTO email_verifications (user_id, token, expires_at) VALUES (?, ?, ?)",
+            "INSERT INTO email_verifications (user_id, token, expires_at) VALUES (%s, %s, %s)",
             (user_id, token, expires_at)
         )
         conn.commit()
@@ -335,13 +324,13 @@ def change_password(req: ChangePasswordRequest):
         raise HTTPException(status_code=400, detail="La nueva contraseña debe tener al menos 6 caracteres")
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT id, password FROM users WHERE email=?", (req.email,))
+    cursor.execute("SELECT id, password FROM users WHERE email=%s", (req.email,))
     user = cursor.fetchone()
     if not user or not verify_password(req.current_password, user[1]):
         conn.close()
         raise HTTPException(status_code=401, detail="Credenciales inválidas")
     hashed_new = hash_password(req.new_password)
-    cursor.execute("UPDATE users SET password=? WHERE id=?", (hashed_new, user[0]))
+    cursor.execute("UPDATE users SET password=%s WHERE id=%s", (hashed_new, user[0]))
     conn.commit()
     conn.close()
     return {
@@ -354,7 +343,7 @@ def change_password(req: ChangePasswordRequest):
 def send_reset_email_endpoint(req: SendResetEmailRequest):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT id FROM users WHERE email=?", (req.email,))
+    cursor.execute("SELECT id FROM users WHERE email=%s", (req.email,))
     user = cursor.fetchone()
     if not user:
         conn.close()
@@ -362,7 +351,7 @@ def send_reset_email_endpoint(req: SendResetEmailRequest):
     user_id = user[0]
     token = str(uuid.uuid4())
     expires_at = (datetime.utcnow() + timedelta(hours=1)).isoformat()
-    cursor.execute("INSERT INTO reset_tokens (user_id, token, expires_at) VALUES (?, ?, ?)", (user_id, token, expires_at))
+    cursor.execute("INSERT INTO reset_tokens (user_id, token, expires_at) VALUES (%s, %s, %s)", (user_id, token, expires_at))
     conn.commit()
     conn.close()    
     reset_link = f"{FRONTEND_BASE_URL}/reset-password?token={token}"
@@ -378,21 +367,21 @@ def send_reset_email_endpoint(req: SendResetEmailRequest):
 def reset_password(req: ResetPasswordRequest):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT user_id, expires_at FROM reset_tokens WHERE token=?", (req.token,))
+    cursor.execute("SELECT user_id, expires_at FROM reset_tokens WHERE token =%s", (req.token,))
     row = cursor.fetchone()
     if not row:
         conn.close()
         raise HTTPException(status_code=400, detail="Token inválido")
     user_id, expires_at = row
     if datetime.utcnow() > datetime.fromisoformat(expires_at):
-        cursor.execute("DELETE FROM reset_tokens WHERE token=?", (req.token,))
+        cursor.execute("DELETE FROM reset_tokens WHERE token=%s", (req.token,))
         conn.commit()
         conn.close()
         raise HTTPException(status_code=400, detail="Token expirado")
     # Actualizar contraseña
     hashed_pw = hash_password(req.newPassword)
-    cursor.execute("UPDATE users SET password=? WHERE id=?", (hashed_pw, user_id))
-    cursor.execute("DELETE FROM reset_tokens WHERE token=?", (req.token,))
+    cursor.execute("UPDATE users SET password=%s WHERE id=%s", (hashed_pw, user_id))
+    cursor.execute("DELETE FROM reset_tokens WHERE token=%s", (req.token,))
     conn.commit()
     conn.close()
     return {"success": True, "message": "Contraseña actualizada correctamente"}
@@ -402,20 +391,20 @@ def reset_password(req: ResetPasswordRequest):
 def verify_email(req: VerifyEmailRequest):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT user_id, expires_at FROM email_verifications WHERE token=?", (req.token,))
+    cursor.execute("SELECT user_id, expires_at FROM email_verifications WHERE token=%s", (req.token,))
     row = cursor.fetchone()
     if not row:
         conn.close()
         raise HTTPException(status_code=400, detail="Token inválido")
     user_id, expires_at = row
     if datetime.utcnow() > datetime.fromisoformat(expires_at):
-        cursor.execute("DELETE FROM email_verifications WHERE token=?", (req.token,))
+        cursor.execute("DELETE FROM email_verifications WHERE token=%s", (req.token,))
         conn.commit()
         conn.close()
         raise HTTPException(status_code=400, detail="Token expirado")
     # Marcar email como verificado
-    cursor.execute("UPDATE users SET email_verified=1 WHERE id=?", (user_id,))
-    cursor.execute("DELETE FROM email_verifications WHERE token=?", (req.token,))
+    cursor.execute("UPDATE users SET email_verified=1 WHERE id%s", (user_id,))
+    cursor.execute("DELETE FROM email_verifications WHERE token=%s", (req.token,))
     conn.commit()
     conn.close()
     return {"success": True, "message": "Email verificado correctamente"}
@@ -425,65 +414,75 @@ def verify_email(req: VerifyEmailRequest):
 def count_members():
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*) FROM users")
+    cursor.execute("SELECT COUNT(*) FROM users WHERE role = 'cliente'")
     count = cursor.fetchone()[0]
     conn.close()
     return {"count": count}
 
+@app.get("/count-trainers")
+def count_trainers():
+    """Obtener el número total de entrenadores activos"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM users WHERE role = 'entrenador'")
+        count = cursor.fetchone()[0]
+        conn.close()
+        return {"count": count}
+    except Exception as e:
+        print(f"[ERROR] Error al contar entrenadores: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al obtener el conteo de entrenadores: {str(e)}")
+
 ## Endpoints para planes
 @app.get("/planes")
 def get_planes():
-    """Obtener todos los planes activos ordenados por orden_display"""
+    """Obtener todos los planes activos"""
     try:
+        print("[DEBUG] Iniciando consulta de planes")
         conn = get_db_connection()
         cursor = conn.cursor()
         
         cursor.execute("""
-            SELECT id, nombre, descripcion, precio_mensual, caracteristicas, 
-                   acceso_entrenador, activo, color_tema, orden_display, 
-                   created_at, updated_at
+            SELECT id, nombre, precio_mensual, acceso_entrenador, activo
             FROM planes 
             WHERE activo = 1 
-            ORDER BY orden_display ASC
+            ORDER BY id ASC
         """)
         
         planes = []
         for row in cursor.fetchall():
-            # Parsear características JSON
-            import json
-            try:
-                caracteristicas = json.loads(row[4])
-            except:
-                caracteristicas = []
-            
             plan = {
                 "id": row[0],
                 "nombre": row[1],
-                "descripcion": row[2],
-                "precio_mensual": float(row[3]),
-                "caracteristicas": caracteristicas,
-                "acceso_entrenador": bool(row[5]),
-                "activo": bool(row[6]),
-                "color_tema": row[7],
-                "orden_display": row[8],
-                "created_at": row[9],
-                "updated_at": row[10],
-                # Campos de compatibilidad con el frontend (mantenemos la interfaz)
+                "precio_mensual": float(row[2]) if row[2] is not None else 0.0,
+                "acceso_entrenador": bool(row[3]),
+                "activo": bool(row[4]),
+                # Campos opcionales con valores por defecto
+                "descripcion": "",
+                "caracteristicas": [],
+                "color_tema": "#000000",
+                "orden_display": 0,
+                "created_at": None,
+                "updated_at": None,
+                # Campos de compatibilidad con el frontend
                 "precio_anual": None,
                 "duracion_meses": 1,
                 "limite_clases": None,
-                "acceso_nutricionista": row[1].lower() in ['estándar', 'premium'],  # Estándar y Premium tienen nutricionista
-                "acceso_entrenador_personal": bool(row[5]),  # Solo Premium
-                "acceso_areas_premium": bool(row[5]),  # Solo Premium
-                "popular": row[1].lower() == 'estándar'  # Estándar es el popular
+                "acceso_nutricionista": row[1].lower() in ['estándar', 'premium'],
+                "acceso_entrenador_personal": bool(row[3]),
+                "acceso_areas_premium": bool(row[3]),
+                "popular": row[1].lower() == 'estándar'
             }
             planes.append(plan)
         
         conn.close()
+        print("[DEBUG] Planes encontrados:", planes)
         return {"planes": planes}
         
     except Exception as e:
-        conn.close()
+        print("[ERROR] Error al obtener planes:", str(e))
+        if 'conn' in locals():
+            conn.close()
         raise HTTPException(status_code=500, detail=f"Error al obtener planes: {str(e)}")
 
 @app.get("/planes/{plan_id}")
@@ -498,7 +497,7 @@ def get_plan_by_id(plan_id: int):
                    acceso_entrenador, activo, color_tema, orden_display, 
                    created_at, updated_at
             FROM planes 
-            WHERE id = ? AND activo = 1
+            WHERE id =%s AND activo = 1
         """, (plan_id,))
         
         row = cursor.fetchone()
@@ -513,28 +512,28 @@ def get_plan_by_id(plan_id: int):
         except:
             caracteristicas = []
         
-        plan = {
-            "id": row[0],
-            "nombre": row[1],
-            "descripcion": row[2],
-            "precio_mensual": float(row[3]),
-            "caracteristicas": caracteristicas,
-            "acceso_entrenador": bool(row[5]),
-            "activo": bool(row[6]),
-            "color_tema": row[7],
-            "orden_display": row[8],
-            "created_at": row[9],
-            "updated_at": row[10],
-            # Campos de compatibilidad con el frontend
-            "precio_anual": None,
-            "duracion_meses": 1,
-            "limite_clases": None,
-            "acceso_nutricionista": row[1].lower() in ['estándar', 'premium'],
-            "acceso_entrenador_personal": bool(row[5]),
-            "acceso_areas_premium": bool(row[5]),
-            "popular": row[1].lower() == 'estándar'
-        }
-        
+            plan = {
+                "id": row[0],
+                "nombre": row[1],
+                "precio_mensual": float(row[2]) if row[2] is not None else 0.0,
+                "acceso_entrenador": bool(row[3]),
+                "activo": bool(row[4]),
+                # Campos opcionales con valores por defecto
+                "descripcion": "",
+                "caracteristicas": [],
+                "color_tema": "#000000",
+                "orden_display": 0,
+                "created_at": None,
+                "updated_at": None,
+                # Campos de compatibilidad con el frontend
+                "precio_anual": None,
+                "duracion_meses": 1,
+                "limite_clases": None,
+                "acceso_nutricionista": row[1].lower() in ['estándar', 'premium'],
+                "acceso_entrenador_personal": bool(row[3]),
+                "acceso_areas_premium": bool(row[3]),
+                "popular": row[1].lower() == 'estándar'
+            }
         conn.close()
         return plan
         
@@ -554,7 +553,7 @@ def contract_plan(req: ContractPlanRequest):
     
     try:
         # 1. Verificar que el usuario existe y tiene rol 'usuario'
-        cursor.execute("SELECT id, name, email, role FROM users WHERE id = ?", (req.user_id,))
+        cursor.execute("SELECT id, name, email, role FROM users WHERE id =%s", (req.user_id,))
         user = cursor.fetchone()
         
         if not user:
@@ -566,7 +565,7 @@ def contract_plan(req: ContractPlanRequest):
             raise HTTPException(status_code=400, detail="Solo los usuarios pueden contratar planes")
         
         # 2. Verificar que el plan existe y obtener información del acceso_entrenador
-        cursor.execute("SELECT id, nombre, acceso_entrenador FROM planes WHERE id = ? AND activo = 1", (req.plan_id,))
+        cursor.execute("SELECT id, nombre, acceso_entrenador FROM planes WHERE id =%s AND activo = 1", (req.plan_id,))
         plan = cursor.fetchone()
         
         if not plan:
@@ -578,14 +577,14 @@ def contract_plan(req: ContractPlanRequest):
         nuevo_rol = "cliente"
         
         # 4. Actualizar el rol del usuario a cliente
-        cursor.execute("UPDATE users SET role = ? WHERE id = ?", (nuevo_rol, req.user_id,))
+        cursor.execute("UPDATE users SET role =%s WHERE id =%s", (nuevo_rol, req.user_id,))
         
         # 4. Crear registro en la tabla clientes
         cursor.execute("""
             INSERT INTO clientes (
                 id_usuario, dni, numero_telefono, plan_id, fecha_nacimiento, 
                 genero, num_tarjeta, fecha_tarjeta, cvv, fecha_inscripcion, estado
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), 'activo')
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, 'activo')
         """, (
             req.user_id, req.dni, req.numero_telefono, req.plan_id,
             req.fecha_nacimiento, req.genero, req.num_tarjeta, 
@@ -601,7 +600,7 @@ def contract_plan(req: ContractPlanRequest):
         cursor.execute("""
             SELECT id, dni, numero_telefono, plan_id, fecha_nacimiento, genero, 
                    num_tarjeta, fecha_tarjeta, cvv, fecha_inscripcion, estado 
-            FROM clientes WHERE id = ?
+            FROM clientes WHERE id =%s
         """, (cliente_id,))
         cliente_data = cursor.fetchone()
         
@@ -684,13 +683,13 @@ def get_all_users(response: Response):
                     SELECT id, dni, numero_telefono, plan_id, fecha_nacimiento, genero, 
                            fecha_inscripcion, estado, created_at, updated_at
                     FROM clientes 
-                    WHERE id_usuario = ?
+                    WHERE id_usuario = %s
                 """, (user_row[0],))
                 cliente_data = cursor.fetchone()
                 
                 if cliente_data:
                     # Obtener nombre del plan
-                    cursor.execute("SELECT nombre FROM planes WHERE id = ?", (cliente_data[3],))
+                    cursor.execute("SELECT nombre FROM planes WHERE id = %s", (cliente_data[3],))
                     plan_data = cursor.fetchone()
                     plan_name = plan_data[0] if plan_data else "Sin plan"
                     
@@ -713,10 +712,9 @@ def get_all_users(response: Response):
         # Calcular estadísticas
         stats = {
             "total": len(users_list),
-            "admin": len([u for u in users_list if u["role"] in ["admin", "administrador"]]),
+            "admin": len([u for u in users_list if u["role"] == "admin"]),
             "entrenador": len([u for u in users_list if u["role"] == "entrenador"]),
             "cliente": len([u for u in users_list if u["role"] == "cliente"]),
-            "clientepro": len([u for u in users_list if u["role"] == "clientepro"]),
             "usuario": len([u for u in users_list if u["role"] == "usuario"]),
             "verified": len([u for u in users_list if u["email_verified"]]),
             "unverified": len([u for u in users_list if not u["email_verified"]])
@@ -753,7 +751,7 @@ def get_user_by_id(user_id: int, response: Response):
         cursor.execute("""
             SELECT id, name, email, role, email_verified, created_at, updated_at
             FROM users 
-            WHERE id = ?
+            WHERE id = %s
         """, (user_id,))
         user_data = cursor.fetchone()
         
@@ -776,15 +774,16 @@ def get_user_by_id(user_id: int, response: Response):
         if user_data[3] == "cliente":
             cursor.execute("""
                 SELECT id, dni, numero_telefono, plan_id, fecha_nacimiento, genero, 
-                       fecha_inscripcion, estado, created_at, updated_at
+                       fecha_inscripcion, estado, created_at, updated_at,
+                       num_tarjeta, fecha_tarjeta, cvv
                 FROM clientes 
-                WHERE id_usuario = ?
+                WHERE id_usuario = %s
             """, (user_id,))
             cliente_data = cursor.fetchone()
             
             if cliente_data:
                 # Obtener nombre del plan
-                cursor.execute("SELECT nombre FROM planes WHERE id = ?", (cliente_data[3],))
+                cursor.execute("SELECT nombre FROM planes WHERE id = %s", (cliente_data[3],))
                 plan_data = cursor.fetchone()
                 plan_name = plan_data[0] if plan_data else "Sin plan"
                 
@@ -799,7 +798,10 @@ def get_user_by_id(user_id: int, response: Response):
                     "fecha_inscripcion": cliente_data[6],
                     "estado": cliente_data[7],
                     "created_at": cliente_data[8],
-                    "updated_at": cliente_data[9]
+                    "updated_at": cliente_data[9],
+                    "num_tarjeta": cliente_data[10],
+                    "fecha_tarjeta": cliente_data[11],
+                    "cvv": cliente_data[12]
                 }
         
         conn.close()
@@ -832,7 +834,7 @@ def update_user(user_id: int, req: UpdateUserRequest, response: Response):
     
     try:
         # Verificar que el usuario existe
-        cursor.execute("SELECT id, role FROM users WHERE id = ?", (user_id,))
+        cursor.execute("SELECT id, role FROM users WHERE id = %s", (user_id,))
         user_data = cursor.fetchone()
         
         if not user_data:
@@ -841,46 +843,122 @@ def update_user(user_id: int, req: UpdateUserRequest, response: Response):
         
         current_role = user_data[1]
         
+        # Si está cambiando de usuario a cliente y se va a crear un nuevo cliente
+        if current_role == "usuario" and req.role == "cliente" and req.crear_cliente:
+            required_fields = [
+                (req.dni, "DNI"),
+                (req.plan_id, "Plan"),
+                (req.fecha_nacimiento, "Fecha de nacimiento"),
+                (req.genero, "Género"),
+                (req.numero_telefono, "Número de teléfono")
+            ]
+
+            for value, field_name in required_fields:
+                if not value:
+                    raise HTTPException(status_code=400, detail=f"El {field_name} es obligatorio para crear un cliente")
+            
+            # Verificar que el DNI no esté ya registrado
+            cursor.execute("SELECT id FROM clientes WHERE dni = %s", (req.dni,))
+            if cursor.fetchone():
+                raise HTTPException(status_code=400, detail="El DNI ya está registrado")
+            
+            # Verificar que el plan existe
+            cursor.execute("SELECT id FROM planes WHERE id = %s AND activo = 1", (req.plan_id,))
+            if not cursor.fetchone():
+                raise HTTPException(status_code=400, detail="El plan seleccionado no existe o no está activo")
+        
+        # Si está cambiando de cliente a usuario, eliminar el registro de cliente
+        if current_role == "cliente" and req.role == "usuario":
+            # Primero verificar si hay reservas activas
+            cursor.execute("""
+                SELECT COUNT(*) FROM reservas r
+                JOIN clientes c ON r.id_cliente = c.id
+                WHERE c.id_usuario = %s AND r.estado = 'activa'
+            """, (user_id,))
+            reservas_activas = cursor.fetchone()[0]
+            
+            if reservas_activas > 0:
+                raise HTTPException(
+                    status_code=400, 
+                    detail="No se puede cambiar el rol a usuario porque tiene reservas activas"
+                )
+            
+            # Eliminar el registro de cliente (las reservas se eliminarán en cascada)
+            cursor.execute("DELETE FROM clientes WHERE id_usuario = %s", (user_id,))
+        
         # Actualizar datos básicos del usuario
         cursor.execute("""
             UPDATE users 
-            SET name = ?, email = ?, role = ?
-            WHERE id = ?
+            SET name = %s, email = %s, role = %s
+            WHERE id = %s
         """, (req.name, req.email, req.role, user_id))
         
-        # Si el usuario es cliente y tenemos datos de cliente para actualizar
-        if req.role == "cliente" and any([req.dni, req.numero_telefono, req.fecha_nacimiento, req.genero]):
+        # Si el usuario se convierte en cliente o ya es cliente y hay datos para actualizar
+        if req.role == "cliente":
             # Verificar si ya existe un registro de cliente
-            cursor.execute("SELECT id FROM clientes WHERE id_usuario = ?", (user_id,))
+            cursor.execute("SELECT id FROM clientes WHERE id_usuario = %s", (user_id,))
             cliente_exists = cursor.fetchone()
             
-            if cliente_exists:
-                # Actualizar datos existentes del cliente (solo los campos proporcionados)
+            if cliente_exists and any([req.dni, req.numero_telefono, req.fecha_nacimiento, req.genero]):
+                # Actualizar datos existentes del cliente
                 update_fields = []
                 update_values = []
                 
                 if req.dni:
-                    update_fields.append("dni = ?")
+                    update_fields.append("dni = %s")
                     update_values.append(req.dni)
                 
                 if req.numero_telefono:
-                    update_fields.append("numero_telefono = ?")
+                    update_fields.append("numero_telefono = %s")
                     update_values.append(req.numero_telefono)
                 
                 if req.fecha_nacimiento:
-                    update_fields.append("fecha_nacimiento = ?")
+                    update_fields.append("fecha_nacimiento = %s")
                     update_values.append(req.fecha_nacimiento)
                 
                 if req.genero:
-                    update_fields.append("genero = ?")
+                    update_fields.append("genero = %s")
                     update_values.append(req.genero)
+                
+                if req.num_tarjeta:
+                    update_fields.append("num_tarjeta = %s")
+                    update_values.append(req.num_tarjeta)
+                
+                if req.fecha_tarjeta:
+                    update_fields.append("fecha_tarjeta = %s")
+                    update_values.append(req.fecha_tarjeta)
+                
+                if req.cvv:
+                    update_fields.append("cvv = %s")
+                    update_values.append(req.cvv)
                 
                 if update_fields:
                     update_fields.append("updated_at = CURRENT_TIMESTAMP")
                     update_values.append(user_id)
                     
-                    update_query = f"UPDATE clientes SET {', '.join(update_fields)} WHERE id_usuario = ?"
+                    update_query = f"UPDATE clientes SET {', '.join(update_fields)} WHERE id_usuario = %s"
                     cursor.execute(update_query, update_values)
+            elif not cliente_exists and req.crear_cliente:
+                # Crear nuevo registro de cliente
+                cursor.execute("""
+                    INSERT INTO clientes (
+                        id_usuario, dni, numero_telefono, fecha_nacimiento, genero,
+                        num_tarjeta, fecha_tarjeta, cvv, plan_id,
+                        fecha_inscripcion, estado
+                    ) VALUES (
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_DATE, 'activo'
+                    )
+                """, (
+                    user_id,
+                    req.dni,
+                    req.numero_telefono or None,
+                    req.fecha_nacimiento or None,
+                    req.genero or None,
+                    req.num_tarjeta or None,
+                    req.fecha_tarjeta or None,
+                    req.cvv or None,
+                    req.plan_id
+                ))
         
         conn.commit()
         print(f"[DEBUG] Datos actualizados en BD para usuario {user_id}")
@@ -889,7 +967,7 @@ def update_user(user_id: int, req: UpdateUserRequest, response: Response):
         cursor.execute("""
             SELECT id, name, email, role, email_verified, created_at, updated_at
             FROM users 
-            WHERE id = ?
+            WHERE id = %s
         """, (user_id,))
         updated_user_data = cursor.fetchone()
         print(f"[DEBUG] Datos leídos de users: {updated_user_data}")
@@ -910,15 +988,16 @@ def update_user(user_id: int, req: UpdateUserRequest, response: Response):
         if updated_user_data[3] == "cliente":
             cursor.execute("""
                 SELECT id, dni, numero_telefono, plan_id, fecha_nacimiento, genero, 
-                       fecha_inscripcion, estado, created_at, updated_at
+                       fecha_inscripcion, estado, created_at, updated_at,
+                       num_tarjeta, fecha_tarjeta, cvv
                 FROM clientes 
-                WHERE id_usuario = ?
+                WHERE id_usuario = %s
             """, (user_id,))
             cliente_data = cursor.fetchone()
             
             if cliente_data:
                 # Obtener nombre del plan
-                cursor.execute("SELECT nombre FROM planes WHERE id = ?", (cliente_data[3],))
+                cursor.execute("SELECT nombre FROM planes WHERE id = %s", (cliente_data[3],))
                 plan_data = cursor.fetchone()
                 plan_name = plan_data[0] if plan_data else "Sin plan"
                 
@@ -933,7 +1012,10 @@ def update_user(user_id: int, req: UpdateUserRequest, response: Response):
                     "fecha_inscripcion": cliente_data[6],
                     "estado": cliente_data[7],
                     "created_at": cliente_data[8],
-                    "updated_at": cliente_data[9]
+                    "updated_at": cliente_data[9],
+                    "num_tarjeta": cliente_data[10],
+                    "fecha_tarjeta": cliente_data[11],
+                    "cvv": cliente_data[12]
                 }
         
         conn.close()
@@ -1086,7 +1168,7 @@ async def guardar_clases_programadas(request: GuardarClasesRequest, response: Re
                     continue
                 
                 # Buscar el ID del instructor por su nombre
-                cursor.execute("SELECT id FROM users WHERE name = ? AND role = 'entrenador'", (clase.instructor,))
+                cursor.execute("SELECT id FROM users WHERE name = %s AND role = 'entrenador'", (clase.instructor,))
                 instructor_result = cursor.fetchone()
                 
                 if not instructor_result:
@@ -1099,7 +1181,7 @@ async def guardar_clases_programadas(request: GuardarClasesRequest, response: Re
                 id_instructor = instructor_result[0]
                 
                 # Obtener información de capacidad desde gym_clases usando ID
-                cursor.execute("SELECT max_participantes, nombre FROM gym_clases WHERE id = ?", (clase.idClase,))
+                cursor.execute("SELECT max_participantes, nombre FROM gym_clases WHERE id = %s", (clase.idClase,))
                 capacidad_result = cursor.fetchone()
                 if not capacidad_result:
                     clases_con_error.append({
@@ -1114,7 +1196,7 @@ async def guardar_clases_programadas(request: GuardarClasesRequest, response: Re
                 # Verificar si ya existe una clase con el mismo instructor, fecha y hora
                 cursor.execute("""
                     SELECT id FROM clases_programadas 
-                    WHERE fecha = ? AND hora = ? AND id_instructor = ? AND estado = 'programada'
+                    WHERE fecha =%s AND hora =%s AND id_instructor =%s AND estado = 'programada'
                 """, (clase.fecha, clase.hora, id_instructor))
                 
                 if cursor.fetchone():
@@ -1128,7 +1210,7 @@ async def guardar_clases_programadas(request: GuardarClasesRequest, response: Re
                 cursor.execute("""
                     INSERT INTO clases_programadas 
                     (fecha, hora, id_clase, id_instructor, capacidad_maxima)
-                    VALUES (?, ?, ?, ?, ?)
+                    VALUES (%s, %s, %s, %s, %s)
                 """, (clase.fecha, clase.hora, clase.idClase, id_instructor, capacidad_maxima))
                 
                 clase_id = cursor.lastrowid
@@ -1184,8 +1266,7 @@ async def get_clases_programadas(response: Response):
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Obtener todas las clases programadas activas con JOIN a gym_clases y users
-        # Incluir el conteo real de reservas activas calculado dinámicamente
+        # Obtener clases programadas disponibles a partir de la fecha y hora actual
         cursor.execute("""
             SELECT cp.id, cp.fecha, cp.hora, cp.id_clase, gc.nombre as tipo_clase, gc.color,
                    cp.id_instructor, u.name as instructor_nombre,
@@ -1201,7 +1282,10 @@ async def get_clases_programadas(response: Response):
                 WHERE estado = 'activa'
                 GROUP BY id_clase_programada
             ) r ON cp.id = r.id_clase_programada
-            WHERE cp.estado IN ('activa', 'programada', 'completada')
+            WHERE cp.estado IN ('activa', 'programada')
+            AND (cp.fecha > CURRENT_DATE 
+                 OR (cp.fecha = CURRENT_DATE AND cp.hora > CURRENT_TIME))
+            AND (COALESCE(r.reservas_activas, 0) < cp.capacidad_maxima OR cp.capacidad_maxima IS NULL)
             ORDER BY cp.fecha, cp.hora
         """)
         
@@ -1259,7 +1343,7 @@ async def eliminar_clase_programada(clase_id: int, response: Response):
         cursor = conn.cursor()
         
         # Verificar que la clase existe antes de eliminarla
-        cursor.execute("SELECT id, fecha, hora, id_clase FROM clases_programadas WHERE id = ?", (clase_id,))
+        cursor.execute("SELECT id, fecha, hora, id_clase FROM clases_programadas WHERE id = %s", (clase_id,))
         clase_existente = cursor.fetchone()
         
         if not clase_existente:
@@ -1267,7 +1351,7 @@ async def eliminar_clase_programada(clase_id: int, response: Response):
             raise HTTPException(status_code=404, detail=f"Clase programada con ID {clase_id} no encontrada")
         
         # Eliminar la clase programada
-        cursor.execute("DELETE FROM clases_programadas WHERE id = ?", (clase_id,))
+        cursor.execute("DELETE FROM clases_programadas WHERE id = %s", (clase_id,))
         filas_afectadas = cursor.rowcount
         
         conn.commit()
@@ -1310,7 +1394,7 @@ async def crear_reserva(request: CrearReservaRequest, response: Response):
         cursor = conn.cursor()
         
         # Verificar que el cliente existe
-        cursor.execute("SELECT id FROM clientes WHERE id = ?", (request.id_cliente,))
+        cursor.execute("SELECT id FROM clientes WHERE id =%s", (request.id_cliente,))
         cliente_existente = cursor.fetchone()
         if not cliente_existente:
             conn.close()
@@ -1321,7 +1405,7 @@ async def crear_reserva(request: CrearReservaRequest, response: Response):
             SELECT cp.id, cp.capacidad_maxima, gc.nombre as tipo_clase, cp.fecha, cp.hora
             FROM clases_programadas cp
             JOIN gym_clases gc ON cp.id_clase = gc.id
-            WHERE cp.id = ? AND cp.estado IN ('activa', 'programada')
+            WHERE cp.id =%s AND cp.estado IN ('activa', 'programada')
         """, (request.id_clase_programada,))
         clase_existente = cursor.fetchone()
         
@@ -1332,7 +1416,7 @@ async def crear_reserva(request: CrearReservaRequest, response: Response):
         # Contar reservas actuales para esta clase
         cursor.execute("""
             SELECT COUNT(*) FROM reservas 
-            WHERE id_clase_programada = ? AND estado = 'activa'
+            WHERE id_clase_programada =%s AND estado = 'activa'
         """, (request.id_clase_programada,))
         reservas_actuales = cursor.fetchone()[0]
         
@@ -1346,7 +1430,7 @@ async def crear_reserva(request: CrearReservaRequest, response: Response):
         # Verificar que el cliente no tenga ya una reserva para esta clase
         cursor.execute("""
             SELECT id FROM reservas 
-            WHERE id_cliente = ? AND id_clase_programada = ? AND estado = 'activa'
+            WHERE id_cliente =%s AND id_clase_programada =%s AND estado = 'activa'
         """, (request.id_cliente, request.id_clase_programada))
         reserva_existente = cursor.fetchone()
         
@@ -1357,7 +1441,7 @@ async def crear_reserva(request: CrearReservaRequest, response: Response):
         # Crear la reserva
         cursor.execute("""
             INSERT INTO reservas (id_cliente, id_clase_programada, estado)
-            VALUES (?, ?, 'activa')
+            VALUES (%s, %s, 'activa')
         """, (request.id_cliente, request.id_clase_programada))
         
         reserva_id = cursor.lastrowid
@@ -1407,7 +1491,7 @@ async def get_reservas_cliente(cliente_id: int, response: Response):
             JOIN clases_programadas cp ON r.id_clase_programada = cp.id
             JOIN gym_clases gc ON cp.id_clase = gc.id
             JOIN users u ON cp.id_instructor = u.id
-            WHERE r.id_cliente = ?
+            WHERE r.id_cliente =%s
             ORDER BY cp.fecha, cp.hora
         """, (cliente_id,))
         
@@ -1455,16 +1539,18 @@ async def get_reservas_por_usuario(user_id: int, response: Response):
         
         # Obtener reservas del usuario con información de la clase (JOIN con clientes)
         cursor.execute("""
-            SELECT r.id, r.id_clase_programada, r.estado,
-                   cp.fecha, cp.hora, gc.nombre as tipo_clase, gc.color,
-                   u.name as instructor_nombre
-            FROM reservas r
-            JOIN clientes c ON r.id_cliente = c.id
-            JOIN clases_programadas cp ON r.id_clase_programada = cp.id
-            JOIN gym_clases gc ON cp.id_clase = gc.id
-            JOIN users u ON cp.id_instructor = u.id
-            WHERE c.id_usuario = ?
-            ORDER BY cp.fecha, cp.hora
+            WITH reservas_usuario AS (
+                SELECT r.id, r.id_clase_programada, r.estado,
+                       cp.fecha, cp.hora, gc.nombre as tipo_clase, gc.color,
+                       u.name as instructor_nombre
+                FROM reservas r
+                JOIN clientes c ON r.id_cliente = c.id
+                JOIN clases_programadas cp ON r.id_clase_programada = cp.id
+                JOIN gym_clases gc ON cp.id_clase = gc.id
+                JOIN users u ON cp.id_instructor = u.id
+                WHERE c.id_usuario = %s
+            )
+            SELECT * FROM reservas_usuario ORDER BY fecha, hora
         """, (user_id,))
         
         reservas_data = cursor.fetchall()
@@ -1539,7 +1625,7 @@ async def cancelar_reserva(reserva_id: int, response: Response):
             FROM reservas r
             JOIN clases_programadas cp ON r.id_clase_programada = cp.id
             JOIN gym_clases gc ON cp.id_clase = gc.id
-            WHERE r.id = ? AND r.estado = 'activa'
+            WHERE r.id =%s AND r.estado = 'activa'
         """, (reserva_id,))
         reserva_existente = cursor.fetchone()
         
@@ -1549,7 +1635,7 @@ async def cancelar_reserva(reserva_id: int, response: Response):
         
         # Eliminar la reserva completamente
         cursor.execute("""
-            DELETE FROM reservas WHERE id = ?
+            DELETE FROM reservas WHERE id =%s
         """, (reserva_id,))
         
         filas_afectadas = cursor.rowcount
@@ -1602,7 +1688,7 @@ async def registrar_asistencia_clase(reserva_id: int, response: Response):
             JOIN clases_programadas cp ON r.id_clase_programada = cp.id
             JOIN gym_clases gc ON cp.id_clase = gc.id
             JOIN users u ON cp.id_instructor = u.id
-            WHERE r.id = ? AND r.estado = 'activa'
+            WHERE r.id =%s AND r.estado = 'activa'
         """, (reserva_id,))
         reserva_info = cursor.fetchone()
         
@@ -1617,7 +1703,7 @@ async def registrar_asistencia_clase(reserva_id: int, response: Response):
         cursor.execute("""
             UPDATE reservas 
             SET estado = 'completada'
-            WHERE id = ?
+            WHERE id =%s
         """, (reserva_id,))
         
         conn.commit()
@@ -1669,18 +1755,22 @@ async def get_asignaciones_entrenador(response: Response):
                 u.name as entrenador_nombre,
                 u.email as entrenador_email,
                 COALESCE(COUNT(eca.id), 0) as total_clientes,
-                GROUP_CONCAT(
-                    CASE WHEN eca.id IS NOT NULL THEN
-                        JSON_OBJECT(
-                            'cliente_id', c.id,
-                            'cliente_nombre', c.name,
-                            'cliente_email', c.email,
-                            'plan_nombre', p.nombre,
-                            'fecha_asignacion', eca.fecha_asignacion,
-                            'estado', eca.estado,
-                            'asignacion_id', eca.id
-                        )
-                    END
+                COALESCE(
+                    json_agg(
+                        CASE WHEN eca.id IS NOT NULL THEN
+                            json_build_object(
+                                'cliente_id', c.id,
+                                'cliente_nombre', c.name,
+                                'cliente_email', c.email,
+                                'plan_nombre', p.nombre,
+                                'fecha_asignacion', eca.fecha_asignacion,
+                                'estado', eca.estado,
+                                'asignacion_id', eca.id
+                            )
+                        ELSE NULL
+                        END
+                    ) FILTER (WHERE eca.id IS NOT NULL),
+                    '[]'
                 ) as clientes_asignados
             FROM users u
             LEFT JOIN entrenador_cliente_asignaciones eca ON u.id = eca.id_entrenador AND eca.estado = 'activa'
@@ -1719,25 +1809,12 @@ async def get_asignaciones_entrenador(response: Response):
         # Formatear datos de entrenadores
         entrenadores = []
         for entrenador in entrenadores_data:
-            clientes_asignados = []
-            if entrenador[4]:  # Si hay clientes asignados
-                # Parsear el GROUP_CONCAT de JSON objects
-                clientes_json = entrenador[4].split(',')
-                for cliente_json in clientes_json:
-                    if cliente_json.strip():
-                        try:
-                            import json
-                            cliente_data = json.loads(cliente_json.strip())
-                            clientes_asignados.append(cliente_data)
-                        except:
-                            pass
-            
             entrenadores.append({
                 "entrenador_id": entrenador[0],
                 "entrenador_nombre": entrenador[1],
                 "entrenador_email": entrenador[2],
                 "total_clientes": entrenador[3],
-                "clientes_asignados": clientes_asignados
+                "clientes_asignados": entrenador[4] if entrenador[4] else []
             })
         
         # Formatear datos de clientes sin asignar
@@ -1784,7 +1861,7 @@ async def asignar_entrenador(request: dict):
         cursor = conn.cursor()
         
         # Verificar que el entrenador existe y es entrenador
-        cursor.execute("SELECT id, name FROM users WHERE id = ? AND role = 'entrenador'", (id_entrenador,))
+        cursor.execute("SELECT id, name FROM users WHERE id = %s AND role = 'entrenador'", (id_entrenador,))
         entrenador = cursor.fetchone()
         if not entrenador:
             raise HTTPException(status_code=404, detail="Entrenador no encontrado")
@@ -1795,14 +1872,14 @@ async def asignar_entrenador(request: dict):
             FROM users u
             JOIN clientes cl ON u.id = cl.id_usuario AND cl.estado = 'activo'
             JOIN planes p ON cl.plan_id = p.id
-            WHERE u.id = ? AND u.role = 'cliente' AND p.acceso_entrenador = 1
+            WHERE u.id = %s AND u.role = 'cliente' AND p.acceso_entrenador = 1
         """, (id_cliente,))
         cliente = cursor.fetchone()
         if not cliente:
             raise HTTPException(status_code=404, detail="Cliente no encontrado o no tiene plan con entrenador")
         
         # Obtener el ID de cliente de la tabla clientes
-        cursor.execute("SELECT id FROM clientes WHERE id_usuario = ?", (id_cliente,))
+        cursor.execute("SELECT id FROM clientes WHERE id_usuario = %s", (id_cliente,))
         cliente_row = cursor.fetchone()
         if not cliente_row:
             raise HTTPException(status_code=404, detail="Registro de cliente no encontrado")
@@ -1812,7 +1889,7 @@ async def asignar_entrenador(request: dict):
         # Verificar que no existe una asignación activa
         cursor.execute("""
             SELECT id FROM entrenador_cliente_asignaciones 
-            WHERE id_cliente = ? AND estado = 'activa'
+            WHERE id_cliente = %s AND estado = 'activa'
         """, (cliente_table_id,))
         asignacion_existente = cursor.fetchone()
         if asignacion_existente:
@@ -1822,7 +1899,7 @@ async def asignar_entrenador(request: dict):
         cursor.execute("""
             INSERT INTO entrenador_cliente_asignaciones 
             (id_entrenador, id_cliente, notas) 
-            VALUES (?, ?, ?)
+            VALUES (%s, %s, %s)
         """, (id_entrenador, cliente_table_id, notas))
         
         asignacion_id = cursor.lastrowid
@@ -1860,8 +1937,9 @@ async def desasignar_entrenador(asignacion_id: int):
             SELECT eca.id, u1.name as entrenador_nombre, u2.name as cliente_nombre
             FROM entrenador_cliente_asignaciones eca
             JOIN users u1 ON eca.id_entrenador = u1.id
-            JOIN users u2 ON eca.id_cliente = u2.id
-            WHERE eca.id = ? AND eca.estado = 'activa'
+            JOIN clientes cl ON eca.id_cliente = cl.id
+            JOIN users u2 ON cl.id_usuario = u2.id
+            WHERE eca.id = %s AND eca.estado = 'activa'
         """, (asignacion_id,))
         
         asignacion = cursor.fetchone()
@@ -1872,7 +1950,7 @@ async def desasignar_entrenador(asignacion_id: int):
         cursor.execute("""
             UPDATE entrenador_cliente_asignaciones 
             SET estado = 'inactiva', updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
+            WHERE id = %s
         """, (asignacion_id,))
         
         conn.commit()
@@ -1910,7 +1988,7 @@ async def get_clientes_entrenador(entrenador_id: int, response: Response):
         cursor = conn.cursor()
         
         # Verificar que el entrenador existe
-        cursor.execute("SELECT id, name FROM users WHERE id = ? AND role = 'entrenador'", (entrenador_id,))
+        cursor.execute("SELECT id, name FROM users WHERE id =%s AND role = 'entrenador'", (entrenador_id,))
         entrenador = cursor.fetchone()
         if not entrenador:
             conn.close()
@@ -1934,7 +2012,7 @@ async def get_clientes_entrenador(entrenador_id: int, response: Response):
             JOIN clientes cl ON eca.id_cliente = cl.id AND cl.estado = 'activo'
             JOIN users u ON cl.id_usuario = u.id
             JOIN planes p ON cl.plan_id = p.id
-            WHERE eca.id_entrenador = ? AND eca.estado = 'activa'
+            WHERE eca.id_entrenador =%s AND eca.estado = 'activa'
             ORDER BY u.name
         """, (entrenador_id,))
         
@@ -2008,7 +2086,7 @@ async def get_estadisticas_entrenador(entrenador_id: int, response: Response):
         cursor = conn.cursor()
         
         # Verificar que el entrenador existe
-        cursor.execute("SELECT id, name FROM users WHERE id = ? AND role = 'entrenador'", (entrenador_id,))
+        cursor.execute("SELECT id, name FROM users WHERE id =%s AND role = 'entrenador'", (entrenador_id,))
         entrenador = cursor.fetchone()
         if not entrenador:
             conn.close()
@@ -2019,7 +2097,7 @@ async def get_estadisticas_entrenador(entrenador_id: int, response: Response):
             SELECT COUNT(*) as total_clientes
             FROM entrenador_cliente_asignaciones eca
             JOIN clientes cl ON eca.id_cliente = cl.id AND cl.estado = 'activo'
-            WHERE eca.id_entrenador = ? AND eca.estado = 'activa'
+            WHERE eca.id_entrenador =%s AND eca.estado = 'activa'
         """, (entrenador_id,))
         total_clientes = cursor.fetchone()[0]
         
@@ -2029,7 +2107,7 @@ async def get_estadisticas_entrenador(entrenador_id: int, response: Response):
             FROM entrenador_cliente_asignaciones eca
             JOIN clientes cl ON eca.id_cliente = cl.id AND cl.estado = 'activo'
             JOIN planes p ON cl.plan_id = p.id
-            WHERE eca.id_entrenador = ? AND eca.estado = 'activa'
+            WHERE eca.id_entrenador =%s AND eca.estado = 'activa'
             GROUP BY p.nombre
         """, (entrenador_id,))
         distribucion_planes = cursor.fetchall()
@@ -2143,13 +2221,13 @@ async def guardar_plan_entrenamiento(
         cursor = conn.cursor()
         
         # Verificar que el entrenador existe
-        cursor.execute("SELECT id FROM users WHERE id = ? AND role = 'entrenador'", (entrenador_id,))
+        cursor.execute("SELECT id FROM users WHERE id =%s AND role = 'entrenador'", (entrenador_id,))
         if not cursor.fetchone():
             conn.close()
             raise HTTPException(status_code=404, detail="Entrenador no encontrado")
         
         # Verificar que el cliente existe y obtener su cliente_id
-        cursor.execute("SELECT c.id FROM clientes c JOIN users u ON c.id_usuario = u.id WHERE u.id = ?", (cliente_id,))
+        cursor.execute("SELECT c.id FROM clientes c JOIN users u ON c.id_usuario = u.id WHERE u.id =%s", (cliente_id,))
         cliente_row = cursor.fetchone()
         if not cliente_row:
             conn.close()
@@ -2160,7 +2238,7 @@ async def guardar_plan_entrenamiento(
         # Verificar que el cliente está asignado al entrenador
         cursor.execute("""
             SELECT id FROM entrenador_cliente_asignaciones 
-            WHERE id_entrenador = ? AND id_cliente = ? AND estado = 'activa'
+            WHERE id_entrenador =%s AND id_cliente =%s AND estado = 'activa'
         """, (entrenador_id, cliente_real_id))
         if not cursor.fetchone():
             conn.close()
@@ -2178,7 +2256,7 @@ async def guardar_plan_entrenamiento(
                 continue
             
             # Buscar el ID del ejercicio por nombre
-            cursor.execute("SELECT id FROM ejercicios WHERE nombre = ? AND estado = 'activo'", (ejercicio_nombre,))
+            cursor.execute("SELECT id FROM ejercicios WHERE nombre = %s AND estado = 'activo'", (ejercicio_nombre,))
             ejercicio_row = cursor.fetchone()
             if not ejercicio_row:
                 print(f"[WARNING] Ejercicio no encontrado: {ejercicio_nombre}")
@@ -2188,9 +2266,11 @@ async def guardar_plan_entrenamiento(
             
             # Insertar o actualizar entrenamiento asignado
             cursor.execute("""
-                INSERT OR REPLACE INTO entrenamientos_asignados 
+                INSERT INTO entrenamientos_asignados 
                 (id_entrenador, id_cliente, id_ejercicio, fecha_entrenamiento, series, estado)
-                VALUES (?, ?, ?, ?, ?, 'pendiente')
+                VALUES (%s, %s, %s, %s, %s, 'pendiente')
+                ON CONFLICT (id_entrenador, id_cliente, id_ejercicio, fecha_entrenamiento) 
+                DO UPDATE SET series = EXCLUDED.series
             """, (entrenador_id, cliente_real_id, ejercicio_id, fecha, series))
             
             entrenamiento_id = cursor.lastrowid
@@ -2238,7 +2318,7 @@ async def get_entrenamientos_pendientes(cliente_user_id: int, response: Response
         cursor = conn.cursor()
         
         # Obtener cliente_id real desde user_id
-        cursor.execute("SELECT c.id FROM clientes c JOIN users u ON c.id_usuario = u.id WHERE u.id = ?", (cliente_user_id,))
+        cursor.execute("SELECT c.id FROM clientes c JOIN users u ON c.id_usuario = u.id WHERE u.id = %s", (cliente_user_id,))
         cliente_row = cursor.fetchone()
         if not cliente_row:
             conn.close()
@@ -2260,7 +2340,7 @@ async def get_entrenamientos_pendientes(cliente_user_id: int, response: Response
             FROM entrenamientos_asignados ea
             JOIN ejercicios e ON ea.id_ejercicio = e.id
             JOIN users u ON ea.id_entrenador = u.id
-            WHERE ea.id_cliente = ? AND ea.estado = 'pendiente'
+            WHERE ea.id_cliente = %s AND ea.estado = 'pendiente'
             ORDER BY ea.fecha_entrenamiento ASC
         """, (cliente_id,))
         
@@ -2314,7 +2394,7 @@ async def registrar_actividad(cliente_user_id: int, actividad_data: dict, respon
         cursor = conn.cursor()
         
         # Obtener cliente_id real desde user_id
-        cursor.execute("SELECT c.id FROM clientes c JOIN users u ON c.id_usuario = u.id WHERE u.id = ?", (cliente_user_id,))
+        cursor.execute("SELECT c.id FROM clientes c JOIN users u ON c.id_usuario = u.id WHERE u.id = %s", (cliente_user_id,))
         cliente_row = cursor.fetchone()
         if not cliente_row:
             conn.close()
@@ -2347,12 +2427,21 @@ async def registrar_actividad(cliente_user_id: int, actividad_data: dict, respon
             (id_cliente, id_ejercicio, id_entrenamiento_asignado, fecha_realizacion, 
              series_realizadas, repeticiones, peso_kg, tiempo_segundos, distancia_metros, 
              notas, valoracion, tipo_registro)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (cliente_id, id_ejercicio, id_entrenamiento_asignado, fecha_realizacion,
               series_realizadas, repeticiones, peso_kg, tiempo_segundos, distancia_metros,
               notas, valoracion, tipo_registro))
         
         actividad_id = cursor.lastrowid
+        
+        # Si es un entrenamiento planificado, actualizamos su estado a completado
+        if id_entrenamiento_asignado:
+            cursor.execute("""
+                UPDATE entrenamientos_asignados
+                SET estado = 'completado'
+                WHERE id = %s
+            """, (id_entrenamiento_asignado,))
+            print(f"[DEBUG] Actualizado estado de entrenamiento asignado {id_entrenamiento_asignado} a completado")
         
         conn.commit()
         conn.close()

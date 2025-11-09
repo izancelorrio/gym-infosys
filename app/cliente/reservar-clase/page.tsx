@@ -147,10 +147,18 @@ export default function ReservarClasePage() {
     return null
   }
 
-  // Filtrar clases basándose en el tipo seleccionado
-  const clasesFiltradas = clasesProgramadas.filter((clase: ClaseProgramada) => 
-    filtroTipo === "Todos" || clase.tipo === filtroTipo
-  )
+  // Filtrar clases basándose en el tipo seleccionado y que sean posteriores a la fecha/hora actual
+  const clasesFiltradas = clasesProgramadas.filter((clase: ClaseProgramada) => {
+    // Verificar si cumple el filtro de tipo
+    const cumpleFiltroTipo = filtroTipo === "Todos" || clase.tipo === filtroTipo;
+    
+    // Verificar si la clase es posterior a la fecha/hora actual
+    const ahora = new Date();
+    const fechaClase = new Date(clase.fecha + "T" + clase.hora);
+    const esClaseFutura = fechaClase > ahora;
+    
+    return cumpleFiltroTipo && esClaseFutura;
+  })
 
   const reservarClase = async (claseId: number) => {
     try {

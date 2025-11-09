@@ -1,1 +1,0 @@
-get_db_connection()

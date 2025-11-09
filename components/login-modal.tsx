@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Eye, EyeOff, Loader2, AlertCircle, Mail } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
-import { API_DISPONIBLE, USUARIOS_DEMO, API_CONFIG } from "@/lib/config"
+import { API_CONFIG } from "@/lib/config"
 
 interface LoginModalProps {
   isOpen: boolean
@@ -37,62 +37,36 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }: LoginModalPr
     setError("")
 
     try {
-      if (API_DISPONIBLE === 1) {
-        // Modo API - usar el API route de Next.js
-        console.log("[DEBUG] Making login request through Next.js API route")
-        const response = await fetch("/api/auth/login", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ email, password }),
-        })
+      console.log("[DEBUG] Making login request through Next.js API route")
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      })
 
-        console.log("[DEBUG] Login response status:", response.status)
-        const userData = await response.json()
-        console.log("[DEBUG] Login response data:", userData)
+      console.log("[DEBUG] Login response status:", response.status)
+      const userData = await response.json()
+      console.log("[DEBUG] Login response data:", userData)
 
-        if (!response.ok) {
-          setError(userData.error || "Error de autenticación")
-          return
-        }
+      if (!response.ok) {
+        setError(userData.error || "Error de autenticación")
+        return
+      }
 
-        if (userData.user) {
-          console.log("[DEBUG] Login successful, user data:", userData.user)
-          login(userData.user)
-          onClose()
-          setEmail("")
-          setPassword("")
-          setError("")
-        } else {
-          setError("Datos de usuario no válidos")
-        }
+      if (userData.user) {
+        console.log("[DEBUG] Login successful, user data:", userData.user)
+        login(userData.user)
+        onClose()
+        setEmail("")
+        setPassword("")
+        setError("")
       } else {
-        // Modo offline
-        await new Promise((resolve) => setTimeout(resolve, 500)) // Simular delay de red
-
-        const user = USUARIOS_DEMO.find((u) => u.email === email)
-
-        if (user) {
-          console.log("Login exitoso (offline):", user)
-          const { password: _, ...userWithoutPassword } = user
-          login(userWithoutPassword)
-          onClose()
-          setEmail("")
-          setPassword("")
-          setError("")
-        } else {
-          setError(
-            "Usuario no encontrado. Usa: usuario@email.com, cliente@email.com, clientepro@email.com, o admin@email.com",
-          )
-        }
+        setError("Datos de usuario no válidos")
       }
     } catch (error) {
-      if (API_DISPONIBLE === 1) {
-        setError("Servicio de autenticación no disponible. Por favor, inténtalo más tarde.")
-      } else {
-        setError("Error de conexión. Por favor, intenta de nuevo.")
-      }
+      setError("Error de conexión. Por favor, intenta de nuevo.")
       console.error("Error en login:", error)
     } finally {
       setIsLoading(false)
@@ -105,31 +79,23 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }: LoginModalPr
     setResetMessage("")
 
     try {
-      if (API_DISPONIBLE === 1) {
-        // Modo API - usar el API route de Next.js
-        const response = await fetch("/api/auth/send-reset-email", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ email: resetEmail }),
-        })
+      const response = await fetch("/api/auth/send-reset-email", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email: resetEmail }),
+      })
 
-        const result = await response.json()
+      const result = await response.json()
 
-        if (!response.ok) {
-          setResetMessage(result.error || "Error al enviar email")
-          return
-        }
-
-        setResetSent(true)
-        setResetMessage(result.message || "Se ha enviado un enlace de restablecimiento a tu email")
-      } else {
-        // Modo offline
-        await new Promise((resolve) => setTimeout(resolve, 1000))
-        setResetSent(true)
-        setResetMessage("Se ha enviado un enlace de restablecimiento a tu email (simulado offline)")
+      if (!response.ok) {
+        setResetMessage(result.error || "Error al enviar email")
+        return
       }
+
+      setResetSent(true)
+      setResetMessage(result.message || "Se ha enviado un enlace de restablecimiento a tu email")
     } catch (error) {
       setResetMessage("Error de conexión. Por favor, intenta de nuevo.")
       console.error("Error:", error)

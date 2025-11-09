@@ -303,7 +303,7 @@ export default function RegistrarEjercicioPage() {
 
       if (data.success) {
         alert("¡Actividad registrada exitosamente!")
-        // Remover el entrenamiento de la lista de pendientes
+        // Solo eliminamos el entrenamiento de la lista
         setEntrenamientosPendientes(prev => prev.filter(e => e.id !== entrenamiento.id))
       } else {
         throw new Error(data.message || "Error al registrar actividad")
@@ -402,7 +402,17 @@ export default function RegistrarEjercicioPage() {
       }
       
       alert(`Se registraron ${actividadesRegistradas.length} actividades correctamente en la base de datos.`)
-      router.push("/cliente/agenda")
+      // Limpiar el formulario y añadir uno nuevo vacío
+      const hoy = new Date()
+      const dia = hoy.getDate().toString().padStart(2, '0')
+      const mes = (hoy.getMonth() + 1).toString().padStart(2, '0')
+      const anio = hoy.getFullYear()
+
+      setEjercicios([{
+        id: Date.now().toString(),
+        fecha: `${anio}-${mes}-${dia}`,
+        actividad: ""
+      }])
       
     } catch (error) {
       console.error("[ERROR] Error al guardar ejercicios:", error)
@@ -822,6 +832,8 @@ function EntrenamientoPendienteCard({ entrenamiento, onRegistrar }: Entrenamient
     }
 
     onRegistrar(entrenamiento, datosParaEnviar)
+    // Cerramos el formulario después de registrar
+    setMostrarFormulario(false)
   }
 
   return (

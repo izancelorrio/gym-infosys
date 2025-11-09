@@ -4,11 +4,24 @@ import requests
 import os
 
 def get_db_connection():
-    """Obtiene la conexión a la base de datos users.db ubicada en la raíz del proyecto"""
+    """Obtiene la conexión a la base de datos PostgreSQL"""
+    import psycopg2
+    
+    # Conexión SQLite (comentada)
+    """
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(script_dir)
     db_path = os.path.join(project_root, "users.db")
     return sqlite3.connect(db_path)
+    """
+    
+    # Conexión PostgreSQL
+    return psycopg2.connect(
+        host="192.168.0.201",
+        database="infosis_db",
+        user="icelorrio",
+        password="y^FL^@2KDqDv%H&x"
+    )
 
 def borrar_usuarios():
     conn = get_db_connection()
@@ -43,7 +56,7 @@ def encriptar_passwords():
     for user_id, pw in users:
         if not is_bcrypt_hash(pw):
             new_hashed = hash_password(pw)
-            cursor.execute("UPDATE users SET password=? WHERE id=?", (new_hashed, user_id))
+            cursor.execute("UPDATE users SET password%s WHERE id%s", (new_hashed, user_id))
             updated += 1
     conn.commit()
     conn.close()

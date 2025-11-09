@@ -15,8 +15,9 @@ python-jose[cryptography]==3.3.0  # Para JWT tokens
 passlib[bcrypt]==1.7.4  # Para hashing de passwords
 email-validator==2.1.0  # Para validar emails
 
-# Base de datos (SQLite está incluido en Python por defecto)
-# sqlite3 viene incluido con Python
+# Base de datos
+psycopg2-binary==2.9.9  # Driver PostgreSQL
+# sqlite3 viene incluido con Python por defecto
 
 # Para desarrollo y testing (opcional)
 pytest==7.4.3
