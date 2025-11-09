@@ -1,5 +1,21 @@
+// Determine API URL based on environment
+const getApiBaseUrl = () => {
+  // Check for explicit environment variable
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+
+  // Check if we're running in a Docker environment
+  if (process.env.NEXT_PUBLIC_DOCKER === 'true') {
+    return 'http://api:8000';  // Docker service name
+  }
+
+  // Development fallback
+  return 'http://192.168.0.201:8000';  // Local development IP
+};
+
 export const API_CONFIG = {
-  BASE_URL: process.env.NEXT_PUBLIC_API_URL || "http://192.168.0.201:8000",
+  BASE_URL: getApiBaseUrl(),
   ENDPOINTS: {
     LOGIN: "/login",
     REGISTER: "/register",

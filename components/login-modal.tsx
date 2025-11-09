@@ -37,12 +37,27 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }: LoginModalPr
     setError("")
 
     try {
+      // Check API health first
+      const { checkApiHealth } = await import('@/lib/health-check')
+      const isHealthy = await checkApiHealth()
+      
+      if (!isHealthy) {
+        setError("No se puede conectar con el servidor. Por favor, intenta de nuevo más tarde.")
+        setIsLoading(false)
+        return
+      }
+
+    try {
       const apiUrl = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.LOGIN}`
       console.log("[DEBUG] Making login request to API:", apiUrl)
       console.log("[DEBUG] API_CONFIG:", API_CONFIG)
       const response = await fetch(apiUrl, {
         method: "POST",
-        headers: API_CONFIG.HEADERS,
+        headers: {
+          ...API_CONFIG.HEADERS,
+          'Access-Control-Allow-Origin': '*',
+        },
+        credentials: 'include',
         body: JSON.stringify({ email, password }),
       })
 

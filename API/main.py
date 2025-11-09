@@ -21,10 +21,19 @@ app = FastAPI()
 # Configuración de CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],  # URLs del frontend Next.js
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://192.168.0.201:3000",   # Frontend en Docker
+        "http://frontend:3000",        # Nombre del servicio en Docker
+        "http://192.168.0.201:8000",   # Backend en Docker
+        "http://api:8000",             # Nombre del servicio de API en Docker
+        "*"                            # Permitir todas las origenes en desarrollo
+    ],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
+    allow_methods=["*"],               # Permitir todos los métodos
+    allow_headers=["*"],               # Permitir todos los headers
+    expose_headers=["*"]              # Exponer todos los headers
 )
 
 def print_server_ip():

@@ -23,3 +23,4 @@ intentar quitar al editar y pasar de usuario a cliente los campos de tiempo
 quitar mensajes de debuj al psar un usuario a cliente desde el admin
 que un unstructor no se pueda tener clases a la misma hora el mismo dia, que cuando depliegues la hora te aparezca en rojo la hora que no se pueda
 en registrar actividad que los ejercicios se agrupen por dias
+eliminar funcion health
