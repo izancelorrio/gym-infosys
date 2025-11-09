@@ -1,0 +1,47 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:17
+    container_name: postgres17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: icelorrio
+      POSTGRES_PASSWORD: y^FL^@2KDqDv%H&x
+      POSTGRES_DB: infosis_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - /srv/docker/postgres/data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U icelorrio"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: https://github.com/izancelorrio/gym-infosys.git#main:API
+      dockerfile: Dockerfile
+    container_name: gym-api
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=postgresql://icelorrio:y^FL^@2KDqDv%H&x@db:5432/infosis_db
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: https://github.com/izancelorrio/gym-infosys.git#main
+      dockerfile: Dockerfile
+    container_name: gym-frontend
+    restart: unless-stopped
+    environment:
+      - NEXT_PUBLIC_API_URL=http://api:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
