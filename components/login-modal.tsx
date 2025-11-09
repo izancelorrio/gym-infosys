@@ -47,7 +47,6 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }: LoginModalPr
         return
       }
 
-    try {
       const apiUrl = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.LOGIN}`
       console.log("[DEBUG] Making login request to API:", apiUrl)
       console.log("[DEBUG] API_CONFIG:", API_CONFIG)
