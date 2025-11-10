@@ -26,7 +26,12 @@ services:
     container_name: gym-api
     restart: unless-stopped
     environment:
-      - DATABASE_URL=postgresql://icelorrio:y^FL^@2KDqDv%H&x@db:5432/infosis_db
+      - DATABASE_URL=postgresql://icelorrio:y%5EFL%5E%402KDqDv%25H%26x@db:5432/infosis_db
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=infosis_db
+      - DB_USER=icelorrio
+      - DB_PASS=y^FL^@2KDqDv%H&x
     ports:
       - "8000:8000"
     depends_on:
@@ -37,21 +42,11 @@ services:
     build:
       context: https://github.com/izancelorrio/gym-infosys.git#main
       dockerfile: Dockerfile
-      args:
-        - NODE_ENV=production
     container_name: gym-frontend
     restart: unless-stopped
     environment:
-      - NODE_ENV=production
       - NEXT_PUBLIC_API_URL=http://api:8000
-      - NEXT_PUBLIC_DOCKER=true
-      - NEXT_TELEMETRY_DISABLED=1
     ports:
       - "3000:3000"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
     depends_on:
       - api
