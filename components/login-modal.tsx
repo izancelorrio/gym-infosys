@@ -47,16 +47,14 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }: LoginModalPr
         return
       }
 
-      const apiUrl = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.LOGIN}`
-      console.log("[DEBUG] Making login request to API:", apiUrl)
+      const proxyUrl = "/api/auth/login"
+      console.log("[DEBUG] Making login request via Next proxy:", proxyUrl)
       console.log("[DEBUG] API_CONFIG:", API_CONFIG)
-      const response = await fetch(apiUrl, {
+      const response = await fetch(proxyUrl, {
         method: "POST",
         headers: {
-          ...API_CONFIG.HEADERS,
+          "Content-Type": "application/json",
         },
-        mode: 'cors',
-        credentials: 'same-origin',
         body: JSON.stringify({ email, password }),
       })
 
