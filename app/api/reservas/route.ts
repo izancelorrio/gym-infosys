@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
       headers: withApiHeaders({
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Pragma': 'no-cache',
-        'Expires': '0'
+        'Expires': '0',
       }),
       body: JSON.stringify(body)
     })
@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
         headers: withApiHeaders({
           'Cache-Control': 'no-cache, no-store, must-revalidate',
           'Pragma': 'no-cache',
-          'Expires': '0'
+          'Expires': '0',
         })
       }
     })
