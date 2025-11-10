@@ -3,6 +3,7 @@
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
 import { useEffect, useState, useMemo } from "react"
+import { API_CONFIG } from "@/lib/config"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -138,7 +139,7 @@ export default function RegistrarEjercicioPage() {
     // Cargar entrenamientos pendientes
     const cargarEntrenamientosPendientes = async () => {
       try {
-        const response = await fetch(`http://localhost:8000/cliente/${user?.id}/entrenamientos-pendientes`, {
+  const response = await fetch(`${API_CONFIG.BASE_URL}/cliente/${user?.id}/entrenamientos-pendientes`, {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
@@ -162,7 +163,7 @@ export default function RegistrarEjercicioPage() {
     // Cargar ejercicios disponibles
     const cargarEjerciciosDisponibles = async () => {
       try {
-        const response = await fetch("http://localhost:8000/ejercicios", {
+  const response = await fetch(`${API_CONFIG.BASE_URL}/ejercicios`, {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
@@ -195,7 +196,7 @@ export default function RegistrarEjercicioPage() {
           return
         }
         
-        const url = `http://localhost:8000/user/${user.id}/reservas`
+  const url = `${API_CONFIG.BASE_URL}/user/${user.id}/reservas`
         console.log("[DEBUG] URL de la petición:", url)
         
         const response = await fetch(url, {
@@ -285,7 +286,7 @@ export default function RegistrarEjercicioPage() {
 
       console.log("[DEBUG] Registrando actividad planificada:", actividadData)
 
-      const response = await fetch(`http://localhost:8000/cliente/${user?.id}/registrar-actividad`, {
+  const response = await fetch(`${API_CONFIG.BASE_URL}/cliente/${user?.id}/registrar-actividad`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -319,7 +320,7 @@ export default function RegistrarEjercicioPage() {
     try {
       console.log("[DEBUG] Registrando asistencia a clase:", claseReservada)
 
-      const response = await fetch(`http://localhost:8000/reservas/${claseReservada.id}/registrar-asistencia`, {
+  const response = await fetch(`${API_CONFIG.BASE_URL}/reservas/${claseReservada.id}/registrar-asistencia`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -382,7 +383,7 @@ export default function RegistrarEjercicioPage() {
           valoracion: ejercicio.valoracion || null
         }
 
-        const response = await fetch(`http://localhost:8000/cliente/${user?.id}/registrar-actividad`, {
+  const response = await fetch(`${API_CONFIG.BASE_URL}/cliente/${user?.id}/registrar-actividad`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

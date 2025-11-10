@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { API_CONFIG } from "@/lib/config";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -70,7 +71,7 @@ export function AsignarEntrenadorModal({ isOpen, onOpenChange }: AsignarEntrenad
   const fetchAsignaciones = async () => {
     try {
       setLoading(true);
-      const response = await fetch("http://localhost:8000/asignaciones-entrenador", {
+  const response = await fetch(`${API_CONFIG.BASE_URL}/asignaciones-entrenador`, {
         method: "GET",
         headers: {
           "Cache-Control": "no-cache, no-store, must-revalidate",
@@ -101,7 +102,7 @@ export function AsignarEntrenadorModal({ isOpen, onOpenChange }: AsignarEntrenad
 
     try {
       setAssigningLoading(true);
-      const response = await fetch("http://localhost:8000/asignar-entrenador", {
+  const response = await fetch(`${API_CONFIG.BASE_URL}/asignar-entrenador`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -142,7 +143,7 @@ export function AsignarEntrenadorModal({ isOpen, onOpenChange }: AsignarEntrenad
     }
 
     try {
-      const response = await fetch(`http://localhost:8000/desasignar-entrenador/${asignacionId}`, {
+  const response = await fetch(`${API_CONFIG.BASE_URL}/desasignar-entrenador/${asignacionId}`, {
         method: "DELETE",
       });
 

@@ -3,6 +3,7 @@
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter, useParams } from "next/navigation"
 import { useEffect, useState, useMemo } from "react"
+import { API_CONFIG } from "@/lib/config"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -74,7 +75,7 @@ export default function AsignarEntrenamientoPage() {
     const fetchData = async () => {
       try {
         // Obtener datos del entrenador y sus clientes
-        const clientesResponse = await fetch(`http://localhost:8000/entrenador/${user?.id}/clientes`, {
+  const clientesResponse = await fetch(`${API_CONFIG.BASE_URL}/entrenador/${user?.id}/clientes`, {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
@@ -112,7 +113,7 @@ export default function AsignarEntrenamientoPage() {
         }
 
         // Obtener ejercicios disponibles
-        const ejerciciosResponse = await fetch("http://localhost:8000/ejercicios", {
+  const ejerciciosResponse = await fetch(`${API_CONFIG.BASE_URL}/ejercicios`, {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
@@ -187,7 +188,7 @@ export default function AsignarEntrenamientoPage() {
 
       console.log("[DEBUG] Guardando entrenamientos:", entrenamientosCompletos)
 
-      const response = await fetch(`http://localhost:8000/entrenador/${user?.id}/cliente/${clienteId}/plan-entrenamiento`, {
+  const response = await fetch(`${API_CONFIG.BASE_URL}/entrenador/${user?.id}/cliente/${clienteId}/plan-entrenamiento`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

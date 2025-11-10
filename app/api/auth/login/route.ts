@@ -11,9 +11,11 @@ export async function POST(request: NextRequest) {
 
     console.log("[v0] Intentando conectar a API externa...")
 
+    let timeoutId: NodeJS.Timeout | undefined
+
     try {
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.TIMEOUT)
+      timeoutId = setTimeout(() => controller.abort(), API_CONFIG.TIMEOUT)
 
       const apiUrl = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.LOGIN}`
       console.log("[v0] POST", apiUrl)
@@ -79,7 +81,9 @@ export async function POST(request: NextRequest) {
         { status: 503 },
       )
     } finally {
-      clearTimeout(timeoutId)
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+      }
     }
   } catch (error) {
     console.error("[v0] Error en login:", error)

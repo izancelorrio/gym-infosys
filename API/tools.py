@@ -63,7 +63,8 @@ def encriptar_passwords():
     print(f"Contraseñas actualizadas: {updated}")
 
 def contar_usuarios_via_api():
-    url = "http://localhost:8000/count-members"
+    base_url = os.getenv("API_URL", "http://api:8000").rstrip("/")
+    url = f"{base_url}/count-members"
     try:
         response = requests.get(url)
         response.raise_for_status()

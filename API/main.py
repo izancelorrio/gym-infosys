@@ -95,7 +95,9 @@ def get_db_connection():
             print(f"[ERROR] Failed to connect using DATABASE_URL: {e}")
 
     # Fallback: usar variables individuales o valores por defecto
-    host = os.getenv("DB_HOST", "localhost")
+    host = os.getenv("DB_HOST")
+    if not host:
+        raise RuntimeError("DB_HOST environment variable must be set")
     port = os.getenv("DB_PORT", "5432")
     database = os.getenv("DB_NAME", "infosis_db")
     user = os.getenv("DB_USER", "icelorrio")

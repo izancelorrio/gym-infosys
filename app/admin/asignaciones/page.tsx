@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/auth-context";
 import { useRouter } from "next/navigation";
+import { API_CONFIG } from "@/lib/config";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -68,7 +69,7 @@ export default function AsignacionesEntrenadorPage() {
   const fetchAsignaciones = async () => {
     try {
       setLoading(true);
-      const response = await fetch("http://localhost:8000/asignaciones-entrenador", {
+  const response = await fetch(`${API_CONFIG.BASE_URL}/asignaciones-entrenador`, {
         method: "GET",
         headers: {
           "Cache-Control": "no-cache, no-store, must-revalidate",
@@ -99,7 +100,7 @@ export default function AsignacionesEntrenadorPage() {
 
     try {
       setAssigningLoading(true);
-      const response = await fetch("http://localhost:8000/asignar-entrenador", {
+  const response = await fetch(`${API_CONFIG.BASE_URL}/asignar-entrenador`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -140,7 +141,7 @@ export default function AsignacionesEntrenadorPage() {
     }
 
     try {
-      const response = await fetch(`http://localhost:8000/desasignar-entrenador/${asignacionId}`, {
+  const response = await fetch(`${API_CONFIG.BASE_URL}/desasignar-entrenador/${asignacionId}`, {
         method: "DELETE",
       });
 

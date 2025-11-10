@@ -10,8 +10,8 @@ const getApiBaseUrl = () => {
     return 'http://api:8000';  // Docker service name
   }
 
-  // Development fallback
-  return 'http://localhost:8000';  // Local development IP
+  // Default to the internal Docker service unless explicitly overridden
+  return 'http://api:8000';
 };
 
 const BASE_URL = getApiBaseUrl().replace(/\/$/, '')

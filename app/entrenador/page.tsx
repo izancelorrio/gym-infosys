@@ -3,6 +3,7 @@
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
+import { API_CONFIG } from "@/lib/config"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -48,7 +49,7 @@ export default function EntrenadorPage() {
       setIsLoading(true)
       setError(null)
       
-      const response = await fetch(`http://localhost:8000/entrenador/${user.id}/clientes`, {
+  const response = await fetch(`${API_CONFIG.BASE_URL}/entrenador/${user.id}/clientes`, {
         method: "GET",
         headers: {
           "Cache-Control": "no-cache, no-store, must-revalidate",
