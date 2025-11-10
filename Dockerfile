@@ -2,6 +2,11 @@ FROM node:20-slim
 
 WORKDIR /app
 
+# Ensure Next build gets the Docker API URL at build time so server-side fetches
+# inside the built app use the correct service address instead of localhost.
+ENV NEXT_PUBLIC_API_URL=http://api:8000
+ENV NEXT_PUBLIC_DOCKER=true
+
 # Copiar package.json y package-lock.json primero para aprovechar la caché
 COPY package*.json ./
 
