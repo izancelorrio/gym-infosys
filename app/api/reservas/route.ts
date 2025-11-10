@@ -67,16 +67,16 @@ export async function GET(request: NextRequest) {
     const timestamp = new Date().getTime()
     console.log(`[${timestamp}] API GET /reservas - Cliente: ${clienteId}`)
 
-    const response = await fetch(
-      buildApiUrl(`${API_CONFIG.ENDPOINTS.RESERVAS}/${clienteId}`, { _t: timestamp }),
-      {
-        method: 'GET',
-        headers: withApiHeaders({
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0',
-        })
-      }
+    const requestUrl = buildApiUrl(`${API_CONFIG.ENDPOINTS.RESERVAS}/${clienteId}`, { _t: timestamp })
+    const headers = withApiHeaders({
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+    })
+
+    const response = await fetch(requestUrl, {
+      method: 'GET',
+      headers,
     })
 
     if (!response.ok) {
