@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { API_CONFIG } from '@/lib/config'
+import { buildApiUrl, withApiHeaders } from '@/lib/api-client'
 
 export async function GET(request: NextRequest) {
   try {
@@ -6,14 +8,13 @@ export async function GET(request: NextRequest) {
     const timestamp = new Date().getTime()
     console.log(`[${timestamp}] API /clases-programadas GET - Obteniendo clases programadas`)
 
-    const response = await fetch(`http://localhost:8000/clases-programadas?_t=${timestamp}`, {
+    const response = await fetch(buildApiUrl(API_CONFIG.ENDPOINTS.CLASES_PROGRAMADAS, { _t: timestamp }), {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
+      headers: withApiHeaders({
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Pragma': 'no-cache',
         'Expires': '0'
-      },
+      }),
     })
 
     if (!response.ok) {
@@ -51,14 +52,13 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     console.log(`[${timestamp}] Clases a guardar:`, body.clases?.length || 0)
 
-    const response = await fetch(`http://localhost:8000/clases-programadas?_t=${timestamp}`, {
+    const response = await fetch(buildApiUrl(API_CONFIG.ENDPOINTS.CLASES_PROGRAMADAS, { _t: timestamp }), {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
+      headers: withApiHeaders({
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Pragma': 'no-cache',
         'Expires': '0'
-      },
+      }),
       body: JSON.stringify(body)
     })
 

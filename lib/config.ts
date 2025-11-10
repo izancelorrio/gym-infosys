@@ -11,11 +11,13 @@ const getApiBaseUrl = () => {
   }
 
   // Development fallback
-  return 'http://192.168.0.201:8000';  // Local development IP
+  return 'http://localhost:8000';  // Local development IP
 };
 
+const BASE_URL = getApiBaseUrl().replace(/\/$/, '')
+
 export const API_CONFIG = {
-  BASE_URL: getApiBaseUrl(),
+  BASE_URL,
   ENDPOINTS: {
     LOGIN: "/login",
     REGISTER: "/register",
@@ -27,6 +29,12 @@ export const API_CONFIG = {
     SEND_RESET_EMAIL: "/send-reset-email",
     PLANES: "/planes",
     COUNT_TRAINERS: "/count-trainers",
+    CONTRACT_PLAN: "/contract-plan",
+    ADMIN_USERS: "/admin/users",
+    GYM_CLASSES: "/gym-clases",
+    ENTRENADORES: "/entrenadores",
+    CLASES_PROGRAMADAS: "/clases-programadas",
+    RESERVAS: "/reservas",
   },
   HEADERS: {
     "Content-Type": "application/json",

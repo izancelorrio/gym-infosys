@@ -1,31 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
-
-// Configuración de la API
-const API_CONFIG = {
-  BASE_URL: process.env.API_BASE_URL || 'http://127.0.0.1:8000',
-  ENDPOINTS: {
-    PLANES: '/planes'
-  }
-}
+import { API_CONFIG } from '@/lib/config'
+import { buildApiUrl, withApiHeaders } from '@/lib/api-client'
 
 export async function GET(request: NextRequest) {
   console.log('[DEBUG] planes: Starting API route')
   
   // Siempre intentar usar la API real primero
   try {
-    const fullUrl = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.PLANES}?_t=${Date.now()}`
+    const fullUrl = buildApiUrl(API_CONFIG.ENDPOINTS.PLANES, { _t: Date.now() })
     console.log('[DEBUG] planes: Full URL:', fullUrl)
     
     console.log('[DEBUG] planes: Making fetch request to backend...')
     
     const response = await fetch(fullUrl, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
+      headers: withApiHeaders({
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Pragma': 'no-cache',
         'Expires': '0'
-      },
+      }),
       // Timeout de 5 segundos
       signal: AbortSignal.timeout(5000)
     })
@@ -59,7 +52,7 @@ export async function GET(request: NextRequest) {
       if (error.message.includes('ECONNREFUSED') || error.message.includes('fetch failed')) {
         console.error('[DEBUG] planes: Connection refused or fetch failed')
         return NextResponse.json(
-          { error: 'No se puede conectar con el servidor backend. Asegúrate de que FastAPI esté corriendo en http://127.0.0.1:8000', code: 'CONNECTION_FAILED' },
+          { error: `No se puede conectar con el servidor backend en ${API_CONFIG.BASE_URL}.`, code: 'CONNECTION_FAILED' },
           { status: 503 }
         )
       }

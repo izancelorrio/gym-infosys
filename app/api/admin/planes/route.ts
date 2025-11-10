@@ -1,18 +1,17 @@
 import { NextResponse } from "next/server"
+import { API_CONFIG } from "@/lib/config"
+import { buildApiUrl, withApiHeaders } from "@/lib/api-client"
 
 export async function GET() {
   console.log('📝 [DEBUG] Iniciando solicitud GET /api/admin/planes')
   try {
-    // Usar directamente la URL de desarrollo
-    const apiUrl = 'http://localhost:8000'
-    console.log('📝 [DEBUG] URL de la API:', apiUrl)
-
-    const response = await fetch(`${apiUrl}/planes`, {
-      headers: {
+    const timestamp = Date.now()
+    const response = await fetch(buildApiUrl(API_CONFIG.ENDPOINTS.PLANES, { _t: timestamp }), {
+      headers: withApiHeaders({
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Pragma': 'no-cache',
         'Expires': '0'
-      }
+      })
     })
 
     console.log('📝 [DEBUG] Status de la respuesta:', response.status)

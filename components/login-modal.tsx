@@ -54,9 +54,9 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }: LoginModalPr
         method: "POST",
         headers: {
           ...API_CONFIG.HEADERS,
-          'Access-Control-Allow-Origin': '*',
         },
-        credentials: 'include',
+        mode: 'cors',
+        credentials: 'same-origin',
         body: JSON.stringify({ email, password }),
       })
 

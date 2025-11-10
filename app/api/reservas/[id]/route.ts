@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { API_CONFIG } from '@/lib/config'
+import { buildApiUrl, withApiHeaders } from '@/lib/api-client'
 
 export async function DELETE(
   request: NextRequest,
@@ -18,14 +20,15 @@ export async function DELETE(
     const timestamp = new Date().getTime()
     console.log(`[${timestamp}] API DELETE /reservas/${reservaId} - Anulando reserva`)
 
-    const response = await fetch(`http://localhost:8000/reservas/${reservaId}?_t=${timestamp}`, {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
-      },
+    const response = await fetch(
+      buildApiUrl(`${API_CONFIG.ENDPOINTS.RESERVAS}/${reservaId}`, { _t: timestamp }),
+      {
+        method: 'DELETE',
+        headers: withApiHeaders({
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }),
     })
 
     if (!response.ok) {
