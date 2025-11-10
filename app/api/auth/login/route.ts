@@ -15,7 +15,10 @@ export async function POST(request: NextRequest) {
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.TIMEOUT)
 
-      const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.LOGIN}`, {
+      const apiUrl = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.LOGIN}`
+      console.log("[v0] POST", apiUrl)
+
+      const response = await fetch(apiUrl, {
         method: "POST",
         headers: API_CONFIG.HEADERS,
         body: JSON.stringify({
@@ -24,8 +27,6 @@ export async function POST(request: NextRequest) {
         }),
         signal: controller.signal,
       })
-
-      clearTimeout(timeoutId)
 
       console.log("[v0] Respuesta recibida, status:", response.status)
       console.log("[v0] Content-Type:", response.headers.get("content-type"))
@@ -70,13 +71,15 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: data.detail || "Credenciales inválidas" }, { status: response.status })
       }
     } catch (fetchError) {
-      console.log("[v0] API externa no disponible")
+      console.error("[v0] API externa no disponible", fetchError)
       return NextResponse.json(
         {
           error: "Servicio de autenticación no disponible. Por favor, inténtalo más tarde.",
         },
         { status: 503 },
       )
+    } finally {
+      clearTimeout(timeoutId)
     }
   } catch (error) {
     console.error("[v0] Error en login:", error)
