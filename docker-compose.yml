@@ -18,23 +18,15 @@ services:
   db:
     image: postgres:17
     # Servicio de base de datos Postgres
-    # Volumen nombrado para persistencia: pgdata
-    # Cambia POSTGRES_PASSWORD por una contraseña segura o usa Docker secrets
-    restart: unless-stopped
-    # Usamos la variable `DB_PASS` (sin valor por defecto) para establecer la
-    # contraseña de Postgres. Proporciónala desde Portainer (Environment variables)
-    # o mediante `--env-file` / `.env.local` al desplegar.
+    # Volumen nombrado para persistencia: pgdata    
+    restart: unless-stopped    
     environment:
-  POSTGRES_USER: ${DB_USER}
-  POSTGRES_PASSWORD: ${DB_PASS}
-  POSTGRES_DB: ${DB_NAME}
-    ports:
-      # Espera una cadena de mapeo de puertos en formato "host_port:container_port"
-      # Usamos la variable DB_PORT repetida para mapear el mismo puerto en host y contenedor
-      # Ejemplo: si DB_PORT=5432 se desplegará como "5432:5432"
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: ${DB_NAME}
+    ports:      
       - "${DB_PORT}:${DB_PORT}"
-    volumes:
-      # Nombre del volumen (definido por la variable DB_VOLUME) montado en la ruta de Postgres
+    volumes:      
       - /srv/docker/postgres/data:/data
     healthcheck:
       # Comprueba la disponibilidad de Postgres usando las variables de entorno
@@ -45,12 +37,9 @@ services:
       retries: 5
 
   api:
-    # El servicio API (FastAPI)
-    # Se construye directamente desde el repositorio GitHub (subdirectorio :API).
-    # Si prefieres construir desde el código local, cambia `context` a `./API`.
-    build:
-      # Build context: usamos la variable ${mitokengithub} proporcionada por
-      # Portainer o por un archivo .env/--env-file. No poner tokens en el repo.
+    # El servicio API (FastAPI) 
+    
+    build:      
       context: https://${mitokengithub}@github.com/izancelorrio/gym-infosys.git#main:API
       dockerfile: Dockerfile
     container_name: gym-api
@@ -66,17 +55,14 @@ services:
     # Healthcheck: comprueba /health en el contenedor API
     # (comentado temporalmente para depuración; vuelve a activar una vez resuelto)
     # Requiere curl en la imagen de la API (ya incluido en API/Dockerfile)
-    # healthcheck:
-    #   test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
-    #   # Valores fijos (no variables): interval=10s, timeout=5s, retries=5
-    #   interval: 10s
-    #   timeout: 5s
-    #   retries: 5
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      # Valores fijos (no variables): interval=10s, timeout=5s, retries=5
+      interval: 10s
+      timeout: 5s
+      retries: 5
   frontend:
-    # Servicio frontend (Next.js)
-    # Se construye desde el repo GitHub (root). Para builds en servidor sin clonar,
-    # Docker descargará el repo si la VM tiene acceso. Alternativa: construir localmente
-    # y publicar imagen en un registry para producción.
+    # Servicio frontend (Next.js)        
     build:
       # Build context para frontend, usando la misma variable de token.
       context: https://${mitokengithub}@github.com/izancelorrio/gym-infosys.git#main
@@ -84,8 +70,7 @@ services:
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     container_name: gym-frontend
-    restart: unless-stopped
-    # Dejar que la imagen o el entorno (Portainer/.env) suministren NEXT_PUBLIC_API_URL y API_URL.
+    restart: unless-stopped    
     ports:
       - "3000:3000"
     depends_on:
@@ -94,12 +79,10 @@ services:
 
 volumes:
   # Nombre del volumen para Postgres (defínelo en Portainer o en .env.local)
-  ${DB_VOLUME}:
+  # Usamos un bind mount estático en el servicio `db` (/srv/docker/postgres/data:/data).
+  # No se utiliza un volumen nombrado, por lo que no es necesario definir DB_VOLUME.
 
 networks:
   default:
     name: gymnet
 
-# Fin del docker-compose. Recuerda revisar:
-# - credenciales (no dejar `change_me` en producción)
-# - acceso a GitHub desde la máquina que hace el build si el repo es privado
