@@ -40,7 +40,7 @@ services:
     # El servicio API (FastAPI) 
     
     build:      
-      context: https://${mitokengithub}@github.com/izancelorrio/gym-infosys.git#main:API
+      context: https://github.com/izancelorrio/gym-infosys.git#main:API
       dockerfile: Dockerfile
     container_name: gym-api
     restart: unless-stopped
@@ -52,8 +52,6 @@ services:
       - DB_NAME=${DB_NAME}
       - DB_USER=${DB_USER}
       - DB_PASS=${DB_PASS}
-    # No sobrescribimos variables aquí: la imagen o el entorno (Portainer/.env)
-    # debe proporcionar DATABASE_URL y DB_* si son necesarias.
     ports:
       - "8000:8000"
     # depends_on con condition: service_healthy ayuda a esperar a Postgres antes de iniciar
@@ -73,7 +71,7 @@ services:
     # Servicio frontend (Next.js)        
     build:
       # Build context para frontend, usando la misma variable de token.
-      context: https://${mitokengithub}@github.com/izancelorrio/gym-infosys.git#main
+      context: https://github.com/izancelorrio/gym-infosys.git#main
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}

@@ -145,11 +145,19 @@ def get_db_connection():
     # Fallback: usar variables individuales o valores por defecto
     host = os.getenv("DB_HOST")
     if not host:
-        raise RuntimeError("DB_HOST environment variable must be set")
-    port = os.getenv("DB_PORT", "5432")
-    database = os.getenv("DB_NAME", "infosis_db")
-    user = os.getenv("DB_USER", "icelorrio")
-    password = os.getenv("DB_PASS", "y^FL^@2KDqDv%H&x")
+        raise RuntimeError("Debe establecer la variable de entorno DB_HOST")
+    port = os.getenv("DB_PORT")
+    if not port:
+        raise RuntimeError("Debe establecer la variable de entorno DB_PORT")
+    database = os.getenv("DB_NAME")
+    if not database:
+        raise RuntimeError("Debe establecer la variable de entorno DB_NAME")
+    user = os.getenv("DB_USER")
+    if not user:
+        raise RuntimeError("Debe establecer la variable de entorno DB_USER")
+    password = os.getenv("DB_PASS")
+    if not password:
+        raise RuntimeError("Debe establecer la variable de entorno DB_PASS")
     try:
         logger.debug("[DEBUG] Connecting to Postgres at %s:%s, db=%s, user=%s", host, port, database, user)
         return psycopg2.connect(host=host, port=port, database=database, user=user, password=password)

@@ -87,7 +87,7 @@ VALUES
 -- Entrenador cliente asignaciones table seed data
 INSERT INTO entrenador_cliente_asignaciones (id_entrenador, id_cliente, estado, fecha_asignacion, notas, created_at, updated_at) 
 VALUES 
-(9, 1, 'activa', '2025-10-16', 'puerba1', '2025-10-16 18:29:13', '2025-10-16 18:29:13');
+(17, 1, 'activa', '2025-10-16', 'puerba1', '2025-10-16 18:29:13', '2025-10-16 18:29:13');
 
 -- Ejercicios table seed data
 INSERT INTO ejercicios (nombre, categoria, descripcion, estado, created_at, updated_at) 
@@ -128,5 +128,6 @@ INSERT INTO entrenamientos_realizados (id_cliente, id_ejercicio, id_entrenamient
 VALUES 
 (1, 10, NULL, '2025-10-07', NULL, NULL, 5, 5, 5, 300, 5, '', 3, 'libre', '2025-10-16 20:10:33', '2025-10-16 20:10:33'),
 (1, 12, NULL, '2025-10-16', NULL, NULL, 3, 3, 55, 480, 55, 'hrhrh', 4, 'libre', '2025-10-16 20:08:10', '2025-10-16 20:08:10'),
-(1, 14, 8, '2025-10-16', NULL, NULL, 1, 1, 1, 31313, 313, '', 3, 'planificado', '2025-10-16 19:56:24', '2025-10-16 19:56:24'),
-(1, 1, 5, '2025-10-16', NULL, NULL, 1, 33, 33, 33, NULL, '', 3, 'planificado', '2025-10-16 19:55:41', '2025-10-16 19:55:41');
+(1, 6, 8, '2025-10-16', NULL, NULL, 1, 1, 1, 31313, 313, '', 3, 'planificado', '2025-10-16 19:56:24', '2025-10-16 19:56:24'),
+(1, 14, 5, '2025-10-16', NULL, NULL, 1, 33, 33, 33, NULL, '', 3, 'planificado', '2025-10-16 19:55:41', '2025-10-16 19:55:41'),
+(1, 1, 7, '2025-10-16', NULL, NULL, 1, 33, 33, 33, NULL, '', 3, 'planificado', '2025-10-16 19:55:41', '2025-10-16 19:55:41');
