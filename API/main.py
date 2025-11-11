@@ -18,8 +18,9 @@ import logging
 # This allows using the .env.local at the repo root when running the API from
 # the project root or from the API folder. If DATABASE_URL is set it will be
 # used by the existing logic in get_db_connection().
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-POSTGRES_DIR = PROJECT_ROOT / "postgres"
+API_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = API_DIR.parent
+POSTGRES_DIR = API_DIR / "postgres"
 DDL_SCRIPT_PATH = POSTGRES_DIR / "ddl_postgres.sql"
 SEED_SCRIPT_PATH = POSTGRES_DIR / "seed_postgres.sql"
 
