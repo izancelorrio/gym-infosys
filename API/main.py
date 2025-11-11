@@ -18,7 +18,12 @@ import logging
 # This allows using the .env.local at the repo root when running the API from
 # the project root or from the API folder. If DATABASE_URL is set it will be
 # used by the existing logic in get_db_connection().
-env_path = Path(__file__).resolve().parents[1] / ".env.local"
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+POSTGRES_DIR = PROJECT_ROOT / "postgres"
+DDL_SCRIPT_PATH = POSTGRES_DIR / "ddl_postgres.sql"
+SEED_SCRIPT_PATH = POSTGRES_DIR / "seed_postgres.sql"
+
+env_path = PROJECT_ROOT / ".env.local"
 load_dotenv(env_path)
 
 # Configure basic logging for the application. Prefer uvicorn's logger when
@@ -30,6 +35,21 @@ if _uvicorn_logger.handlers:
 else:
     logger = logging.getLogger("gym-infosys")
 logger.setLevel(logging.INFO)
+
+REQUIRED_TABLES = {
+    "users",
+    "email_verifications",
+    "reset_tokens",
+    "planes",
+    "clientes",
+    "gym_clases",
+    "clases_programadas",
+    "reservas",
+    "entrenador_cliente_asignaciones",
+    "ejercicios",
+    "entrenamientos_asignados",
+    "entrenamientos_realizados",
+}
 
 # Configuración del entorno
 # Cambia esta URL según tu entorno: desarrollo local o producción
@@ -68,16 +88,90 @@ def print_server_ip():
 print_server_ip()
 
 
+def _get_missing_tables(conn) -> list[str]:
+    """Devuelve las tablas públicas que faltan según el esquema esperado."""
+    with conn.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT table_name
+            FROM information_schema.tables
+            WHERE table_schema = 'public'
+            """
+        )
+        existing = {row[0] for row in cursor.fetchall()}
+    return sorted(REQUIRED_TABLES - existing)
+
+
+def _run_sql_script(conn, script_path: Path) -> bool:
+    """Ejecuta las sentencias contenidas en el fichero SQL indicado."""
+    if not script_path.exists():
+        logger.warning("Archivo SQL no encontrado: %s", script_path)
+        return False
+    sql_text = script_path.read_text(encoding="utf-8").strip()
+    if not sql_text:
+        logger.info("Archivo SQL vacío, nada que ejecutar: %s", script_path)
+        return False
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(sql_text)
+        conn.commit()
+        return True
+    except Exception as exc:
+        conn.rollback()
+        logger.error("Error al ejecutar %s: %s", script_path, exc)
+        return False
+
+
+def _ensure_database_schema(conn) -> None:
+    """Crea el esquema esperado cuando faltan tablas."""
+    missing_tables = _get_missing_tables(conn)
+    if not missing_tables:
+        logger.info("Esquema detectado con tablas esperadas")
+        return
+    logger.warning(
+        "Faltan tablas en la BD (%s). Ejecutando ddl_postgres.sql para recrear el esquema.",
+        ", ".join(missing_tables),
+    )
+    if _run_sql_script(conn, DDL_SCRIPT_PATH):
+        logger.info("Script DDL ejecutado correctamente")
+    else:
+        logger.error("No se pudo ejecutar el script DDL en %s", DDL_SCRIPT_PATH)
+
+
+def _ensure_seed_data(conn) -> None:
+    """Carga los datos de ejemplo cuando las tablas principales están vacías."""
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT COUNT(*) FROM users")
+            user_count = cursor.fetchone()[0]
+    except Exception as exc:
+        conn.rollback()
+        logger.error("No se pudo comprobar la tabla users para el seed: %s", exc)
+        return
+    if user_count > 0:
+        logger.info("Datos de ejemplo ya presentes (usuarios=%s)", user_count)
+        return
+    logger.warning("No se encontraron usuarios. Ejecutando seed_postgres.sql")
+    if _run_sql_script(conn, SEED_SCRIPT_PATH):
+        logger.info("Script de seed ejecutado correctamente")
+    else:
+        logger.error("No se pudo ejecutar el script de seed en %s", SEED_SCRIPT_PATH)
+
+
 @app.on_event("startup")
 def check_db_on_startup():
-    """Try to connect to the database once at startup and log the result."""
+    """Intenta conectar con la base de datos al iniciar y registra el resultado."""
     try:
         # Attempt to get a connection; get_db_connection() will prefer DATABASE_URL
         conn = get_db_connection()
         try:
-            conn.close()
-        except Exception:
-            pass
+            _ensure_database_schema(conn)
+            _ensure_seed_data(conn)
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
         database_url = os.getenv("DATABASE_URL")
         if database_url:
@@ -93,8 +187,8 @@ def check_db_on_startup():
 
 @app.get("/health")
 def health_check(request: Request):
-    """Simple health check endpoint that doesn't depend on database.
-    Also logs a short INFO line with the client IP for visibility in dev.
+    """Comprobación simple de salud sin dependencia de la base de datos.
+    Además registra una línea INFO corta con la IP cliente para facilitar el desarrollo.
     """
     host = request.client.host if request.client else "unknown"
     logger.info('%s - "GET /health" -> %s', host, {"status": "ok"})
@@ -282,7 +376,7 @@ def send_verification_email(to_email: str, verify_link: str):
 
 @app.middleware("http")
 async def log_request_body(request: Request, call_next):
-    # Minimal middleware: do not log requests/responses here. Leave logging to endpoints.
+    # Middleware mínimo: no registrar aquí las peticiones/respuestas; se delega en los endpoints.
     response = await call_next(request)
     return response
 
@@ -509,7 +603,7 @@ def verify_email(req: VerifyEmailRequest):
 ## Endpoint para obtener el número total de usuarios registrados
 @app.get("/count-members")
 def count_members(request: Request):
-    """Return total members and log the request and result."""
+    """Devuelve el número total de clientes y registra la petición y el resultado."""
     client_host = request.client.host if request.client else "unknown"
     conn = get_db_connection()
     cursor = conn.cursor()

@@ -18,7 +18,8 @@ services:
   postgres:
     image: postgres:17
     # Servicio de base de datos Postgres
-    # Volumen nombrado para persistencia: pgdata    
+    # Volumen nombrado para persistencia: pgdata
+    container_name: gym-postgres    
     restart: unless-stopped    
     environment:
       POSTGRES_USER: ${DB_USER}
