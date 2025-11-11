@@ -15,7 +15,7 @@ version: "3.9"
 # ------------------------------------------------------------
 
 services:
-  db:
+  postgres:
     image: postgres:17
     # Servicio de base de datos Postgres
     # Volumen nombrado para persistencia: pgdata    
@@ -58,7 +58,7 @@ services:
       - "8000:8000"
     # depends_on con condition: service_healthy ayuda a esperar a Postgres antes de iniciar
     depends_on:
-      db:
+      postgres:
         condition: service_healthy
     # Healthcheck: comprueba /health en el contenedor API
     # (comentado temporalmente para depuración; vuelve a activar una vez resuelto)
