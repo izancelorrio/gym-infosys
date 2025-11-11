@@ -77,11 +77,6 @@ services:
       api:
         condition: service_healthy
 
-volumes:
-  # Nombre del volumen para Postgres (defínelo en Portainer o en .env.local)
-  # Usamos un bind mount estático en el servicio `db` (/srv/docker/postgres/data:/data).
-  # No se utiliza un volumen nombrado, por lo que no es necesario definir DB_VOLUME.
-
 networks:
   default:
     name: gymnet
