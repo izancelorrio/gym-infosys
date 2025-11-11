@@ -24,8 +24,18 @@ POSTGRES_DIR = API_DIR / "postgres"
 DDL_SCRIPT_PATH = POSTGRES_DIR / "ddl_postgres.sql"
 SEED_SCRIPT_PATH = POSTGRES_DIR / "seed_postgres.sql"
 
-env_path = PROJECT_ROOT / ".env.local"
-load_dotenv(env_path)
+def _load_env_file() -> None:
+    """Carga el primer fichero .env.local disponible."""
+    candidates = [
+        API_DIR / ".env.local",
+        PROJECT_ROOT / ".env.local",
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            load_dotenv(candidate)
+            return
+
+_load_env_file()
 
 # Configure basic logging for the application. Prefer uvicorn's logger when
 # running under uvicorn so messages appear in the server output.
