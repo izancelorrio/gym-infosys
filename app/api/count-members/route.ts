@@ -30,19 +30,22 @@ export async function GET() {
       console.log("[DEBUG] count-members: Response status text:", response.statusText)
       
       // Intentar leer el contenido del error
+      let errorText = ""
       try {
-        const errorText = await response.text()
+        errorText = await response.text()
         console.log("[DEBUG] count-members: Error response text:", errorText)
       } catch (e) {
         console.log("[DEBUG] count-members: Could not read error text:", e)
       }
       
-      return NextResponse.json({ 
-        count: 847, 
-        error: `Backend API error: ${response.status} ${response.statusText}`,
-        debug: { fullUrl, status: response.status },
-        mode: "error"
-      })
+      return NextResponse.json(
+        {
+          error: `Backend API error: ${response.status} ${response.statusText}`,
+          debug: { fullUrl, status: response.status, errorText },
+          mode: "error",
+        },
+        { status: response.status }
+      )
     }
 
     const data = await response.json()
@@ -51,10 +54,17 @@ export async function GET() {
     if (data.count !== undefined) {
       console.log("[DEBUG] count-members: Returning count:", data.count)
       return NextResponse.json({ count: data.count, mode: "api" })
-    } else {
-      console.log("[DEBUG] count-members: No count field in response, using default")
-      return NextResponse.json({ count: 847, mode: "no-count-field" })
     }
+
+    console.log("[DEBUG] count-members: No count field in response, returning error")
+    return NextResponse.json(
+      {
+        error: "Backend API response missing count field",
+        debug: { fullUrl, data },
+        mode: "missing-count",
+      },
+      { status: 502 }
+    )
   } catch (error) {
     console.error("[DEBUG] count-members: Error in route:", error)
     console.error("[DEBUG] count-members: Error details:", {
@@ -62,14 +72,16 @@ export async function GET() {
       stack: error instanceof Error ? error.stack : undefined,
     })
     
-    return NextResponse.json({ 
-      count: 847, 
-      error: error instanceof Error ? error.message : "Unknown error",
-      debug: { 
-        fullUrl: `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.COUNT_MEMBERS}`,
-        errorType: typeof error 
+    return NextResponse.json(
+      {
+        error: error instanceof Error ? error.message : "Unknown error",
+        debug: {
+          fullUrl: `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.COUNT_MEMBERS}`,
+          errorType: typeof error,
+        },
+        mode: "error",
       },
-      mode: "error"
-    })
+      { status: 500 }
+    )
   }
 }
