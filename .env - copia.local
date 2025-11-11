@@ -1,0 +1,37 @@
+############################################################
+# Configuración de entorno local (desarrollo)
+############################################################
+# Valores activos para desarrollo local
+API_URL=http://localhost:8000
+NEXT_PUBLIC_API_URL=http://localhost:8000
+
+############################################################
+# Base de datos - configuración local (desarrollo)
+############################################################
+# Sustituye los valores por tus credenciales locales de Postgres.
+# Puedes usar una sola variable DATABASE_URL o las variables DB_* individuales.
+# Ejemplo (descomentar y completar para uso local):
+# DATABASE_URL=postgresql://usuario:TU_CONTRASENA@localhost:5432/infosis_db
+
+# Variables DB individuales para desarrollo local (activa una opción):
+DB_HOST=192.168.0.201
+DB_PORT=5432
+DB_NAME=infosis_db
+DB_USER=icelorrio
+DB_PASS=y^FL^@2KDqDv%H&x
+
+# ##########################################################
+# Ejemplos para Docker / Compose (descomentar cuando se ejecute dentro del contenedor)
+# ##########################################################
+# API (desde otros contenedores en la misma red de Compose):
+# API_URL=http://api:8000
+# API_BASE_URL=http://api:8000    # obsoleta / para compatibilidad solo si la necesitas
+# NEXT_PUBLIC_API_URL=http://api:8000
+
+# Base de datos cuando Postgres está como servicio en Compose (usar el nombre del servicio):
+# DB_HOST=postgres
+# DB_PORT=5432
+# DB_NAME=infosis_db
+# DB_USER=icelorrio
+# DB_PASS=change_me
+
