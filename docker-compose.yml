@@ -44,6 +44,14 @@ services:
       dockerfile: Dockerfile
     container_name: gym-api
     restart: unless-stopped
+    # Pasamos las variables de conexión a la base de datos al contenedor API.
+    # Estas deben estar definidas en Portainer (Stack Environment) o en un .env/--env-file
+    environment:
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASS=${DB_PASS}
     # No sobrescribimos variables aquí: la imagen o el entorno (Portainer/.env)
     # debe proporcionar DATABASE_URL y DB_* si son necesarias.
     ports:
