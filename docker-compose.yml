@@ -21,16 +21,25 @@ services:
     # Volumen nombrado para persistencia: pgdata
     # Cambia POSTGRES_PASSWORD por una contraseña segura o usa Docker secrets
     restart: unless-stopped
+    # Usamos la variable `DB_PASS` (sin valor por defecto) para establecer la
+    # contraseña de Postgres. Proporciónala desde Portainer (Environment variables)
+    # o mediante `--env-file` / `.env.local` al desplegar.
     environment:
-      POSTGRES_USER: icelorrio
-      POSTGRES_PASSWORD: change_me
-      POSTGRES_DB: infosis_db
+  POSTGRES_USER: ${DB_USER}
+  POSTGRES_PASSWORD: ${DB_PASS}
+  POSTGRES_DB: ${DB_NAME}
     ports:
-      - "5432:5432"
+      # Espera una cadena de mapeo de puertos en formato "host_port:container_port"
+      # Usamos la variable DB_PORT repetida para mapear el mismo puerto en host y contenedor
+      # Ejemplo: si DB_PORT=5432 se desplegará como "5432:5432"
+      - "${DB_PORT}:${DB_PORT}"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      # Nombre del volumen (definido por la variable DB_VOLUME) montado en la ruta de Postgres
+      - /srv/docker/postgres/data:/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U icelorrio -d infosis_db"]
+      # Comprueba la disponibilidad de Postgres usando las variables de entorno
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      # Valores fijos (no variables): interval=10s, timeout=5s, retries=5
       interval: 10s
       timeout: 5s
       retries: 5
@@ -46,16 +55,8 @@ services:
       dockerfile: Dockerfile
     container_name: gym-api
     restart: unless-stopped
-    environment:
-      # Preferimos usar variables que Portainer cargará desde `env.local`.
-      # Puedes proporcionar DATABASE_URL directamente o dejar que se construya
-      # a partir de las variables DB_*.
-      - DATABASE_URL=${DATABASE_URL}
-      - DB_HOST=${DB_HOST:-db}
-      - DB_PORT=${DB_PORT:-5432}
-      - DB_NAME=${DB_NAME:-infosis_db}
-      - DB_USER=${DB_USER:-icelorrio}
-      - DB_PASS=${DB_PASS:-change_me}
+    # No sobrescribimos variables aquí: la imagen o el entorno (Portainer/.env)
+    # debe proporcionar DATABASE_URL y DB_* si son necesarias.
     ports:
       - "8000:8000"
     # depends_on con condition: service_healthy ayuda a esperar a Postgres antes de iniciar
@@ -67,10 +68,10 @@ services:
     # Requiere curl en la imagen de la API (ya incluido en API/Dockerfile)
     # healthcheck:
     #   test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+    #   # Valores fijos (no variables): interval=10s, timeout=5s, retries=5
     #   interval: 10s
     #   timeout: 5s
     #   retries: 5
-
   frontend:
     # Servicio frontend (Next.js)
     # Se construye desde el repo GitHub (root). Para builds en servidor sin clonar,
@@ -81,12 +82,10 @@ services:
       context: https://${mitokengithub}@github.com/izancelorrio/gym-infosys.git#main
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://api:8000}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     container_name: gym-frontend
     restart: unless-stopped
-    environment:
-      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://api:8000}
-      - API_URL=${API_URL:-http://api:8000}
+    # Dejar que la imagen o el entorno (Portainer/.env) suministren NEXT_PUBLIC_API_URL y API_URL.
     ports:
       - "3000:3000"
     depends_on:
@@ -94,7 +93,8 @@ services:
         condition: service_healthy
 
 volumes:
-  pgdata:
+  # Nombre del volumen para Postgres (defínelo en Portainer o en .env.local)
+  ${DB_VOLUME}:
 
 networks:
   default:
