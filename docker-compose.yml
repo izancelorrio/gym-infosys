@@ -40,18 +40,22 @@ services:
     # Se construye directamente desde el repositorio GitHub (subdirectorio :API).
     # Si prefieres construir desde el código local, cambia `context` a `./API`.
     build:
-      context: https://github.com/izancelorrio/gym-infosys.git#main:API
+      # Build context: usamos la variable ${mitokengithub} proporcionada por
+      # Portainer o por un archivo .env/--env-file. No poner tokens en el repo.
+      context: https://${mitokengithub}@github.com/izancelorrio/gym-infosys.git#main:API
       dockerfile: Dockerfile
     container_name: gym-api
     restart: unless-stopped
     environment:
-      # Preferimos DATABASE_URL para conectarnos a Postgres desde dentro de Compose
-      - DATABASE_URL=postgresql://icelorrio:change_me@db:5432/infosis_db
-      - DB_HOST=db
-      - DB_PORT=5432
-      - DB_NAME=infosis_db
-      - DB_USER=icelorrio
-      - DB_PASS=change_me
+      # Preferimos usar variables que Portainer cargará desde `env.local`.
+      # Puedes proporcionar DATABASE_URL directamente o dejar que se construya
+      # a partir de las variables DB_*.
+      - DATABASE_URL=${DATABASE_URL}
+      - DB_HOST=${DB_HOST:-db}
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_NAME=${DB_NAME:-infosis_db}
+      - DB_USER=${DB_USER:-icelorrio}
+      - DB_PASS=${DB_PASS:-change_me}
     ports:
       - "8000:8000"
     # depends_on con condition: service_healthy ayuda a esperar a Postgres antes de iniciar
@@ -73,15 +77,16 @@ services:
     # Docker descargará el repo si la VM tiene acceso. Alternativa: construir localmente
     # y publicar imagen en un registry para producción.
     build:
-      context: https://github.com/izancelorrio/gym-infosys.git#main
+      # Build context para frontend, usando la misma variable de token.
+      context: https://${mitokengithub}@github.com/izancelorrio/gym-infosys.git#main
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: http://api:8000
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://api:8000}
     container_name: gym-frontend
     restart: unless-stopped
     environment:
-      - NEXT_PUBLIC_API_URL=http://api:8000
-      - API_URL=http://api:8000
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://api:8000}
+      - API_URL=${API_URL:-http://api:8000}
     ports:
       - "3000:3000"
     depends_on:
