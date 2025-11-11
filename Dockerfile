@@ -2,16 +2,15 @@ FROM node:20-slim
 
 WORKDIR /app
 
-# Ensure Next build gets the Docker API URL at build time so server-side fetches
-# inside the built app use the correct service address instead of localhost.
-ENV NEXT_PUBLIC_API_URL=http://api:8000
-ENV NEXT_PUBLIC_DOCKER=true
+# Build argument to inject API URL at build time (useful when building inside Compose)
+ARG NEXT_PUBLIC_API_URL=http://api:8000
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 
 # Copiar package.json y package-lock.json primero para aprovechar la caché
 COPY package*.json ./
 
-# Instalar dependencias
-RUN npm install
+# Instalar dependencias de producción (usa npm ci si tienes package-lock)
+RUN npm ci --production=false
 
 # Copiar el resto de los archivos del frontend
 COPY . .

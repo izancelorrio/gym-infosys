@@ -1,52 +1,100 @@
 version: "3.9"
 
+# ------------------------------------------------------------
+# docker-compose para Gym-Infosys
+#
+# Nota rápida:
+# - Este fichero define 3 servicios: db (Postgres), api (FastAPI) y frontend (Next.js).
+# - El api y el frontend se construyen desde el repositorio GitHub usando la sintaxis
+#   de `build.context` con URL. Si el repositorio es privado, la máquina que ejecute
+#   `docker compose build` debe tener acceso para clonar (credenciales SSH o helper).
+# - No pongas secretos en este fichero si el repo es público. Usa `env_file` o Docker
+#   secrets en producción. Las contraseñas aquí son placeholders (change_me).
+# - Para despliegues reproducibles en producción, considera usar imágenes etiquetadas
+#   en un registry y usar `image:` en lugar de `build:`.
+# ------------------------------------------------------------
+
 services:
   db:
     image: postgres:17
-    container_name: postgres17
+    # Servicio de base de datos Postgres
+    # Volumen nombrado para persistencia: pgdata
+    # Cambia POSTGRES_PASSWORD por una contraseña segura o usa Docker secrets
     restart: unless-stopped
     environment:
       POSTGRES_USER: icelorrio
-      POSTGRES_PASSWORD: y^FL^@2KDqDv%H&x
+      POSTGRES_PASSWORD: change_me
       POSTGRES_DB: infosis_db
     ports:
       - "5432:5432"
     volumes:
-      - /srv/docker/postgres/data:/data
+      - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U icelorrio"]
+      test: ["CMD-SHELL", "pg_isready -U icelorrio -d infosis_db"]
       interval: 10s
       timeout: 5s
       retries: 5
 
   api:
+    # El servicio API (FastAPI)
+    # Se construye directamente desde el repositorio GitHub (subdirectorio :API).
+    # Si prefieres construir desde el código local, cambia `context` a `./API`.
     build:
       context: https://github.com/izancelorrio/gym-infosys.git#main:API
       dockerfile: Dockerfile
     container_name: gym-api
     restart: unless-stopped
     environment:
-      - DATABASE_URL=postgresql://icelorrio:y%5EFL%5E%402KDqDv%25H%26x@db:5432/infosis_db
+      # Preferimos DATABASE_URL para conectarnos a Postgres desde dentro de Compose
+      - DATABASE_URL=postgresql://icelorrio:change_me@db:5432/infosis_db
       - DB_HOST=db
       - DB_PORT=5432
       - DB_NAME=infosis_db
       - DB_USER=icelorrio
-      - DB_PASS=y^FL^@2KDqDv%H&x
+      - DB_PASS=change_me
     ports:
       - "8000:8000"
+    # depends_on con condition: service_healthy ayuda a esperar a Postgres antes de iniciar
     depends_on:
       db:
         condition: service_healthy
+    # Healthcheck: comprueba /health en el contenedor API
+    # (comentado temporalmente para depuración; vuelve a activar una vez resuelto)
+    # Requiere curl en la imagen de la API (ya incluido en API/Dockerfile)
+    # healthcheck:
+    #   test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+    #   interval: 10s
+    #   timeout: 5s
+    #   retries: 5
 
   frontend:
+    # Servicio frontend (Next.js)
+    # Se construye desde el repo GitHub (root). Para builds en servidor sin clonar,
+    # Docker descargará el repo si la VM tiene acceso. Alternativa: construir localmente
+    # y publicar imagen en un registry para producción.
     build:
       context: https://github.com/izancelorrio/gym-infosys.git#main
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://api:8000
     container_name: gym-frontend
     restart: unless-stopped
     environment:
       - NEXT_PUBLIC_API_URL=http://api:8000
+      - API_URL=http://api:8000
     ports:
       - "3000:3000"
     depends_on:
-      - api
+      api:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+
+networks:
+  default:
+    name: gymnet
+
+# Fin del docker-compose. Recuerda revisar:
+# - credenciales (no dejar `change_me` en producción)
+# - acceso a GitHub desde la máquina que hace el build si el repo es privado

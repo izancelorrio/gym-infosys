@@ -10,11 +10,31 @@ from datetime import datetime, timedelta
 import socket
 import os
 import psycopg2
+from dotenv import load_dotenv
+from pathlib import Path
+import logging
+
+# Load environment variables from project root .env.local (development)
+# This allows using the .env.local at the repo root when running the API from
+# the project root or from the API folder. If DATABASE_URL is set it will be
+# used by the existing logic in get_db_connection().
+env_path = Path(__file__).resolve().parents[1] / ".env.local"
+load_dotenv(env_path)
+
+# Configure basic logging for the application. Prefer uvicorn's logger when
+# running under uvicorn so messages appear in the server output.
+logging.basicConfig(level=logging.INFO)
+_uvicorn_logger = logging.getLogger("uvicorn.error")
+if _uvicorn_logger.handlers:
+    logger = _uvicorn_logger
+else:
+    logger = logging.getLogger("gym-infosys")
+logger.setLevel(logging.INFO)
 
 # Configuración del entorno
 # Cambia esta URL según tu entorno: desarrollo local o producción
 FRONTEND_BASE_URL = "http://localhost:3000"  # Para desarrollo local
-# FRONTEND_BASE_URL = "https://v0-gym-landing-page-steel.vercel.app"  # Para producción
+
 
 app = FastAPI()
 
@@ -41,15 +61,43 @@ def print_server_ip():
     try:
         hostname = socket.gethostname()
         local_ip = socket.gethostbyname(hostname)
-        print(f"API iniciada. Accede en: http://{local_ip}:8000")
+        logger.info(f"API iniciada. Accede en: http://{local_ip}:8000")
     except Exception as e:
-        print("No se pudo determinar la IP local:", e)
+        logger.warning("No se pudo determinar la IP local: %s", e)
 
 print_server_ip()
 
+
+@app.on_event("startup")
+def check_db_on_startup():
+    """Try to connect to the database once at startup and log the result."""
+    try:
+        # Attempt to get a connection; get_db_connection() will prefer DATABASE_URL
+        conn = get_db_connection()
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+        database_url = os.getenv("DATABASE_URL")
+        if database_url:
+            logger.info("DB connection OK (using DATABASE_URL)")
+        else:
+            host = os.getenv("DB_HOST")
+            port = os.getenv("DB_PORT", "5432")
+            database = os.getenv("DB_NAME", "(unknown)")
+            user = os.getenv("DB_USER", "(unknown)")
+            logger.info("DB connection OK to %s:%s/%s as %s", host, port, database, user)
+    except Exception as e:
+        logger.error("DB connection FAILED at startup: %s", e)
+
 @app.get("/health")
-def health_check():
-    """Simple health check endpoint that doesn't depend on database"""
+def health_check(request: Request):
+    """Simple health check endpoint that doesn't depend on database.
+    Also logs a short INFO line with the client IP for visibility in dev.
+    """
+    host = request.client.host if request.client else "unknown"
+    logger.info('%s - "GET /health" -> %s', host, {"status": "ok"})
     return {"status": "ok", "message": "API is running"}
 
 # ----------------------------------------------------
@@ -89,10 +137,10 @@ def get_db_connection():
     database_url = os.getenv("DATABASE_URL")
     if database_url:
         try:
-            print(f"[DEBUG] Connecting to Postgres using DATABASE_URL")
+            logger.debug("[DEBUG] Connecting to Postgres using DATABASE_URL")
             return psycopg2.connect(database_url)
         except Exception as e:
-            print(f"[ERROR] Failed to connect using DATABASE_URL: {e}")
+            logger.error("[ERROR] Failed to connect using DATABASE_URL: %s", e)
 
     # Fallback: usar variables individuales o valores por defecto
     host = os.getenv("DB_HOST")
@@ -103,10 +151,10 @@ def get_db_connection():
     user = os.getenv("DB_USER", "icelorrio")
     password = os.getenv("DB_PASS", "y^FL^@2KDqDv%H&x")
     try:
-        print(f"[DEBUG] Connecting to Postgres at {host}:{port}, db={database}, user={user}")
+        logger.debug("[DEBUG] Connecting to Postgres at %s:%s, db=%s, user=%s", host, port, database, user)
         return psycopg2.connect(host=host, port=port, database=database, user=user, password=password)
     except Exception as e:
-        print(f"[ERROR] Failed to connect to Postgres at {host}:{port} db={database} user={user}: {e}")
+        logger.error("[ERROR] Failed to connect to Postgres at %s:%s db=%s user=%s: %s", host, port, database, user, e)
         raise
 
 def hash_password(password: str) -> str:
@@ -226,9 +274,7 @@ def send_verification_email(to_email: str, verify_link: str):
 
 @app.middleware("http")
 async def log_request_body(request: Request, call_next):
-    body = await request.body()
-    # Imprime la IP, método, ruta y cuerpo recibido
-    print(f"INFO: {request.client.host} - \"{request.method} {request.url.path}\" Body: {body.decode('utf-8')}")
+    # Minimal middleware: do not log requests/responses here. Leave logging to endpoints.
     response = await call_next(request)
     return response
 
@@ -454,26 +500,33 @@ def verify_email(req: VerifyEmailRequest):
 
 ## Endpoint para obtener el número total de usuarios registrados
 @app.get("/count-members")
-def count_members():
+def count_members(request: Request):
+    """Return total members and log the request and result."""
+    client_host = request.client.host if request.client else "unknown"
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM users WHERE role = 'cliente'")
     count = cursor.fetchone()[0]
     conn.close()
-    return {"count": count}
+    result = {"count": count}
+    logger.info('%s - "GET /count-members" Response 200: %s', client_host, result)
+    return result
 
 @app.get("/count-trainers")
-def count_trainers():
+def count_trainers(request: Request):
     """Obtener el número total de entrenadores activos"""
+    client_host = request.client.host if request.client else "unknown"
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) FROM users WHERE role = 'entrenador'")
         count = cursor.fetchone()[0]
         conn.close()
-        return {"count": count}
+        result = {"count": count}
+        logger.info('%s - "GET /count-trainers" Response 200: %s', client_host, result)
+        return result
     except Exception as e:
-        print(f"[ERROR] Error al contar entrenadores: {str(e)}")
+        logger.error("[ERROR] Error al contar entrenadores: %s", str(e))
         raise HTTPException(status_code=500, detail=f"Error al obtener el conteo de entrenadores: {str(e)}")
 
 ## Endpoints para planes

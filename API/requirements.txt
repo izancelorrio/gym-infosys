@@ -22,3 +22,6 @@ psycopg2-binary==2.9.9  # Driver PostgreSQL
 # Para desarrollo y testing (opcional)
 pytest==7.4.3
 httpx==0.25.2  # Para testing de FastAPI
+
+# Cargar variables de entorno desde .env durante desarrollo
+python-dotenv==1.0.0

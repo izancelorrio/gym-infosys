@@ -29,7 +29,7 @@ echo [4/4] Iniciando servidor Python FastAPI...
 echo Servidor disponible en: http://localhost:3000 (Frontend) y http://localhost:8000 (API)
 echo.
 echo Presiona Ctrl+C para detener los servidores
-call python.exe -m uvicorn API.main:app --reload --host 0.0.0.0
+call python.exe -m uvicorn API.main:app --reload --host 0.0.0.0 --log-level info
 
 echo.
 echo Servidores detenidos.
