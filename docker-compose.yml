@@ -33,7 +33,7 @@ services:
       # Comprueba la disponibilidad de Postgres usando las variables de entorno
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
       # Valores fijos (no variables): interval=10s, timeout=5s, retries=5
-      interval: 10s
+      interval: 300s
       timeout: 5s
       retries: 5
 
@@ -65,7 +65,7 @@ services:
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
       # Valores fijos (no variables): interval=10s, timeout=5s, retries=5
-      interval: 10s
+      interval: 300s
       timeout: 5s
       retries: 5
   frontend:
