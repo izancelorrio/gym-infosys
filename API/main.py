@@ -37,6 +37,44 @@ else:
     logger = logging.getLogger("gym-infosys")
 logger.setLevel(logging.INFO)
 
+# ----------------------------------------------------
+# RESUMEN DE ENDPOINTS DISPONIBLES
+# ----------------------------------------------------
+# GET    /health                                      - Comprobación básica de estado del servicio.
+# POST   /login                                       - Autenticación de usuarios registrados.
+# POST   /register                                    - Alta de nuevos usuarios.
+# POST   /change-password                             - Cambio de contraseña autenticado por email.
+# POST   /send-reset-email                            - Envío de enlace de recuperación de contraseña.
+# POST   /reset-password                              - Restablecer contraseña mediante token válido.
+# POST   /verify-email                                - Confirmación de correo electrónico de usuario.
+# GET    /count-members                               - Conteo total de usuarios con rol cliente.
+# GET    /count-trainers                              - Conteo total de entrenadores activos.
+# GET    /planes                                      - Listado de planes disponibles.
+# GET    /planes/{plan_id}                            - Detalle de un plan específico.
+# POST   /contract-plan                               - Contratación de plan y conversión a cliente.
+# GET    /admin/users                                 - Listado completo de usuarios (solo admin).
+# GET    /admin/users/{user_id}                       - Detalle de usuario individual (solo admin).
+# PUT    /admin/users/{user_id}                       - Actualización de usuario (solo admin).
+# GET    /gym-clases                                  - Catálogo de tipos de clases activas.
+# GET    /entrenadores                                - Listado de entrenadores registrados.
+# POST   /clases-programadas                          - Alta masiva de clases programadas.
+# GET    /clases-programadas                          - Clases programadas con plazas disponibles.
+# DELETE /clases-programadas/{clase_id}               - Eliminación de clase programada.
+# POST   /reservas                                    - Creación de reservas de clase.
+# GET    /reservas/{cliente_id}                       - Reservas asociadas a un cliente.
+# GET    /user/{user_id}/reservas                     - Reservas asociadas a un usuario.
+# DELETE /reservas/{reserva_id}                       - Cancelación de reserva activa.
+# POST   /reservas/{reserva_id}/registrar-asistencia  - Registro de asistencia a clase reservada.
+# GET    /asignaciones-entrenador                     - Asignaciones activas entrenador-cliente.
+# POST   /asignar-entrenador                          - Creación de nueva asignación.
+# DELETE /desasignar-entrenador/{asignacion_id}       - Finaliza una asignación existente.
+# GET    /entrenador/{entrenador_id}/clientes         - Clientes asignados a un entrenador.
+# GET    /entrenador/{entrenador_id}/estadisticas     - Indicadores agregados por entrenador.
+# GET    /ejercicios                                  - Catálogo de ejercicios disponibles.
+# POST   /entrenador/{entrenador_id}/cliente/{cliente_id}/plan-entrenamiento - Asignación de plan.
+# GET    /cliente/{cliente_user_id}/entrenamientos-pendientes               - Entrenamientos pendientes.
+# POST   /cliente/{cliente_user_id}/registrar-actividad                     - Registro de actividad realizada.
+
 REQUIRED_TABLES = {
     "users",
     "email_verifications",
@@ -194,29 +232,6 @@ def health_check(request: Request):
     host = request.client.host if request.client else "unknown"
     logger.info('%s - "GET /health" -> %s', host, {"status": "ok"})
     return {"status": "ok", "message": "API is running"}
-
-# ----------------------------------------------------
-# RESUMEN DE ENDPOINTS DE ESTE FICHERO
-# ----------------------------------------------------
-# POST   /login              - Login de usuario
-# POST   /register           - Registro de usuario
-# POST   /change-password    - Cambiar contraseña (requiere email y contraseña actual)
-# POST   /send-reset-email   - Enviar email de recuperación de contraseña
-# POST   /reset-password     - Cambiar contraseña usando token de recuperación
-# GET    /count-members      - Obtener número total de usuarios registrados
-# POST   /verify-email       - Verificar email de usuario mediante token
-# GET    /planes             - Obtener todos los planes disponibles
-# GET    /planes/{id}        - Obtener plan específico por ID
-# POST   /contract-plan      - Contratar plan (cambia rol usuario -> cliente, independiente del plan)
-# GET    /admin/users        - Obtener todos los usuarios (solo admin)
-# GET    /admin/users/{id}   - Obtener usuario específico por ID (solo admin)
-# PUT    /admin/users/{id}   - Actualizar usuario específico (solo admin)
-# GET    /gym-clases         - Obtener todos los tipos de clases activas del gimnasio
-# GET    /entrenadores       - Obtener todos los usuarios con rol de entrenador
-# GET    /clases-programadas - Obtener todas las clases programadas activas
-# POST   /clases-programadas - Guardar múltiples clases programadas en el calendario
-# ----------------------------------------------------
-
 def get_db_connection():
     """Obtiene la conexión a la base de datos PostgreSQL"""
     
