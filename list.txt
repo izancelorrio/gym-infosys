@@ -26,9 +26,9 @@ en registrar actividad que los ejercicios se agrupen por dias
 eliminar funcion health
 hay que eliminar la duracion de gym_clases o de clases_programadas yo diria de gym_clases y lo mismo con la capacidad maxima
 quitar la ubicacion de la tabla clases_programadas
-caambiar el token correo de main a env.local
 poner en la memoria que suamos correo para verificar
 cambiar node.js de modo development a definitivo
+quitar comentarios de la ia en distinto ficheros
 
 
 

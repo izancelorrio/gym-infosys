@@ -352,12 +352,12 @@ class CancelarReservaRequest(BaseModel):
     id_reserva: int
 
 def send_reset_email(to_email: str, reset_link: str):
-    # Configura estos valores según tu servidor SMTP
-    SMTP_SERVER = "smtp.gmail.com"
-    SMTP_PORT = 587
-    SMTP_USER = "izan.celorrio.caballero@gmail.com"
-    SMTP_PASS = "eksd jgro hfyw hkgq"
-    FROM_EMAIL = SMTP_USER
+    # Load SMTP configuration from environment variables.
+    SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+    SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+    SMTP_USER = os.getenv("SMTP_USER")
+    SMTP_PASS = os.getenv("SMTP_PASS")
+    FROM_EMAIL = SMTP_USER or os.getenv("FROM_EMAIL", "no-reply@example.com")
 
     subject = "Recuperación de contraseña"
     body = f"Haz clic en el siguiente enlace para restablecer tu contraseña:\n\n{reset_link}\n\nEste enlace es válido por 1 hora."
@@ -366,17 +366,23 @@ def send_reset_email(to_email: str, reset_link: str):
     msg["From"] = FROM_EMAIL
     msg["To"] = to_email
 
+    # If SMTP credentials are not configured, log and skip sending email to avoid exposing secrets.
+    if not SMTP_USER or not SMTP_PASS:
+        logger.warning("SMTP credentials not configured; skipping reset email to %s", to_email)
+        return
+
     with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
         server.starttls()
         server.login(SMTP_USER, SMTP_PASS)
         server.sendmail(FROM_EMAIL, [to_email], msg.as_string())
 
 def send_verification_email(to_email: str, verify_link: str):
-    SMTP_SERVER = "smtp.gmail.com"
-    SMTP_PORT = 587
-    SMTP_USER = "izan.celorrio.caballero@gmail.com"
-    SMTP_PASS = "eksd jgro hfyw hkgq"
-    FROM_EMAIL = SMTP_USER
+    # Load SMTP configuration from environment variables.
+    SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+    SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+    SMTP_USER = os.getenv("SMTP_USER")
+    SMTP_PASS = os.getenv("SMTP_PASS")
+    FROM_EMAIL = SMTP_USER or os.getenv("FROM_EMAIL", "no-reply@example.com")
 
     subject = "Verifica tu correo electrónico"
     body = f"Haz clic en el siguiente enlace para verificar tu correo:\n\n{verify_link}\n\nEste enlace es válido por 24 horas."
@@ -384,6 +390,11 @@ def send_verification_email(to_email: str, verify_link: str):
     msg["Subject"] = subject
     msg["From"] = FROM_EMAIL
     msg["To"] = to_email
+
+    # If SMTP credentials are not configured, log and skip sending email to avoid exposing secrets.
+    if not SMTP_USER or not SMTP_PASS:
+        logger.warning("SMTP credentials not configured; skipping verification email to %s", to_email)
+        return
 
     with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
         server.starttls()
@@ -799,14 +810,20 @@ def contract_plan(req: ContractPlanRequest):
                 id_usuario, dni, numero_telefono, plan_id, fecha_nacimiento, 
                 genero, num_tarjeta, fecha_tarjeta, cvv, fecha_inscripcion, estado
             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, 'activo')
+            RETURNING id
         """, (
             req.user_id, req.dni, req.numero_telefono, req.plan_id,
             req.fecha_nacimiento, req.genero, req.num_tarjeta, 
             req.fecha_tarjeta, req.cvv
         ))
         
-        # 5. Obtener el ID del cliente recién creado
-        cliente_id = cursor.lastrowid
+        # 5. Obtener el ID del cliente recién creado de forma segura
+        cliente_row = cursor.fetchone()
+        if not cliente_row:
+            conn.rollback()
+            conn.close()
+            raise HTTPException(status_code=500, detail="No se pudo registrar el cliente")
+        cliente_id = cliente_row[0]
         
         conn.commit()
         
@@ -817,6 +834,9 @@ def contract_plan(req: ContractPlanRequest):
             FROM clientes WHERE id =%s
         """, (cliente_id,))
         cliente_data = cursor.fetchone()
+        if not cliente_data:
+            conn.close()
+            raise HTTPException(status_code=500, detail="No se pudo recuperar la información del cliente")
         
         conn.close()
         
