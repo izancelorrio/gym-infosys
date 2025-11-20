@@ -47,3 +47,4 @@ ehthumbs.db
 # API service env files (templates can be kept but real .env should be ignored)
 API/.env
 API/.env.local
+API/tools.py
