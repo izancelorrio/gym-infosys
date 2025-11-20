@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { API_CONFIG } from "@/lib/config"
+import { buildApiUrl } from "@/lib/api-client"
 
 export async function GET() {
   try {
@@ -8,7 +9,7 @@ export async function GET() {
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.TIMEOUT)
 
-    const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.HEALTH}`, {
+    const response = await fetch(buildApiUrl(API_CONFIG.ENDPOINTS.HEALTH), {
       method: "GET",
       headers: API_CONFIG.HEADERS,
       signal: controller.signal,

@@ -1,18 +1,34 @@
 // Determine API URL based on environment
 const getApiBaseUrl = () => {
-  // Check for explicit environment variable
+  const isBrowser = typeof window !== "undefined"
+
+  if (isBrowser) {
+    if (process.env.NEXT_PUBLIC_BROWSER_API_URL) {
+      return process.env.NEXT_PUBLIC_BROWSER_API_URL
+    }
+
+    if (process.env.NEXT_PUBLIC_API_URL) {
+      return process.env.NEXT_PUBLIC_API_URL
+    }
+
+    const { protocol, host } = window.location
+    return `${protocol}//${host}`
+  }
+
+  if (process.env.API_INTERNAL_URL) {
+    return process.env.API_INTERNAL_URL
+  }
+
+  if (process.env.API_URL) {
+    return process.env.API_URL
+  }
+
   if (process.env.NEXT_PUBLIC_API_URL) {
-    return process.env.NEXT_PUBLIC_API_URL;
+    return process.env.NEXT_PUBLIC_API_URL
   }
 
-  // Check if we're running in a Docker environment
-  if (process.env.NEXT_PUBLIC_DOCKER === 'true') {
-    return 'http://api:8000';  // Docker service name
-  }
-
-  // Default to the internal Docker service unless explicitly overridden
-  return 'http://api:8000';
-};
+  return "http://api:8000"
+}
 
 const BASE_URL = getApiBaseUrl().replace(/\/$/, '')
 
