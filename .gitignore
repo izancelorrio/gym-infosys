@@ -38,3 +38,12 @@ ehthumbs.db
 
 # Git locks
 .git/index.lock
+
+# Local environment files (do not commit credentials)
+.env.local.docker
+.env.local.localhost
+**/.env.local
+**/.env.local.*
+# API service env files (templates can be kept but real .env should be ignored)
+API/.env
+API/.env.local
