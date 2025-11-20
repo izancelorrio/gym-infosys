@@ -7,12 +7,13 @@ const getApiBaseUrl = () => {
       return process.env.NEXT_PUBLIC_BROWSER_API_URL
     }
 
-    if (process.env.NEXT_PUBLIC_API_URL) {
-      return process.env.NEXT_PUBLIC_API_URL
-    }
+    const { protocol, hostname, port } = window.location
+    const fallbackPort = process.env.NEXT_PUBLIC_API_FALLBACK_PORT || "8000"
+    const needsPortSwap = port && ["3000", "4173"].includes(port)
+    const resolvedPort = needsPortSwap ? fallbackPort : port
+    const portSegment = resolvedPort ? `:${resolvedPort}` : ""
 
-    const { protocol, host } = window.location
-    return `${protocol}//${host}`
+    return `${protocol}//${hostname}${portSegment}`
   }
 
   if (process.env.API_INTERNAL_URL) {
