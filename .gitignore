@@ -1,50 +1,29 @@
 node_modules
 .next/
-.env
 .env.local
 .DS_Store
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .vscode/
-.idea/
 *.log
 __pycache__/
 *.py[cod]
 *$py.class
-
-# Python virtual environments
 venv/
 .venv/
 env/
-.env/
-ENV/
-env.bak/
-venv.bak/
-
-# Database files
 *.db
 *.sqlite
 *.sqlite3
-
-# OS generated files
-Thumbs.db
-ehthumbs.db
-
-# Temporary files
 *.tmp
 *.temp
 *~
-
-# Git locks
 .git/index.lock
-
-# Local environment files (do not commit credentials)
 .env.local.docker
 .env.local.localhost
 **/.env.local
 **/.env.local.*
-# API service env files (templates can be kept but real .env should be ignored)
 API/.env
 API/.env.local
 API/tools.py
