@@ -199,6 +199,21 @@ export default function DetalleUsuarioPage() {
           setError("El número de teléfono es obligatorio para crear un cliente")
           return
         }
+        // Validar número de tarjeta
+        if (!usuarioData.cliente?.num_tarjeta) {
+          setError("El número de tarjeta es obligatorio para crear un cliente")
+          return
+        }
+        // Validar fecha de caducidad de tarjeta
+        if (!usuarioData.cliente?.fecha_tarjeta) {
+          setError("La fecha de caducidad de la tarjeta es obligatoria para crear un cliente")
+          return
+        }
+        // Validar CVV
+        if (!usuarioData.cliente?.cvv) {
+          setError("El CVV es obligatorio para crear un cliente")
+          return
+        }
       }
       
       setGuardando(true)
@@ -215,6 +230,9 @@ export default function DetalleUsuarioPage() {
           numero_telefono: usuarioData.cliente.numero_telefono || "",
           fecha_nacimiento: usuarioData.cliente.fecha_nacimiento || null,
           genero: usuarioData.cliente.genero || null,
+          num_tarjeta: usuarioData.cliente.num_tarjeta || null,
+          fecha_tarjeta: usuarioData.cliente.fecha_tarjeta || null,
+          cvv: usuarioData.cliente.cvv || null,
           crear_cliente: usuarioData.role === "cliente" && !usuarioData.cliente.id
         })
       }
@@ -498,6 +516,7 @@ export default function DetalleUsuarioPage() {
                   <div className="space-y-2">
                     <Label htmlFor="telefono" className="flex items-center gap-1">
                       Teléfono
+                      <span className="text-red-500">*</span>
                     </Label>
                     <Input
                       id="telefono"
@@ -508,10 +527,13 @@ export default function DetalleUsuarioPage() {
                         cliente: { ...usuarioData.cliente!, numero_telefono: e.target.value }
                       })}
                       placeholder="600123456"
+                      required
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="fechaNacimiento">Fecha de Nacimiento</Label>
+                    <Label htmlFor="fechaNacimiento">Fecha de Nacimiento
+                      <span className="text-red-500">*</span>
+                    </Label>
                     <Input
                       id="fechaNacimiento"
                       type="date"
@@ -520,10 +542,11 @@ export default function DetalleUsuarioPage() {
                         ...usuarioData,
                         cliente: { ...usuarioData.cliente!, fecha_nacimiento: e.target.value }
                       })}
+                      required
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="genero">Género</Label>
+                    <Label htmlFor="genero">Género <span className="text-red-500">*</span></Label>
                     <Select
                       value={usuarioData.cliente?.genero || ""}
                       onValueChange={(value) => setUsuarioData({
@@ -582,7 +605,7 @@ export default function DetalleUsuarioPage() {
                     <h3 className="text-lg font-semibold mb-4">Información de Pago</h3>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="numTarjeta">Número de Tarjeta</Label>
+                    <Label htmlFor="numTarjeta">Número de Tarjeta <span className="text-red-500">*</span></Label>
                     <Input
                       id="numTarjeta"
                       value={usuarioData.cliente?.num_tarjeta || ""}
@@ -592,10 +615,11 @@ export default function DetalleUsuarioPage() {
                       })}
                       className="font-mono"
                       placeholder="1234 5678 9012 3456"
+                      required
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="fechaTarjeta">Fecha de Caducidad</Label>
+                    <Label htmlFor="fechaTarjeta">Fecha de Caducidad <span className="text-red-500">*</span></Label>
                     <Input
                       id="fechaTarjeta"
                       value={usuarioData.cliente?.fecha_tarjeta || ""}
@@ -604,10 +628,11 @@ export default function DetalleUsuarioPage() {
                         cliente: { ...usuarioData.cliente!, fecha_tarjeta: e.target.value }
                       })}
                       placeholder="MM/YY"
+                      required
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="cvv">CVV</Label>
+                    <Label htmlFor="cvv">CVV <span className="text-red-500">*</span></Label>
                     <Input
                       id="cvv"
                       type="text"
@@ -619,6 +644,7 @@ export default function DetalleUsuarioPage() {
                       })}
                       className="font-mono w-24"
                       placeholder="123"
+                      required
                     />
                   </div>
                 </div>

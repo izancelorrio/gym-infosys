@@ -777,6 +777,26 @@ def contract_plan(req: ContractPlanRequest):
     cursor = conn.cursor()
     
     try:
+        # Validar campos obligatorios no vacíos
+        required_fields = [
+            (req.dni, "DNI"),
+            (req.numero_telefono, "Número de teléfono"),
+            (req.plan_id, "Plan"),
+            (req.fecha_nacimiento, "Fecha de nacimiento"),
+            (req.genero, "Género"),
+            (req.num_tarjeta, "Número de tarjeta"),
+            (req.fecha_tarjeta, "Fecha de caducidad de la tarjeta"),
+            (req.cvv, "CVV")
+        ]
+
+        for val, name in required_fields:
+            if val is None:
+                conn.close()
+                raise HTTPException(status_code=400, detail=f"El campo {name} es obligatorio para contratar un plan")
+            if isinstance(val, str) and not val.strip():
+                conn.close()
+                raise HTTPException(status_code=400, detail=f"El campo {name} es obligatorio y no puede estar vacío")
+
         # 1. Verificar que el usuario existe y tiene rol 'usuario'
         cursor.execute("SELECT id, name, email, role FROM users WHERE id =%s", (req.user_id,))
         user = cursor.fetchone()
@@ -1084,7 +1104,10 @@ def update_user(user_id: int, req: UpdateUserRequest, response: Response):
                 (req.plan_id, "Plan"),
                 (req.fecha_nacimiento, "Fecha de nacimiento"),
                 (req.genero, "Género"),
-                (req.numero_telefono, "Número de teléfono")
+                (req.numero_telefono, "Número de teléfono"),
+                (req.num_tarjeta, "Número de tarjeta"),
+                (req.fecha_tarjeta, "Fecha de caducidad de la tarjeta"),
+                (req.cvv, "CVV")
             ]
 
             for value, field_name in required_fields:
