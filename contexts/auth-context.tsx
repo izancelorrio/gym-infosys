@@ -80,62 +80,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter()
 
   useEffect(() => {
-    console.log("[GymInfoSys] AuthProvider mounting, checking storage...")
+    // Enforce fresh session on every new load: clear any persisted session data so
+    // that opening the app in a new tab/window always starts as logged out.
+    console.log("[GymInfoSys] AuthProvider mounting - clearing persisted session to enforce fresh login state")
     setIsHydrated(true)
 
     try {
-      let userData: User | null = null
-
       if (typeof window !== "undefined") {
-        console.log("[GymInfoSys] localStorage available:", typeof Storage !== "undefined")
-        console.log("[GymInfoSys] All localStorage keys:", Object.keys(localStorage))
-
-        const savedUser = localStorage.getItem("gym_user")
-        console.log("[GymInfoSys] Raw localStorage value for 'gym_user':", savedUser)
-
-        if (savedUser && savedUser !== "null") {
-          userData = JSON.parse(savedUser)
-          if (userData && !userData.role) {
-            userData.role = "usuario"
-            console.log("[GymInfoSys] Rol por defecto asignado a usuario existente:", userData)
-          }
-          console.log("[GymInfoSys] User session restored from localStorage:", userData)
-        }
-      }
-
-      if (!userData) {
-        const cookieUser = getCookie("gym_user")
-        if (cookieUser && cookieUser !== "null") {
-          userData = JSON.parse(decodeURIComponent(cookieUser))
-          if (userData && !userData.role) {
-            userData.role = "usuario"
-            console.log("[GymInfoSys] Rol por defecto asignado a usuario de cookie:", userData)
-          }
-          console.log("[GymInfoSys] User session restored from cookie:", userData)
-
-          // Restaurar tambiÃ©n en localStorage
-          if (typeof window !== "undefined") {
-            localStorage.setItem("gym_user", JSON.stringify(userData))
-            console.log("[GymInfoSys] User data restored to localStorage from cookie")
-          }
-        }
-      }
-
-      if (userData) {
-        setUser(userData)
-      } else {
-        console.log("[GymInfoSys] No saved user found in any storage")
-      }
-    } catch (error) {
-      console.error("[GymInfoSys] Error restoring user session:", error)
-      // Limpiar datos corruptos
-      if (typeof window !== "undefined") {
+        // Remove any previously saved client-side session
         localStorage.removeItem("gym_user")
+        console.log("[GymInfoSys] Cleared localStorage 'gym_user' on mount")
       }
+
+      // Also remove cookie backup if present
       deleteCookie("gym_user")
+
+      // Ensure user is null on initial load
+      setUser(null)
+    } catch (error) {
+      console.error("[GymInfoSys] Error while clearing persisted session:", error)
     } finally {
       setIsLoading(false)
-      console.log("[GymInfoSys] AuthProvider initialization complete")
+      console.log("[GymInfoSys] AuthProvider initialization complete (persistent session cleared)")
     }
   }, [])
 
