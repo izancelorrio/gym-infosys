@@ -39,7 +39,10 @@ export function ContractPlanModal({ isOpen, onClose }: ContractPlanModalProps) {
   const { user, updateUser } = useAuth()
   const [planes, setPlanes] = useState<Plan[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  // `fatalError` para errores de carga que deben reemplazar el contenido
+  const [fatalError, setFatalError] = useState<string | null>(null)
+  // `formError` para errores de validación/envío que se muestran inline en el formulario
+  const [formError, setFormError] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     nombre: user?.name || "",
     email: user?.email || "",
@@ -59,7 +62,7 @@ export function ContractPlanModal({ isOpen, onClose }: ContractPlanModalProps) {
     const fetchPlanes = async () => {
       try {
         setLoading(true)
-        setError(null)
+        setFatalError(null)
         
         const response = await fetch(`/api/planes?_t=${Date.now()}`, {
           method: 'GET',
@@ -77,7 +80,7 @@ export function ContractPlanModal({ isOpen, onClose }: ContractPlanModalProps) {
         setPlanes(data.planes || [])
       } catch (error) {
         console.error('Error fetching planes:', error)
-        setError('No se pudieron cargar los planes')
+        setFatalError('No se pudieron cargar los planes')
       } finally {
         setLoading(false)
       }
@@ -114,17 +117,45 @@ export function ContractPlanModal({ isOpen, onClose }: ContractPlanModalProps) {
     e.preventDefault()
     
     if (!user) {
-      alert("Error: Usuario no autenticado")
+      setFormError("Error: Usuario no autenticado")
       return
     }
-    
+
     if (user.role !== "usuario") {
-      alert("Solo los usuarios pueden contratar planes")
+      setFormError("Solo los usuarios pueden contratar planes")
       return
     }
-    
+
     setIsSubmitting(true)
-    setError(null)
+    setFormError(null)
+
+    // Normalizar y validar DNI/NIE en frontend
+    const rawDni = formData.dni || ""
+    const dniNorm = rawDni.replace(/\s+/g, '').toUpperCase()
+    const dniRegex = /^([0-9]{8}[A-Z])$|^[XYZ][0-9]{7}[A-Z]$/
+    if (!dniRegex.test(dniNorm)) {
+      setFormError('Formato de DNI/NIE inválido')
+      setIsSubmitting(false)
+      return
+    }
+    // asignar normalizado
+    formData.dni = dniNorm
+    
+    // Normalizar y validar teléfono (acepta +34 y formatos con espacios/guiones)
+    const rawPhone = formData.telefono || ""
+    const digits = rawPhone.replace(/[^0-9]/g, '')
+    let normalizedPhone = digits
+    if (digits.startsWith('34') && digits.length === 11) {
+      normalizedPhone = digits.slice(2)
+    }
+    const phoneRegex = /^[6-9][0-9]{8}$/
+    if (!phoneRegex.test(normalizedPhone)) {
+      setFormError('Formato de teléfono inválido. Debe ser un teléfono español de 9 dígitos, opcionalmente con +34.')
+      setIsSubmitting(false)
+      return
+    }
+    // asignar normalizado
+    formData.telefono = normalizedPhone
 
     try {
       const contractData = {
@@ -150,6 +181,16 @@ export function ContractPlanModal({ isOpen, onClose }: ContractPlanModalProps) {
       const data = await response.json()
 
       if (!response.ok) {
+        // detectar duplicado por campo y mostrar mensaje específico
+        const detail = data.detail || data.error || ''
+        const detailStr = typeof detail === 'string' ? detail : JSON.stringify(detail)
+        if (/numero_telefono|telefono|phone/i.test(detailStr)) {
+          throw new Error('El número de teléfono ya está en la base de datos')
+        } else if (/dni|nie/i.test(detailStr) || /Key \(dni\)/i.test(detailStr)) {
+          throw new Error('El DNI ya está en la base de datos')
+        } else if (/duplicate key/i.test(detailStr)) {
+          throw new Error('Ya existe un registro en la base de datos con ese valor')
+        }
         throw new Error(data.error || 'Error al contratar el plan')
       }
 
@@ -166,7 +207,7 @@ export function ContractPlanModal({ isOpen, onClose }: ContractPlanModalProps) {
       
     } catch (error) {
       console.error("Error al contratar plan:", error)
-      setError(error instanceof Error ? error.message : "Error desconocido al contratar el plan")
+      setFormError(error instanceof Error ? error.message : "Error desconocido al contratar el plan")
     } finally {
       setIsSubmitting(false)
     }
@@ -213,18 +254,21 @@ export function ContractPlanModal({ isOpen, onClose }: ContractPlanModalProps) {
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <span className="ml-2">Cargando planes...</span>
           </div>
-        ) : error ? (
+        ) : fatalError ? (
           <div className="flex items-center justify-center py-8 text-red-600">
             <AlertCircle className="h-8 w-8" />
-            <span className="ml-2">{error}</span>
+            <span className="ml-2">{fatalError}</span>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Mostrar error si existe */}
-            {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-2">
-                <AlertCircle className="h-5 w-5 text-red-600" />
-                <span className="text-red-800">{error}</span>
+            {/* Mostrar error de formulario si existe (inline) */}
+            {formError && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-2 justify-between">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-5 w-5 text-red-600" />
+                  <span className="text-red-800">{formError}</span>
+                </div>
+                <button type="button" onClick={() => setFormError(null)} aria-label="Cerrar mensaje" className="text-red-600 hover:opacity-80">✕</button>
               </div>
             )}
             

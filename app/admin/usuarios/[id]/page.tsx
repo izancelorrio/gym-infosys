@@ -199,6 +199,32 @@ export default function DetalleUsuarioPage() {
           setError("El número de teléfono es obligatorio para crear un cliente")
           return
         }
+        // Normalizar y validar formato de DNI/NIE
+        const rawDni = usuarioData.cliente?.dni || ""
+        const dniNorm = rawDni.replace(/\s+/g, '').toUpperCase()
+        const dniRegex = /^([0-9]{8}[A-Z])$|^[XYZ][0-9]{7}[A-Z]$/
+        if (!dniRegex.test(dniNorm)) {
+          setError("Formato de DNI/NIE inválido")
+          return
+        }
+        // Guardar dni normalizado
+        usuarioData.cliente.dni = dniNorm
+
+        // Normalizar y validar teléfono (acepta opcional +34 y formatos con espacios/guiones)
+        const rawPhone = usuarioData.cliente?.numero_telefono || ""
+        const digits = rawPhone.replace(/[^0-9]/g, '')
+        let normalizedPhone = digits
+        if (digits.startsWith('34') && digits.length === 11) {
+          normalizedPhone = digits.slice(2)
+        }
+        // Validar que tenga exactamente 9 dígitos y comience por 6-9
+        const phoneRegex = /^[6-9][0-9]{8}$/
+        if (!phoneRegex.test(normalizedPhone)) {
+          setError('Formato de teléfono inválido. Debe ser un teléfono español de 9 dígitos, opcionalmente con +34.')
+          return
+        }
+        // Guardar normalizado
+        usuarioData.cliente.numero_telefono = normalizedPhone
         // Validar número de tarjeta
         if (!usuarioData.cliente?.num_tarjeta) {
           setError("El número de tarjeta es obligatorio para crear un cliente")
@@ -218,6 +244,35 @@ export default function DetalleUsuarioPage() {
       
       setGuardando(true)
       setError(null)
+
+      // Si el rol es cliente, validar siempre el DNI/NIE (tanto al crear como al editar)
+      if (usuarioData.role === "cliente") {
+        const rawDniAny = usuarioData.cliente?.dni || ""
+        const dniNormAny = rawDniAny.replace(/\s+/g, '').toUpperCase()
+        const dniRegexAny = /^([0-9]{8}[A-Z])$|^[XYZ][0-9]{7}[A-Z]$/
+        if (!dniRegexAny.test(dniNormAny) || dniNormAny.length !== 9) {
+          setGuardando(false)
+          setError('Formato de DNI/NIE inválido (debe tener 9 caracteres: 8 dígitos + letra, o NIE comenzando por X/Y/Z)')
+          return
+        }
+        // Normalizar en el objeto antes de enviar
+        if (usuarioData.cliente) usuarioData.cliente.dni = dniNormAny
+        
+        // Normalizar y validar teléfono también al editar
+        const rawPhoneAny = usuarioData.cliente?.numero_telefono || ""
+        const digitsAny = rawPhoneAny.replace(/[^0-9]/g, '')
+        let normalizedPhoneAny = digitsAny
+        if (digitsAny.startsWith('34') && digitsAny.length === 11) {
+          normalizedPhoneAny = digitsAny.slice(2)
+        }
+        const phoneRegexAny = /^[6-9][0-9]{8}$/
+        if (!phoneRegexAny.test(normalizedPhoneAny)) {
+          setGuardando(false)
+          setError('Formato de teléfono inválido. Debe ser un teléfono español de 9 dígitos, opcionalmente con +34.')
+          return
+        }
+        if (usuarioData.cliente) usuarioData.cliente.numero_telefono = normalizedPhoneAny
+      }
       
       const updateData = {
         name: usuarioData.name,
@@ -251,24 +306,27 @@ export default function DetalleUsuarioPage() {
       const data = await response.json()
 
       if (!response.ok) {
-        // Si el error está en detail, es un error de validación de FastAPI
-        if (data.detail) {
-          let errorMessage: string
-          if (Array.isArray(data.detail)) {
-            errorMessage = data.detail.map((err: any) => {
-              if (typeof err === 'string') return err
-              return err.msg || JSON.stringify(err)
-            }).join('\n')
-          } else if (typeof data.detail === 'string') {
-            errorMessage = data.detail
-          } else if (typeof data.detail === 'object' && data.detail.msg) {
-            errorMessage = data.detail.msg
-          } else {
-            errorMessage = JSON.stringify(data.detail)
-          }
-          throw new Error(errorMessage)
+        // Detectar duplicado de DNI u otros mensajes del servidor y mostrar mensaje amigable
+        let errorMessage = ''
+        const detail = data.detail || data.error || ''
+        const detailStr = typeof detail === 'string' ? detail : JSON.stringify(detail)
+        if (/numero_telefono|telefono|phone/i.test(detailStr)) {
+          errorMessage = 'El número de teléfono ya está en la base de datos'
+        } else if (/dni|nie/i.test(detailStr) || /Key \(dni\)/i.test(detailStr)) {
+          errorMessage = 'El DNI ya está en la base de datos'
+        } else if (/duplicate key/i.test(detailStr)) {
+          // Mensaje genérico cuando no podemos determinar el campo
+          errorMessage = 'Ya existe un registro en la base de datos con ese valor'
+        } else if (Array.isArray(data.detail)) {
+          errorMessage = data.detail.map((err: any) => (typeof err === 'string' ? err : err.msg || JSON.stringify(err))).join('\n')
+        } else if (typeof data.detail === 'string') {
+          errorMessage = data.detail
+        } else if (typeof data.detail === 'object' && data.detail.msg) {
+          errorMessage = data.detail.msg
+        } else {
+          errorMessage = data.error || 'Error al actualizar el usuario'
         }
-        throw new Error(data.error || 'Error al actualizar el usuario')
+        throw new Error(errorMessage)
       }
 
       // Log detallado de la respuesta del PUT
@@ -519,7 +577,7 @@ export default function DetalleUsuarioPage() {
                     <span className="font-medium">Información de cliente</span>
                   </div>
                   <p className="text-yellow-700 mt-1">
-                    Los campos marcados con * son obligatorios al crear un cliente. Si el cliente ya existe, puedes editarlos libremente.
+                    Los campos marcados con * son obligatorios para un cliente.
                   </p>
                 </div>
 
@@ -618,7 +676,7 @@ export default function DetalleUsuarioPage() {
                       </SelectTrigger>
                       <SelectContent>
                         {loadingPlanes ? (
-                          <SelectItem value="" disabled>Cargando planes...</SelectItem>
+                          <SelectItem value="__none_loading" disabled>Cargando planes...</SelectItem>
                         ) : planes.length > 0 ? (
                           planes.map(plan => (
                             <SelectItem key={plan.id} value={plan.id.toString()}>
@@ -626,7 +684,7 @@ export default function DetalleUsuarioPage() {
                             </SelectItem>
                           ))
                         ) : (
-                          <SelectItem value="" disabled>No hay planes disponibles</SelectItem>
+                          <SelectItem value="__none_empty" disabled>No hay planes disponibles</SelectItem>
                         )}
                       </SelectContent>
                     </Select>

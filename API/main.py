@@ -15,7 +15,7 @@ from pathlib import Path
 import logging
 
 # Load environment variables from project root .env.local (development)
-# This allows using the .env.local at the repo root when running the API from
+ 
 # the project root or from the API folder. If DATABASE_URL is set it will be
 # used by the existing logic in get_db_connection().
 API_DIR = Path(__file__).resolve().parent
@@ -1155,8 +1155,9 @@ def update_user(user_id: int, req: UpdateUserRequest, response: Response):
             # Verificar si ya existe un registro de cliente
             cursor.execute("SELECT id FROM clientes WHERE id_usuario = %s", (user_id,))
             cliente_exists = cursor.fetchone()
+            print(f"[DEBUG] update_user: recibido plan_id={req.plan_id}, cliente_exists={bool(cliente_exists)}")
             
-            if cliente_exists and any([req.dni, req.numero_telefono, req.fecha_nacimiento, req.genero]):
+            if cliente_exists and any([req.dni, req.numero_telefono, req.fecha_nacimiento, req.genero, req.plan_id, req.num_tarjeta, req.fecha_tarjeta, req.cvv]):
                 # Actualizar datos existentes del cliente
                 update_fields = []
                 update_values = []
@@ -1177,6 +1178,15 @@ def update_user(user_id: int, req: UpdateUserRequest, response: Response):
                     update_fields.append("genero = %s")
                     update_values.append(req.genero)
                 
+                # Validar y actualizar plan_id si se proporcionó
+                if req.plan_id is not None:
+                    # Verificar que el plan existe y está activo
+                    cursor.execute("SELECT id FROM planes WHERE id = %s AND activo = 1", (req.plan_id,))
+                    if not cursor.fetchone():
+                        raise HTTPException(status_code=400, detail="El plan seleccionado no existe o no está activo")
+                    update_fields.append("plan_id = %s")
+                    update_values.append(req.plan_id)
+
                 if req.num_tarjeta:
                     update_fields.append("num_tarjeta = %s")
                     update_values.append(req.num_tarjeta)
@@ -1194,6 +1204,7 @@ def update_user(user_id: int, req: UpdateUserRequest, response: Response):
                     update_values.append(user_id)
                     
                     update_query = f"UPDATE clientes SET {', '.join(update_fields)} WHERE id_usuario = %s"
+                    print(f"[DEBUG] update_user -> executing: {update_query} with values={update_values}")
                     cursor.execute(update_query, update_values)
             elif not cliente_exists and req.crear_cliente:
                 # Crear nuevo registro de cliente
@@ -1217,7 +1228,28 @@ def update_user(user_id: int, req: UpdateUserRequest, response: Response):
                     req.plan_id
                 ))
         
-        conn.commit()
+            # Si se proporcionó un plan_id y el plan NO tiene acceso a entrenador,
+            # eliminar asignaciones entrenador-cliente existentes para este cliente.
+            # Lo intentamos antes de hacer commit para que todo ocurra en la misma transacción.
+            try:
+                if req.role == "cliente" and req.plan_id is not None:
+                    cursor.execute("SELECT acceso_entrenador FROM planes WHERE id = %s", (req.plan_id,))
+                    plan_row = cursor.fetchone()
+                    acceso_entrenador = bool(plan_row[0]) if plan_row and plan_row[0] is not None else False
+                    if not acceso_entrenador:
+                        # Buscar id del cliente asociado al usuario
+                        cursor.execute("SELECT id FROM clientes WHERE id_usuario = %s", (user_id,))
+                        cliente_row = cursor.fetchone()
+                        if cliente_row:
+                            cliente_id = cliente_row[0]
+                            cursor.execute("DELETE FROM entrenador_cliente_asignaciones WHERE cliente_id = %s", (cliente_id,))
+                            deleted = cursor.rowcount
+                            print(f"[DEBUG] Eliminadas {deleted} asignaciones entrenador-cliente para cliente {cliente_id} por cambio de plan sin acceso a entrenador")
+            except Exception as e:
+                # No detener la actualización por un problema al limpiar asignaciones; loguear y continuar
+                print(f"[WARN] No se pudo limpiar asignaciones de entrenador al cambiar plan: {e}")
+
+            conn.commit()
         print(f"[DEBUG] Datos actualizados en BD para usuario {user_id}")
         
         # Obtener los datos actualizados del usuario
