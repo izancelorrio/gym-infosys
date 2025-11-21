@@ -452,12 +452,44 @@ export default function DetalleUsuarioPage() {
                     )}
                   </Button>
                 )}
-                <Button
+                    <Button
                   onClick={() => {
                     // manejar entrada/salida de modo edición y snapshot
                     if (!editando) {
-                      // entrar en modo edición: guardar snapshot
-                      setUsuarioSnapshot(usuarioData ? JSON.parse(JSON.stringify(usuarioData)) : null)
+                      // entrar en modo edición: si es cliente pero no tiene objeto cliente, inicializar con defaults
+                      let usuarioToEdit = usuarioData
+                      if (usuarioData && usuarioData.role === 'cliente' && !usuarioData.cliente) {
+                        const now = new Date().toISOString().split('T')[0]
+                        const defaultCliente: Cliente = {
+                          id: 0,
+                          dni: "",
+                          numero_telefono: "",
+                          plan_id: 0,
+                          plan_name: "",
+                          fecha_nacimiento: "",
+                          genero: "",
+                          fecha_inscripcion: now,
+                          estado: "activo",
+                          created_at: "",
+                          updated_at: "",
+                        }
+                        usuarioToEdit = { ...(usuarioData as Usuario), cliente: defaultCliente }
+                        setUsuarioData(usuarioToEdit)
+                      }
+
+                      // guardar snapshot (safe clone)
+                      try {
+                        let clone: any = null
+                        if (typeof structuredClone === 'function') {
+                          clone = structuredClone(usuarioToEdit)
+                        } else {
+                          clone = usuarioToEdit ? JSON.parse(JSON.stringify(usuarioToEdit)) : null
+                        }
+                        setUsuarioSnapshot(clone)
+                      } catch (err) {
+                        console.error('Error clonando usuarioData para snapshot:', err)
+                        setUsuarioSnapshot(usuarioToEdit || null)
+                      }
                       setEditando(true)
                     } else {
                       // salir de modo edición (cancelar): restaurar snapshot
@@ -506,7 +538,7 @@ export default function DetalleUsuarioPage() {
                       value={usuarioData.cliente?.dni || ""}
                       onChange={(e) => setUsuarioData({
                         ...usuarioData,
-                        cliente: { ...usuarioData.cliente!, dni: e.target.value }
+                        cliente: ({ id: usuarioData.cliente?.id ?? 0, ...(usuarioData.cliente || {}), dni: e.target.value } as Cliente)
                       })}
                       required={!usuarioData.cliente?.id}
                       className="font-mono"
@@ -524,7 +556,7 @@ export default function DetalleUsuarioPage() {
                       value={usuarioData.cliente?.numero_telefono || ""}
                       onChange={(e) => setUsuarioData({
                         ...usuarioData,
-                        cliente: { ...usuarioData.cliente!, numero_telefono: e.target.value }
+                        cliente: ({ id: usuarioData.cliente?.id ?? 0, ...(usuarioData.cliente || {}), numero_telefono: e.target.value } as Cliente)
                       })}
                       placeholder="600123456"
                       required={!usuarioData.cliente?.id}
@@ -540,7 +572,7 @@ export default function DetalleUsuarioPage() {
                       value={usuarioData.cliente?.fecha_nacimiento || ""}
                       onChange={(e) => setUsuarioData({
                         ...usuarioData,
-                        cliente: { ...usuarioData.cliente!, fecha_nacimiento: e.target.value }
+                        cliente: ({ id: usuarioData.cliente?.id ?? 0, ...(usuarioData.cliente || {}), fecha_nacimiento: e.target.value } as Cliente)
                       })}
                       required={!usuarioData.cliente?.id}
                     />
@@ -551,7 +583,7 @@ export default function DetalleUsuarioPage() {
                       value={usuarioData.cliente?.genero || ""}
                       onValueChange={(value) => setUsuarioData({
                         ...usuarioData,
-                        cliente: { ...usuarioData.cliente!, genero: value }
+                        cliente: ({ id: usuarioData.cliente?.id ?? 0, ...(usuarioData.cliente || {}), genero: value } as Cliente)
                       })}
                     >
                       <SelectTrigger>
@@ -578,7 +610,7 @@ export default function DetalleUsuarioPage() {
                       value={usuarioData.cliente?.plan_id?.toString() || ""}
                       onValueChange={(value) => setUsuarioData({
                         ...usuarioData,
-                        cliente: { ...usuarioData.cliente!, plan_id: parseInt(value) }
+                        cliente: ({ id: usuarioData.cliente?.id ?? 0, ...(usuarioData.cliente || {}), plan_id: parseInt(value) } as Cliente)
                       })}
                     >
                       <SelectTrigger>
@@ -611,7 +643,7 @@ export default function DetalleUsuarioPage() {
                       value={usuarioData.cliente?.num_tarjeta || ""}
                       onChange={(e) => setUsuarioData({
                         ...usuarioData,
-                        cliente: { ...usuarioData.cliente!, num_tarjeta: e.target.value }
+                        cliente: ({ id: usuarioData.cliente?.id ?? 0, ...(usuarioData.cliente || {}), num_tarjeta: e.target.value } as Cliente)
                       })}
                       className="font-mono"
                       placeholder="1234 5678 9012 3456"
@@ -625,7 +657,7 @@ export default function DetalleUsuarioPage() {
                       value={usuarioData.cliente?.fecha_tarjeta || ""}
                       onChange={(e) => setUsuarioData({
                         ...usuarioData,
-                        cliente: { ...usuarioData.cliente!, fecha_tarjeta: e.target.value }
+                        cliente: ({ id: usuarioData.cliente?.id ?? 0, ...(usuarioData.cliente || {}), fecha_tarjeta: e.target.value } as Cliente)
                       })}
                       placeholder="MM/YY"
                       required
@@ -640,7 +672,7 @@ export default function DetalleUsuarioPage() {
                       value={usuarioData.cliente?.cvv || ""}
                       onChange={(e) => setUsuarioData({
                         ...usuarioData,
-                        cliente: { ...usuarioData.cliente!, cvv: e.target.value }
+                        cliente: ({ id: usuarioData.cliente?.id ?? 0, ...(usuarioData.cliente || {}), cvv: e.target.value } as Cliente)
                       })}
                       className="font-mono w-24"
                       placeholder="123"
