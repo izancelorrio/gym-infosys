@@ -80,28 +80,69 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter()
 
   useEffect(() => {
-    // Enforce fresh session on every new load: clear any persisted session data so
-    // that opening the app in a new tab/window always starts as logged out.
-    console.log("[GymInfoSys] AuthProvider mounting - clearing persisted session to enforce fresh login state")
+    // Decide whether to clear persisted session. We want to:
+    // - Clear stored session when the user "enters" the app (fresh navigation)
+    // - Preserve session when the page is reloaded (F5 / browser reload) or when
+    //   navigating with back/forward, so the user doesn't get logged out on refresh.
+    console.log("[GymInfoSys] AuthProvider mounting - determining navigation type to decide session handling")
     setIsHydrated(true)
 
     try {
-      if (typeof window !== "undefined") {
-        // Remove any previously saved client-side session
-        localStorage.removeItem("gym_user")
-        console.log("[GymInfoSys] Cleared localStorage 'gym_user' on mount")
+      let navType: string | undefined = undefined
+
+      if (typeof window !== "undefined" && typeof performance !== "undefined") {
+        const entries = performance.getEntriesByType("navigation")
+        if (entries && entries.length > 0) {
+          // PerformanceNavigationTiming.type can be 'navigate' | 'reload' | 'back_forward' | 'prerender'
+          // @ts-ignore
+          navType = (entries[0] as PerformanceNavigationTiming).type
+        } else if ((performance as any).navigation && typeof (performance as any).navigation.type === "number") {
+          // Fallback for older browsers: performance.navigation.type
+          const t = (performance as any).navigation.type
+          // 0 = navigate, 1 = reload, 2 = back_forward
+          navType = t === 1 ? "reload" : t === 2 ? "back_forward" : "navigate"
+        }
       }
 
-      // Also remove cookie backup if present
-      deleteCookie("gym_user")
+      console.log("[GymInfoSys] navigation type:", navType)
 
-      // Ensure user is null on initial load
+      // If this is a reload or back/forward navigation, preserve any existing session
+      if (navType === "reload" || navType === "back_forward") {
+        console.log("[GymInfoSys] Detected reload/back navigation - preserving session if present")
+        if (typeof window !== "undefined") {
+          const savedUser = localStorage.getItem("gym_user")
+          if (savedUser && savedUser !== "null") {
+            try {
+              const userData: User = JSON.parse(savedUser)
+              setUser(userData)
+              console.log("[GymInfoSys] Restored user from localStorage on reload/back navigation", userData)
+            } catch (e) {
+              console.error("[GymInfoSys] Failed parsing saved user on reload/back navigation:", e)
+              localStorage.removeItem("gym_user")
+              deleteCookie("gym_user")
+            }
+          } else {
+            console.log("[GymInfoSys] No saved user found in localStorage on reload/back navigation")
+          }
+        }
+
+        setIsLoading(false)
+        return
+      }
+
+      // Otherwise (fresh navigation), clear any previous persisted session to
+      // ensure the app opens unauthenticated.
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("gym_user")
+        console.log("[GymInfoSys] Cleared localStorage 'gym_user' on fresh navigation mount")
+      }
+      deleteCookie("gym_user")
       setUser(null)
     } catch (error) {
-      console.error("[GymInfoSys] Error while clearing persisted session:", error)
+      console.error("[GymInfoSys] Error while handling persisted session:", error)
     } finally {
       setIsLoading(false)
-      console.log("[GymInfoSys] AuthProvider initialization complete (persistent session cleared)")
+      console.log("[GymInfoSys] AuthProvider initialization complete (navigation-aware)")
     }
   }, [])
 
