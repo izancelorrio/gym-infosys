@@ -478,8 +478,8 @@ export default function DetalleUsuarioPage() {
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Campos de cliente cuando se cambia de usuario a cliente */}
-            {editando && usuarioData.role === "cliente" && !usuarioData.cliente?.id && (
+            {/* Campos de cliente: mostrar tanto al crear como al editar (si el rol es cliente) */}
+            {editando && usuarioData.role === "cliente" && (
               <div className="border-b pb-6 mb-6">
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
                   <div className="flex items-center gap-2 text-yellow-800">
@@ -487,7 +487,7 @@ export default function DetalleUsuarioPage() {
                     <span className="font-medium">Información de cliente</span>
                   </div>
                   <p className="text-yellow-700 mt-1">
-                    Los campos marcados con * son obligatorios para crear un cliente.
+                    Los campos marcados con * son obligatorios al crear un cliente. Si el cliente ya existe, puedes editarlos libremente.
                   </p>
                 </div>
 
@@ -508,7 +508,7 @@ export default function DetalleUsuarioPage() {
                         ...usuarioData,
                         cliente: { ...usuarioData.cliente!, dni: e.target.value }
                       })}
-                      required
+                      required={!usuarioData.cliente?.id}
                       className="font-mono"
                       placeholder="12345678A"
                     />
@@ -527,7 +527,7 @@ export default function DetalleUsuarioPage() {
                         cliente: { ...usuarioData.cliente!, numero_telefono: e.target.value }
                       })}
                       placeholder="600123456"
-                      required
+                      required={!usuarioData.cliente?.id}
                     />
                   </div>
                   <div className="space-y-2">
@@ -542,7 +542,7 @@ export default function DetalleUsuarioPage() {
                         ...usuarioData,
                         cliente: { ...usuarioData.cliente!, fecha_nacimiento: e.target.value }
                       })}
-                      required
+                      required={!usuarioData.cliente?.id}
                     />
                   </div>
                   <div className="space-y-2">
