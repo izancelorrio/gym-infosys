@@ -61,6 +61,11 @@ export default function UsuariosPage() {
   })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // campo de búsqueda por nombre
+  const [searchTerm, setSearchTerm] = useState<string>("")
+  // paginación
+  const [currentPage, setCurrentPage] = useState<number>(1)
+  const pageSize = 10
 
   useEffect(() => {
     if (!user || user.role !== "admin") {
@@ -149,7 +154,17 @@ export default function UsuariosPage() {
     return null
   }
 
+  // aplicar filtro por rol
   const usuariosFiltrados = filtroRol === "todos" ? usuarios : usuarios.filter((usuario) => usuario.role === filtroRol)
+
+  // aplicar búsqueda por nombre (insensible a mayúsculas)
+  const usuariosBuscados = searchTerm.trim()
+    ? usuariosFiltrados.filter((u) => u.name && u.name.toLowerCase().includes(searchTerm.toLowerCase()))
+    : usuariosFiltrados
+
+  // paginar resultados
+  const totalPages = Math.max(1, Math.ceil(usuariosBuscados.length / pageSize))
+  const paginatedUsuarios = usuariosBuscados.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 
   const getRoleBadge = (role: string) => {
     switch (role) {
@@ -322,8 +337,19 @@ export default function UsuariosPage() {
                 <div className="bg-primary/20 p-2 rounded-full">
                   <Users className="h-5 w-5 text-primary" />
                 </div>
-                Todos los Usuarios ({usuariosFiltrados.length})
+                Todos los Usuarios ({usuariosBuscados.length})
               </CardTitle>
+
+              {/* input de búsqueda por nombre */}
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  placeholder="Buscar por nombre..."
+                  value={searchTerm}
+                  onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1) }}
+                  className="px-3 py-2 border border-border rounded-md bg-background text-sm w-64"
+                />
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -368,7 +394,7 @@ export default function UsuariosPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {usuariosFiltrados.map((usuario) => (
+                    {paginatedUsuarios.map((usuario) => (
                       <tr
                         key={usuario.id}
                         className="border-b border-border hover:bg-muted/50 transition-colors cursor-pointer"
@@ -406,6 +432,24 @@ export default function UsuariosPage() {
                     ))}
                   </tbody>
                 </table>
+                {/* Paginación: botones prev/next */}
+                <div className="flex items-center justify-between mt-4">
+                  <div>
+                    {currentPage > 1 && (
+                      <Button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} variant="outline">
+                        Página anterior
+                      </Button>
+                    )}
+                  </div>
+
+                  <div>
+                    {currentPage < totalPages && (
+                      <Button onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}>
+                        Página siguiente
+                      </Button>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
           </CardContent>
