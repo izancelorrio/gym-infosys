@@ -1,5 +1,4 @@
 quitar boton actualizar de gestion de usuarios
-habra que quitar todos los datos estaticos hardcodeados
 crear pantallas con los mensajes emergentes en programar clases y alguna mas
 comprobar que todos los csripts create coincide con la base de datos
 revisar tablas porque iogual sobre campos o faltan
@@ -7,7 +6,6 @@ en el panel de administrador poner bien las estaditicas y la pantalla ver estadi
 posibilidad de los horarios dispoibles gestionarlos como administrador
 quitar lineas de debug
 que el admin pueda elgir los ocupantes de la,clase y que dpor dewdfecto te aparezca los que salen en la tabla gym_clases
-decirle quitar la variable acceso_api y quitar datos hardcode, si no esta levantda la api da error
 en muchas llamadas para evitar la cache hemos creado un timestump para generar urls disitntas
 revisar tildes en frontend como en el deplegable de los planes
 quitar clientepro de gestion de usuarios
