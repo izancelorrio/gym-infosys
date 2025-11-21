@@ -50,6 +50,8 @@ export default function DetalleUsuarioPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [editando, setEditando] = useState(false)
+  // snapshot del usuario antes de editar (se usa para restaurar al cancelar)
+  const [usuarioSnapshot, setUsuarioSnapshot] = useState<Usuario | null>(null)
   const [guardando, setGuardando] = useState(false)
   const [showErrorModal, setShowErrorModal] = useState(false)
   const [planes, setPlanes] = useState<{id: number, nombre: string}[]>([])
@@ -272,6 +274,8 @@ export default function DetalleUsuarioPage() {
       // Pequeña pausa para asegurar que la BD se ha actualizado
       await new Promise(resolve => setTimeout(resolve, 100))
       await fetchUsuario(false)
+      // limpiar snapshot tras guardar correctamente
+      setUsuarioSnapshot(null)
       console.log('🔄 Datos refrescados. Estado actual:', usuarioData)
       
     } catch (error) {
@@ -431,7 +435,21 @@ export default function DetalleUsuarioPage() {
                   </Button>
                 )}
                 <Button
-                  onClick={() => setEditando(!editando)}
+                  onClick={() => {
+                    // manejar entrada/salida de modo edición y snapshot
+                    if (!editando) {
+                      // entrar en modo edición: guardar snapshot
+                      setUsuarioSnapshot(usuarioData ? JSON.parse(JSON.stringify(usuarioData)) : null)
+                      setEditando(true)
+                    } else {
+                      // salir de modo edición (cancelar): restaurar snapshot
+                      if (usuarioSnapshot) {
+                        setUsuarioData(usuarioSnapshot)
+                      }
+                      setUsuarioSnapshot(null)
+                      setEditando(false)
+                    }
+                  }}
                   variant={editando ? "outline" : "default"}
                   className={editando ? "" : "bg-primary hover:bg-primary/90"}
                   disabled={guardando}
