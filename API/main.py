@@ -1217,9 +1217,21 @@ def update_user(user_id: int, req: UpdateUserRequest, response: Response):
                             print(f"[DEBUG] update_user: plan cambiado de premium({old_plan_id}) a básico/estandar({req.plan_id}) para cliente_id={cliente_id}, eliminando asignaciones...")
                             try:
                                 cursor.execute("SAVEPOINT sp_cleanup_assigns")
-                                cursor.execute("DELETE FROM entrenador_cliente_asignaciones WHERE cliente_id = %s", (cliente_id,))
+                                print(f"[DEBUG] update_user: about to delete assignments for cliente_id={cliente_id} (type={type(cliente_id)})")
+                                cursor.execute("SELECT COUNT(*) FROM entrenador_cliente_asignaciones WHERE id_cliente = %s", (cliente_id,))
+                                existing_assigns = cursor.fetchone()[0]
+                                print(f"[DEBUG] update_user: existing assignments count before DELETE = {existing_assigns} for cliente_id={cliente_id}")
+                                cursor.execute("SELECT id, id_entrenador, id_cliente, estado FROM entrenador_cliente_asignaciones WHERE id_cliente = %s LIMIT 10", (cliente_id,))
+                                sample_rows = cursor.fetchall()
+                                print(f"[DEBUG] update_user: sample rows before DELETE = {sample_rows}")
+                                cursor.execute("DELETE FROM entrenador_cliente_asignaciones WHERE cliente_id = (SELECT id FROM clientes WHERE id_usuario = %s)", (user_id,))
                                 deleted_assigns = cursor.rowcount
                                 print(f"[DEBUG] update_user: eliminadas {deleted_assigns} asignaciones entrenador-cliente para cliente {cliente_id} por cambio de plan")
+                                try:
+                                    conn.commit()
+                                    print(f"[DEBUG] update_user: conn.commit() after DELETE assignments for user_id={user_id}")
+                                except Exception as ce:
+                                    print(f"[ERROR] update_user: commit failed after DELETE assignments: {repr(ce)}")
                                 cursor.execute("RELEASE SAVEPOINT sp_cleanup_assigns")
                             except Exception as e:
                                 # Si falla la limpieza de asignaciones revertimos sólo hasta el savepoint
@@ -1287,9 +1299,21 @@ def update_user(user_id: int, req: UpdateUserRequest, response: Response):
                             cliente_id = cliente_row[0]
                             try:
                                 cursor.execute("SAVEPOINT sp_cleanup_acceso")
-                                cursor.execute("DELETE FROM entrenador_cliente_asignaciones WHERE cliente_id = %s", (cliente_id,))
+                                print(f"[DEBUG] update_user: about to delete assignments (acceso_entrenador) for cliente_id={cliente_id} (type={type(cliente_id)})")
+                                cursor.execute("SELECT COUNT(*) FROM entrenador_cliente_asignaciones WHERE id_cliente = %s", (cliente_id,))
+                                existing_assigns = cursor.fetchone()[0]
+                                print(f"[DEBUG] update_user: existing assignments count before DELETE (acceso) = {existing_assigns} for cliente_id={cliente_id}")
+                                cursor.execute("SELECT id, id_entrenador, id_cliente, estado FROM entrenador_cliente_asignaciones WHERE id_cliente = %s LIMIT 10", (cliente_id,))
+                                sample_rows = cursor.fetchall()
+                                print(f"[DEBUG] update_user: sample rows before DELETE (acceso) = {sample_rows}")
+                                cursor.execute("DELETE FROM entrenador_cliente_asignaciones WHERE cliente_id = (SELECT id FROM clientes WHERE id_usuario = %s)", (user_id,))
                                 deleted = cursor.rowcount
-                                print(f"[DEBUG] Eliminadas {deleted} asignaciones entrenador-cliente para cliente {cliente_id} por cambio de plan sin acceso a entrenador")
+                                print(f"[DEBUG] Eliminadas {deleted} asignaciones entrenador-cliente para cliente_id (derived from user_id={user_id}) por cambio de plan sin acceso a entrenador")
+                                try:
+                                    conn.commit()
+                                    print(f"[DEBUG] update_user: conn.commit() after DELETE assignments (acceso) for user_id={user_id}")
+                                except Exception as ce:
+                                    print(f"[ERROR] update_user: commit failed after DELETE assignments (acceso): {repr(ce)}")
                                 cursor.execute("RELEASE SAVEPOINT sp_cleanup_acceso")
                             except Exception as e:
                                 print(f"[WARN] update_user: fallo al limpiar asignaciones por cambio de plan (acceso_entrenador): {repr(e)} - rollback to savepoint")
