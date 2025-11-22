@@ -61,7 +61,7 @@ logger.setLevel(logging.INFO)
 # GET    /clases-programadas                          - Clases programadas con plazas disponibles.
 # DELETE /clases-programadas/{clase_id}               - Eliminación de clase programada.
 # POST   /reservas                                    - Creación de reservas de clase.
-# GET    /reservas/{cliente_id}                       - Reservas asociadas a un cliente.
+# GET    /reservas/{id_cliente}                       - Reservas asociadas a un cliente.
 # GET    /user/{user_id}/reservas                     - Reservas asociadas a un usuario.
 # DELETE /reservas/{reserva_id}                       - Cancelación de reserva activa.
 # POST   /reservas/{reserva_id}/registrar-asistencia  - Registro de asistencia a clase reservada.
@@ -71,7 +71,7 @@ logger.setLevel(logging.INFO)
 # GET    /entrenador/{entrenador_id}/clientes         - Clientes asignados a un entrenador.
 # GET    /entrenador/{entrenador_id}/estadisticas     - Indicadores agregados por entrenador.
 # GET    /ejercicios                                  - Catálogo de ejercicios disponibles.
-# POST   /entrenador/{entrenador_id}/cliente/{cliente_id}/plan-entrenamiento - Asignación de plan.
+# POST   /entrenador/{entrenador_id}/cliente/{id_cliente}/plan-entrenamiento - Asignación de plan.
 # GET    /cliente/{cliente_user_id}/entrenamientos-pendientes               - Entrenamientos pendientes.
 # POST   /cliente/{cliente_user_id}/registrar-actividad                     - Registro de actividad realizada.
 
@@ -843,7 +843,7 @@ def contract_plan(req: ContractPlanRequest):
             conn.rollback()
             conn.close()
             raise HTTPException(status_code=500, detail="No se pudo registrar el cliente")
-        cliente_id = cliente_row[0]
+        id_cliente = cliente_row[0]
         
         conn.commit()
         
@@ -852,7 +852,7 @@ def contract_plan(req: ContractPlanRequest):
             SELECT id, dni, numero_telefono, plan_id, fecha_nacimiento, genero, 
                    num_tarjeta, fecha_tarjeta, cvv, fecha_inscripcion, estado 
             FROM clientes WHERE id =%s
-        """, (cliente_id,))
+        """, (id_cliente,))
         cliente_data = cursor.fetchone()
         if not cliente_data:
             conn.close()
@@ -1177,9 +1177,9 @@ def update_user(user_id: int, req: UpdateUserRequest, response: Response):
             cursor.execute("SELECT id, plan_id FROM clientes WHERE id_usuario = %s", (user_id,))
             cliente_row = cursor.fetchone()
             cliente_exists = bool(cliente_row)
-            cliente_id = cliente_row[0] if cliente_row else None
+            id_cliente = cliente_row[0] if cliente_row else None
             old_plan_id = cliente_row[1] if cliente_row and len(cliente_row) > 1 else None
-            print(f"[DEBUG] update_user: recibido plan_id={req.plan_id}, cliente_exists={cliente_exists}, cliente_id={cliente_id}, old_plan_id={old_plan_id}")
+            print(f"[DEBUG] update_user: recibido plan_id={req.plan_id}, cliente_exists={cliente_exists}, id_cliente={id_cliente}, old_plan_id={old_plan_id}")
             
             if cliente_exists and any([req.dni, req.numero_telefono, req.fecha_nacimiento, req.genero, req.plan_id, req.num_tarjeta, req.fecha_tarjeta, req.cvv]):
                 # Actualizar datos existentes del cliente
@@ -1214,19 +1214,19 @@ def update_user(user_id: int, req: UpdateUserRequest, response: Response):
                     # Si el cliente tenía plan premium (1) y ahora se cambia a básico/estándar (2 o 3),
                     # eliminar asignaciones entrenador-cliente para este cliente.
                     if cliente_exists and old_plan_id == 1 and int(req.plan_id) in (2, 3):
-                            print(f"[DEBUG] update_user: plan cambiado de premium({old_plan_id}) a básico/estandar({req.plan_id}) para cliente_id={cliente_id}, eliminando asignaciones...")
+                            print(f"[DEBUG] update_user: plan cambiado de premium({old_plan_id}) a básico/estandar({req.plan_id}) para id_cliente={id_cliente}, eliminando asignaciones...")
                             try:
                                 cursor.execute("SAVEPOINT sp_cleanup_assigns")
-                                print(f"[DEBUG] update_user: about to delete assignments for cliente_id={cliente_id} (type={type(cliente_id)})")
-                                cursor.execute("SELECT COUNT(*) FROM entrenador_cliente_asignaciones WHERE id_cliente = %s", (cliente_id,))
+                                print(f"[DEBUG] update_user: about to delete assignments for id_cliente={id_cliente} (type={type(id_cliente)})")
+                                cursor.execute("SELECT COUNT(*) FROM entrenador_cliente_asignaciones WHERE id_cliente = %s", (id_cliente,))
                                 existing_assigns = cursor.fetchone()[0]
-                                print(f"[DEBUG] update_user: existing assignments count before DELETE = {existing_assigns} for cliente_id={cliente_id}")
-                                cursor.execute("SELECT id, id_entrenador, id_cliente, estado FROM entrenador_cliente_asignaciones WHERE id_cliente = %s LIMIT 10", (cliente_id,))
+                                print(f"[DEBUG] update_user: existing assignments count before DELETE = {existing_assigns} for id_cliente={id_cliente}")
+                                cursor.execute("SELECT id, id_entrenador, id_cliente, estado FROM entrenador_cliente_asignaciones WHERE id_cliente = %s LIMIT 10", (id_cliente,))
                                 sample_rows = cursor.fetchall()
                                 print(f"[DEBUG] update_user: sample rows before DELETE = {sample_rows}")
-                                cursor.execute("DELETE FROM entrenador_cliente_asignaciones WHERE cliente_id = (SELECT id FROM clientes WHERE id_usuario = %s)", (user_id,))
+                                cursor.execute("DELETE FROM entrenador_cliente_asignaciones WHERE id_cliente = (SELECT id FROM clientes WHERE id_usuario = %s)", (user_id,))
                                 deleted_assigns = cursor.rowcount
-                                print(f"[DEBUG] update_user: eliminadas {deleted_assigns} asignaciones entrenador-cliente para cliente {cliente_id} por cambio de plan")
+                                print(f"[DEBUG] update_user: eliminadas {deleted_assigns} asignaciones entrenador-cliente para cliente {id_cliente} por cambio de plan")
                                 try:
                                     conn.commit()
                                     print(f"[DEBUG] update_user: conn.commit() after DELETE assignments for user_id={user_id}")
@@ -1234,12 +1234,25 @@ def update_user(user_id: int, req: UpdateUserRequest, response: Response):
                                     print(f"[ERROR] update_user: commit failed after DELETE assignments: {repr(ce)}")
                                 cursor.execute("RELEASE SAVEPOINT sp_cleanup_assigns")
                             except Exception as e:
-                                # Si falla la limpieza de asignaciones revertimos sólo hasta el savepoint
-                                print(f"[WARN] update_user: fallo al limpiar asignaciones por cambio de plan: {repr(e)} - rollback to savepoint")
+                                # Si falla la limpieza de asignaciones intentamos revertir hasta el savepoint.
+                                # Si eso falla, ejecutamos un `conn.rollback()` para limpiar el estado abortado
+                                print(f"[WARN] update_user: fallo al limpiar asignaciones por cambio de plan: {repr(e)} - attempting rollback to savepoint")
                                 try:
                                     cursor.execute("ROLLBACK TO SAVEPOINT sp_cleanup_assigns")
+                                    print(f"[DEBUG] update_user: ROLLBACK TO SAVEPOINT sp_cleanup_assigns succeeded")
                                 except Exception as re:
-                                    print(f"[ERROR] update_user: rollback to savepoint failed: {repr(re)}")
+                                    print(f"[ERROR] update_user: rollback to savepoint failed: {repr(re)} - performing full conn.rollback()")
+                                    try:
+                                        conn.rollback()
+                                        print(f"[DEBUG] update_user: conn.rollback() executed to clear aborted transaction")
+                                    except Exception as cre:
+                                        print(f"[ERROR] update_user: conn.rollback() also failed: {repr(cre)}")
+                                finally:
+                                    # Recreate cursor to ensure it's usable after rollback
+                                    try:
+                                        cursor = conn.cursor()
+                                    except Exception as ce:
+                                        print(f"[ERROR] update_user: failed to recreate cursor after rollback: {repr(ce)}")
 
                 if req.num_tarjeta:
                     update_fields.append("num_tarjeta = %s")
@@ -1296,19 +1309,19 @@ def update_user(user_id: int, req: UpdateUserRequest, response: Response):
                         cursor.execute("SELECT id FROM clientes WHERE id_usuario = %s", (user_id,))
                         cliente_row = cursor.fetchone()
                         if cliente_row:
-                            cliente_id = cliente_row[0]
+                            id_cliente = cliente_row[0]
                             try:
                                 cursor.execute("SAVEPOINT sp_cleanup_acceso")
-                                print(f"[DEBUG] update_user: about to delete assignments (acceso_entrenador) for cliente_id={cliente_id} (type={type(cliente_id)})")
-                                cursor.execute("SELECT COUNT(*) FROM entrenador_cliente_asignaciones WHERE id_cliente = %s", (cliente_id,))
+                                print(f"[DEBUG] update_user: about to delete assignments (acceso_entrenador) for id_cliente={id_cliente} (type={type(id_cliente)})")
+                                cursor.execute("SELECT COUNT(*) FROM entrenador_cliente_asignaciones WHERE id_cliente = %s", (id_cliente,))
                                 existing_assigns = cursor.fetchone()[0]
-                                print(f"[DEBUG] update_user: existing assignments count before DELETE (acceso) = {existing_assigns} for cliente_id={cliente_id}")
-                                cursor.execute("SELECT id, id_entrenador, id_cliente, estado FROM entrenador_cliente_asignaciones WHERE id_cliente = %s LIMIT 10", (cliente_id,))
+                                print(f"[DEBUG] update_user: existing assignments count before DELETE (acceso) = {existing_assigns} for id_cliente={id_cliente}")
+                                cursor.execute("SELECT id, id_entrenador, id_cliente, estado FROM entrenador_cliente_asignaciones WHERE id_cliente = %s LIMIT 10", (id_cliente,))
                                 sample_rows = cursor.fetchall()
                                 print(f"[DEBUG] update_user: sample rows before DELETE (acceso) = {sample_rows}")
-                                cursor.execute("DELETE FROM entrenador_cliente_asignaciones WHERE cliente_id = (SELECT id FROM clientes WHERE id_usuario = %s)", (user_id,))
+                                cursor.execute("DELETE FROM entrenador_cliente_asignaciones WHERE id_cliente = (SELECT id FROM clientes WHERE id_usuario = %s)", (user_id,))
                                 deleted = cursor.rowcount
-                                print(f"[DEBUG] Eliminadas {deleted} asignaciones entrenador-cliente para cliente_id (derived from user_id={user_id}) por cambio de plan sin acceso a entrenador")
+                                print(f"[DEBUG] Eliminadas {deleted} asignaciones entrenador-cliente para id_cliente (derived from user_id={user_id}) por cambio de plan sin acceso a entrenador")
                                 try:
                                     conn.commit()
                                     print(f"[DEBUG] update_user: conn.commit() after DELETE assignments (acceso) for user_id={user_id}")
@@ -1316,14 +1329,36 @@ def update_user(user_id: int, req: UpdateUserRequest, response: Response):
                                     print(f"[ERROR] update_user: commit failed after DELETE assignments (acceso): {repr(ce)}")
                                 cursor.execute("RELEASE SAVEPOINT sp_cleanup_acceso")
                             except Exception as e:
-                                print(f"[WARN] update_user: fallo al limpiar asignaciones por cambio de plan (acceso_entrenador): {repr(e)} - rollback to savepoint")
+                                print(f"[WARN] update_user: fallo al limpiar asignaciones por cambio de plan (acceso_entrenador): {repr(e)} - attempting rollback to savepoint")
                                 try:
                                     cursor.execute("ROLLBACK TO SAVEPOINT sp_cleanup_acceso")
+                                    print(f"[DEBUG] update_user: ROLLBACK TO SAVEPOINT sp_cleanup_acceso succeeded")
                                 except Exception as re:
-                                    print(f"[ERROR] update_user: rollback to savepoint failed: {repr(re)}")
+                                    print(f"[ERROR] update_user: rollback to savepoint failed: {repr(re)} - performing full conn.rollback()")
+                                    try:
+                                        conn.rollback()
+                                        print(f"[DEBUG] update_user: conn.rollback() executed to clear aborted transaction")
+                                    except Exception as cre:
+                                        print(f"[ERROR] update_user: conn.rollback() also failed: {repr(cre)}")
+                                finally:
+                                    # Recreate cursor to ensure it's usable after rollback
+                                    try:
+                                        cursor = conn.cursor()
+                                    except Exception as ce:
+                                        print(f"[ERROR] update_user: failed to recreate cursor after rollback: {repr(ce)}")
             except Exception as e:
-                # No detener la actualización por un problema al limpiar asignaciones; loguear y continuar
+                # No detener la actualización por un problema al limpiar asignaciones; loguear y continuar.
+                # Pero si la excepción dejó la transacción abortada, hacer rollback para poder seguir con otras operaciones.
                 print(f"[WARN] No se pudo limpiar asignaciones de entrenador al cambiar plan: {e}")
+                try:
+                    conn.rollback()
+                    print(f"[DEBUG] update_user: conn.rollback() executed in outer cleanup exception to clear aborted transaction")
+                except Exception as cre:
+                    print(f"[ERROR] update_user: conn.rollback() failed in outer cleanup exception: {repr(cre)}")
+                try:
+                    cursor = conn.cursor()
+                except Exception as ce:
+                    print(f"[ERROR] update_user: failed to recreate cursor after outer rollback: {repr(ce)}")
 
             conn.commit()
         print(f"[DEBUG] Datos actualizados en BD para usuario {user_id}")
@@ -1845,17 +1880,17 @@ async def crear_reserva(request: CrearReservaRequest, response: Response):
         print(f"[ERROR] Error al crear reserva: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error al crear reserva: {str(e)}")
 
-@app.get("/reservas/{cliente_id}")
-async def get_reservas_cliente(cliente_id: int, response: Response):
+@app.get("/reservas/{id_cliente}")
+async def get_reservas_cliente(id_cliente: int, response: Response):
     """
-    Obtener todas las reservas de un cliente (usando cliente_id)
+    Obtener todas las reservas de un cliente (usando id_cliente)
     """
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
     
     try:
-        print(f"[DEBUG] Obteniendo reservas del cliente {cliente_id}")
+        print(f"[DEBUG] Obteniendo reservas del cliente {id_cliente}")
         
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -1871,7 +1906,7 @@ async def get_reservas_cliente(cliente_id: int, response: Response):
             JOIN users u ON cp.id_instructor = u.id
             WHERE r.id_cliente =%s
             ORDER BY cp.fecha, cp.hora
-        """, (cliente_id,))
+        """, (id_cliente,))
         
         reservas_data = cursor.fetchall()
         conn.close()
@@ -1892,7 +1927,7 @@ async def get_reservas_cliente(cliente_id: int, response: Response):
                 }
             })
         
-        print(f"[DEBUG] Se encontraron {len(reservas)} reservas para el cliente {cliente_id}")
+        print(f"[DEBUG] Se encontraron {len(reservas)} reservas para el cliente {id_cliente}")
         
         return reservas
         
@@ -1974,7 +2009,7 @@ async def get_reservas_por_usuario(user_id: int, response: Response):
                 }
             })
         
-        print(f"[DEBUG] Se encontraron {len(reservas)} reservas para el cliente {cliente_id}")
+        print(f"[DEBUG] Se encontraron {len(reservas)} reservas para el cliente {id_cliente}")
         
         return reservas
         
@@ -2075,7 +2110,7 @@ async def registrar_asistencia_clase(reserva_id: int, response: Response):
             raise HTTPException(status_code=404, detail="Reserva no encontrada o ya cancelada")
         
         # Extraer información de la reserva
-        reserva_id_db, cliente_id, clase_programada_id, fecha, hora, tipo_clase, duracion_minutos, instructor = reserva_info
+        reserva_id_db, id_cliente, clase_programada_id, fecha, hora, tipo_clase, duracion_minutos, instructor = reserva_info
         
         # Solo marcar la reserva como completada
         cursor.execute("""
@@ -2137,7 +2172,7 @@ async def get_asignaciones_entrenador(response: Response):
                     json_agg(
                         CASE WHEN eca.id IS NOT NULL THEN
                             json_build_object(
-                                'cliente_id', c.id,
+                                'id_cliente', c.id,
                                 'cliente_nombre', c.name,
                                 'cliente_email', c.email,
                                 'plan_nombre', p.nombre,
@@ -2165,7 +2200,7 @@ async def get_asignaciones_entrenador(response: Response):
         # Obtener clientes sin asignar que tengan plan estándar o premium (incluyen entrenador)
         cursor.execute("""
             SELECT 
-                u.id as cliente_id,
+                u.id as id_cliente,
                 u.name as cliente_nombre,
                 u.email as cliente_email,
                 p.nombre as plan_nombre,
@@ -2199,7 +2234,7 @@ async def get_asignaciones_entrenador(response: Response):
         clientes_sin_asignar = []
         for cliente in clientes_sin_asignar_data:
             clientes_sin_asignar.append({
-                "cliente_id": cliente[0],
+                "id_cliente": cliente[0],
                 "cliente_nombre": cliente[1],
                 "cliente_email": cliente[2],
                 "plan_nombre": cliente[3],
@@ -2378,7 +2413,7 @@ async def get_clientes_entrenador(entrenador_id: int, response: Response):
                 u.id as cliente_user_id,
                 u.name as cliente_nombre,
                 u.email as cliente_email,
-                cl.id as cliente_id,
+                cl.id as id_cliente,
                 cl.fecha_inscripcion,
                 cl.estado as cliente_estado,
                 p.nombre as plan_nombre,
@@ -2402,7 +2437,7 @@ async def get_clientes_entrenador(entrenador_id: int, response: Response):
             # Calcular estadísticas básicas del cliente (puedes expandir esto)
             cliente_info = {
                 "id": cliente[0],  # user_id para compatibilidad con frontend
-                "cliente_id": cliente[3],  # id de tabla clientes
+                "id_cliente": cliente[3],  # id de tabla clientes
                 "name": cliente[1],
                 "email": cliente[2],
                 "fecha_inscripcion": cliente[4],
@@ -2570,16 +2605,16 @@ async def get_ejercicios(response: Response):
         print(f"[ERROR] Error al obtener ejercicios: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error al obtener ejercicios: {str(e)}")
 
-@app.post("/entrenador/{entrenador_id}/cliente/{cliente_id}/plan-entrenamiento")
+@app.post("/entrenador/{entrenador_id}/cliente/{id_cliente}/plan-entrenamiento")
 async def guardar_plan_entrenamiento(
     entrenador_id: int, 
-    cliente_id: int,  # Este es el user_id del cliente, no el cliente_id de la tabla clientes
+    id_cliente: int,  # Este es el user_id del cliente, no el id_cliente de la tabla clientes
     plan_data: dict,
     response: Response
 ):
     """
     Guardar plan de entrenamiento asignado por un entrenador a un cliente
-    Nota: cliente_id es el user_id del cliente, se convertirá internamente al cliente_id de la tabla clientes
+    Nota: id_cliente es el user_id del cliente, se convertirá internamente al id_cliente de la tabla clientes
     """
     # Headers anti-cache
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
@@ -2587,7 +2622,7 @@ async def guardar_plan_entrenamiento(
     response.headers["Expires"] = "0"
     
     try:
-        print(f"[DEBUG] Guardando plan de entrenamiento - Entrenador: {entrenador_id}, Cliente: {cliente_id}")
+        print(f"[DEBUG] Guardando plan de entrenamiento - Entrenador: {entrenador_id}, Cliente: {id_cliente}")
         print(f"[DEBUG] Datos del plan: {plan_data}")
         
         # Validar datos de entrada
@@ -2604,8 +2639,8 @@ async def guardar_plan_entrenamiento(
             conn.close()
             raise HTTPException(status_code=404, detail="Entrenador no encontrado")
         
-        # Verificar que el cliente existe y obtener su cliente_id
-        cursor.execute("SELECT c.id FROM clientes c JOIN users u ON c.id_usuario = u.id WHERE u.id =%s", (cliente_id,))
+        # Verificar que el cliente existe y obtener su id_cliente
+        cursor.execute("SELECT c.id FROM clientes c JOIN users u ON c.id_usuario = u.id WHERE u.id =%s", (id_cliente,))
         cliente_row = cursor.fetchone()
         if not cliente_row:
             conn.close()
@@ -2695,14 +2730,14 @@ async def get_entrenamientos_pendientes(cliente_user_id: int, response: Response
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Obtener cliente_id real desde user_id
+        # Obtener id_cliente real desde user_id
         cursor.execute("SELECT c.id FROM clientes c JOIN users u ON c.id_usuario = u.id WHERE u.id = %s", (cliente_user_id,))
         cliente_row = cursor.fetchone()
         if not cliente_row:
             conn.close()
             raise HTTPException(status_code=404, detail="Cliente no encontrado")
         
-        cliente_id = cliente_row[0]
+        id_cliente = cliente_row[0]
         
         # Obtener entrenamientos pendientes con información del ejercicio
         cursor.execute("""
@@ -2720,7 +2755,7 @@ async def get_entrenamientos_pendientes(cliente_user_id: int, response: Response
             JOIN users u ON ea.id_entrenador = u.id
             WHERE ea.id_cliente = %s AND ea.estado = 'pendiente'
             ORDER BY ea.fecha_entrenamiento ASC
-        """, (cliente_id,))
+        """, (id_cliente,))
         
         entrenamientos_data = cursor.fetchall()
         conn.close()
@@ -2771,14 +2806,14 @@ async def registrar_actividad(cliente_user_id: int, actividad_data: dict, respon
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Obtener cliente_id real desde user_id
+        # Obtener id_cliente real desde user_id
         cursor.execute("SELECT c.id FROM clientes c JOIN users u ON c.id_usuario = u.id WHERE u.id = %s", (cliente_user_id,))
         cliente_row = cursor.fetchone()
         if not cliente_row:
             conn.close()
             raise HTTPException(status_code=404, detail="Cliente no encontrado")
         
-        cliente_id = cliente_row[0]
+        id_cliente = cliente_row[0]
         
         # Extraer datos de la actividad
         id_ejercicio = actividad_data.get("id_ejercicio")
@@ -2806,7 +2841,7 @@ async def registrar_actividad(cliente_user_id: int, actividad_data: dict, respon
              series_realizadas, repeticiones, peso_kg, tiempo_segundos, distancia_metros, 
              notas, valoracion, tipo_registro)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """, (cliente_id, id_ejercicio, id_entrenamiento_asignado, fecha_realizacion,
+        """, (id_cliente, id_ejercicio, id_entrenamiento_asignado, fecha_realizacion,
               series_realizadas, repeticiones, peso_kg, tiempo_segundos, distancia_metros,
               notas, valoracion, tipo_registro))
         

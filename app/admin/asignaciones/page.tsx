@@ -299,19 +299,25 @@ export default function AsignacionesEntrenadorPage() {
                         <SelectValue placeholder="Elige un cliente sin asignar..." />
                       </SelectTrigger>
                       <SelectContent>
-                        {data?.clientes_sin_asignar.map((cliente) => (
-                          <SelectItem 
-                            key={cliente.cliente_id} 
-                            value={cliente.cliente_id.toString()}
-                          >
-                            <div className="flex items-center justify-between w-full">
-                              <span>{cliente.cliente_nombre}</span>
-                              <Badge variant="outline" className="ml-2">
-                                {cliente.plan_nombre}
-                              </Badge>
-                            </div>
-                          </SelectItem>
-                        ))}
+                        {data?.clientes_sin_asignar.map((cliente) => {
+                          // Garantizar que no llamamos .toString() sobre undefined.
+                          // Algunos objetos provenientes del backend pueden usar `id_cliente` u otra clave.
+                          const clienteId = (cliente as any).cliente_id ?? (cliente as any).id_cliente ?? (cliente as any).asignacion_id ?? null;
+                          const itemKey = clienteId ?? cliente.cliente_email ?? cliente.cliente_nombre ?? "cliente-unknown";
+                          return (
+                            <SelectItem 
+                              key={itemKey}
+                              value={clienteId != null ? String(clienteId) : ""}
+                            >
+                              <div className="flex items-center justify-between w-full">
+                                <span>{cliente.cliente_nombre}</span>
+                                <Badge variant="outline" className="ml-2">
+                                  {cliente.plan_nombre}
+                                </Badge>
+                              </div>
+                            </SelectItem>
+                          );
+                        })}
                       </SelectContent>
                     </Select>
                   </div>
