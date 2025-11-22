@@ -27,6 +27,7 @@ quitar la ubicacion de la tabla clases_programadas
 poner en la memoria que suamos correo para verificar
 cambiar node.js de modo development a definitivo
 quitar comentarios de la ia en distinto ficheros
+en el script habra que crear el directorio del volumen del postgres, probar en otra maquina
 
 
 
