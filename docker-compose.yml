@@ -93,8 +93,6 @@ services:
       - frontend
     volumes:
       - ./nginx:/etc/nginx/conf.d:ro
-    networks:
-      - default
 
 
 networks:
