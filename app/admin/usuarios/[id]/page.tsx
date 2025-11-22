@@ -56,6 +56,7 @@ export default function DetalleUsuarioPage() {
   const [showErrorModal, setShowErrorModal] = useState(false)
   const [planes, setPlanes] = useState<{id: number, nombre: string}[]>([])
   const [loadingPlanes, setLoadingPlanes] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
 
   const closeErrorModal = () => {
     setShowErrorModal(false)
@@ -117,6 +118,34 @@ export default function DetalleUsuarioPage() {
       fetchPlanes()
     }
   }, [editando])
+
+  useEffect(() => {
+    try {
+      const ua = typeof navigator !== 'undefined' ? navigator.userAgent : ''
+      setIsMobile(/Mobi|Android|iPhone|iPad|iPod/i.test(ua))
+    } catch (e) {
+      setIsMobile(false)
+    }
+  }, [])
+
+  const formatDateDDMMYYYY = (iso?: string | null) => {
+    if (!iso) return ''
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return iso
+    const dd = String(d.getDate()).padStart(2, '0')
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    const yyyy = d.getFullYear()
+    return `${dd}/${mm}/${yyyy}`
+  }
+
+  const parseDDMMYYYYtoISO = (s: string) => {
+    const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+    if (!m) return s // leave as-is; validation will catch wrong formats later
+    const dd = m[1].padStart(2, '0')
+    const mm = m[2].padStart(2, '0')
+    const yyyy = m[3]
+    return `${yyyy}-${mm}-${dd}`
+  }
 
   // Debugging: monitorear cambios en usuarioData
   useEffect(() => {
@@ -626,13 +655,25 @@ export default function DetalleUsuarioPage() {
                     </Label>
                     <Input
                       id="fechaNacimiento"
-                      type="date"
-                      value={usuarioData.cliente?.fecha_nacimiento || ""}
-                      onChange={(e) => setUsuarioData({
-                        ...usuarioData,
-                        cliente: ({ id: usuarioData.cliente?.id ?? 0, ...(usuarioData.cliente || {}), fecha_nacimiento: e.target.value } as Cliente)
-                      })}
+                      type={isMobile ? "text" : "date"}
+                      value={isMobile ? formatDateDDMMYYYY(usuarioData.cliente?.fecha_nacimiento || "") : (usuarioData.cliente?.fecha_nacimiento || "")}
+                      onChange={(e) => {
+                        const v = e.target.value
+                        if (isMobile) {
+                          const iso = parseDDMMYYYYtoISO(v)
+                          setUsuarioData({
+                            ...usuarioData,
+                            cliente: ({ id: usuarioData.cliente?.id ?? 0, ...(usuarioData.cliente || {}), fecha_nacimiento: iso } as Cliente)
+                          })
+                        } else {
+                          setUsuarioData({
+                            ...usuarioData,
+                            cliente: ({ id: usuarioData.cliente?.id ?? 0, ...(usuarioData.cliente || {}), fecha_nacimiento: v } as Cliente)
+                          })
+                        }
+                      }}
                       required={!usuarioData.cliente?.id}
+                      placeholder={isMobile ? "DD/MM/YYYY" : undefined}
                     />
                   </div>
                   <div className="space-y-2">
@@ -906,10 +947,10 @@ export default function DetalleUsuarioPage() {
                     <div className="space-y-2">
                       <Label>Fecha de Inscripción</Label>
                       <Input 
-                        value={new Date(usuarioData.cliente.fecha_inscripcion).toLocaleDateString()}
-                        disabled 
-                        className="bg-muted" 
-                      />
+                          value={formatDateDDMMYYYY(usuarioData.cliente.fecha_inscripcion)}
+                          disabled 
+                          className="bg-muted" 
+                        />
                     </div>
 
                     <div className="space-y-2">
