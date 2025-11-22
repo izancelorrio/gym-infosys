@@ -910,8 +910,10 @@ def get_all_users(response: Response):
     
     try:
         # Obtener todos los usuarios con información básica
+        # Seleccionar los campos de fecha como texto para evitar que el driver
+        # intente parsear valores fuera de rango y lance excepciones.
         cursor.execute("""
-            SELECT id, name, email, role, email_verified, created_at, updated_at
+            SELECT id, name, email, role, email_verified, created_at::text, updated_at::text
             FROM users 
             ORDER BY id ASC
         """)
@@ -934,8 +936,8 @@ def get_all_users(response: Response):
             # Si es un cliente, obtener datos adicionales de la tabla clientes
             if user_row[3] == "cliente":
                 cursor.execute("""
-                    SELECT id, dni, numero_telefono, plan_id, fecha_nacimiento, genero, 
-                           fecha_inscripcion, estado, created_at, updated_at
+                    SELECT id, dni, numero_telefono, plan_id, fecha_nacimiento::text, genero, 
+                           fecha_inscripcion::text, estado, created_at::text, updated_at::text
                     FROM clientes 
                     WHERE id_usuario = %s
                 """, (user_row[0],))
@@ -1002,8 +1004,9 @@ def get_user_by_id(user_id: int, response: Response):
     
     try:
         # Obtener usuario específico
+        # Retornar columnas de fecha como texto para evitar parseos peligrosos
         cursor.execute("""
-            SELECT id, name, email, role, email_verified, created_at, updated_at
+            SELECT id, name, email, role, email_verified, created_at::text, updated_at::text
             FROM users 
             WHERE id = %s
         """, (user_id,))
@@ -1027,8 +1030,8 @@ def get_user_by_id(user_id: int, response: Response):
         # Si es un cliente, obtener datos adicionales
         if user_data[3] == "cliente":
             cursor.execute("""
-                SELECT id, dni, numero_telefono, plan_id, fecha_nacimiento, genero, 
-                       fecha_inscripcion, estado, created_at, updated_at,
+                SELECT id, dni, numero_telefono, plan_id, fecha_nacimiento::text, genero, 
+                       fecha_inscripcion::text, estado, created_at::text, updated_at::text,
                        num_tarjeta, fecha_tarjeta, cvv
                 FROM clientes 
                 WHERE id_usuario = %s
