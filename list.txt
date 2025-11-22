@@ -28,6 +28,7 @@ poner en la memoria que suamos correo para verificar
 cambiar node.js de modo development a definitivo
 quitar comentarios de la ia en distinto ficheros
 en el script habra que crear el directorio del volumen del postgres, probar en otra maquina
+quitar y no exponer puertos api frontend
 
 
 

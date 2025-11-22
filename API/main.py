@@ -1129,36 +1129,57 @@ def update_user(user_id: int, req: UpdateUserRequest, response: Response):
         
         # Si está cambiando de cliente a usuario, eliminar el registro de cliente
         if current_role == "cliente" and req.role == "usuario":
+            print(f"[DEBUG] update_user: inicio del flujo cliente->usuario para user_id={user_id}")
             # Primero verificar si hay reservas activas
+            print(f"[DEBUG] update_user: comprobando reservas activas para user_id={user_id}")
             cursor.execute("""
                 SELECT COUNT(*) FROM reservas r
                 JOIN clientes c ON r.id_cliente = c.id
                 WHERE c.id_usuario = %s AND r.estado = 'activa'
             """, (user_id,))
             reservas_activas = cursor.fetchone()[0]
+            print(f"[DEBUG] update_user: reservas_activas={reservas_activas} para user_id={user_id}")
             
             if reservas_activas > 0:
+                print(f"[DEBUG] update_user: bloqueo por reservas activas, no se permite cambio de rol para user_id={user_id}")
                 raise HTTPException(
                     status_code=400, 
                     detail="No se puede cambiar el rol a usuario porque tiene reservas activas"
                 )
             
             # Eliminar el registro de cliente (las reservas se eliminarán en cascada)
+            print(f"[DEBUG] update_user: eliminando registro de cliente para user_id={user_id}")
             cursor.execute("DELETE FROM clientes WHERE id_usuario = %s", (user_id,))
+            deleted = cursor.rowcount
+            print(f"[DEBUG] update_user: DELETE clientes affected rows={deleted} for user_id={user_id}")
         
         # Actualizar datos básicos del usuario
+        print(f"[DEBUG] update_user: ejecutando UPDATE users para user_id={user_id}")
         cursor.execute("""
             UPDATE users 
             SET name = %s, email = %s, role = %s
             WHERE id = %s
         """, (req.name, req.email, req.role, user_id))
+        print(f"[DEBUG] update_user: UPDATE users affected rows={cursor.rowcount} for user_id={user_id}")
+
+        # Persistir cambios en la base de datos
+        try:
+            conn.commit()
+            print(f"[DEBUG] update_user: conn.commit() executed for user_id={user_id}")
+        except Exception as e:
+            print(f"[ERROR] update_user: commit failed for user_id={user_id}: {e}")
+            conn.rollback()
+            raise HTTPException(status_code=500, detail=f"Error al guardar cambios: {e}")
         
         # Si el usuario se convierte en cliente o ya es cliente y hay datos para actualizar
         if req.role == "cliente":
-            # Verificar si ya existe un registro de cliente
-            cursor.execute("SELECT id FROM clientes WHERE id_usuario = %s", (user_id,))
-            cliente_exists = cursor.fetchone()
-            print(f"[DEBUG] update_user: recibido plan_id={req.plan_id}, cliente_exists={bool(cliente_exists)}")
+            # Verificar si ya existe un registro de cliente y obtener el plan actual
+            cursor.execute("SELECT id, plan_id FROM clientes WHERE id_usuario = %s", (user_id,))
+            cliente_row = cursor.fetchone()
+            cliente_exists = bool(cliente_row)
+            cliente_id = cliente_row[0] if cliente_row else None
+            old_plan_id = cliente_row[1] if cliente_row and len(cliente_row) > 1 else None
+            print(f"[DEBUG] update_user: recibido plan_id={req.plan_id}, cliente_exists={cliente_exists}, cliente_id={cliente_id}, old_plan_id={old_plan_id}")
             
             if cliente_exists and any([req.dni, req.numero_telefono, req.fecha_nacimiento, req.genero, req.plan_id, req.num_tarjeta, req.fecha_tarjeta, req.cvv]):
                 # Actualizar datos existentes del cliente
@@ -1184,11 +1205,29 @@ def update_user(user_id: int, req: UpdateUserRequest, response: Response):
                 # Validar y actualizar plan_id si se proporcionó
                 if req.plan_id is not None:
                     # Verificar que el plan existe y está activo
-                    cursor.execute("SELECT id FROM planes WHERE id = %s AND activo = 1", (req.plan_id,))
-                    if not cursor.fetchone():
+                    cursor.execute("SELECT id, acceso_entrenador FROM planes WHERE id = %s AND activo = 1", (req.plan_id,))
+                    plan_check = cursor.fetchone()
+                    if not plan_check:
                         raise HTTPException(status_code=400, detail="El plan seleccionado no existe o no está activo")
                     update_fields.append("plan_id = %s")
                     update_values.append(req.plan_id)
+                    # Si el cliente tenía plan premium (1) y ahora se cambia a básico/estándar (2 o 3),
+                    # eliminar asignaciones entrenador-cliente para este cliente.
+                    if cliente_exists and old_plan_id == 1 and int(req.plan_id) in (2, 3):
+                            print(f"[DEBUG] update_user: plan cambiado de premium({old_plan_id}) a básico/estandar({req.plan_id}) para cliente_id={cliente_id}, eliminando asignaciones...")
+                            try:
+                                cursor.execute("SAVEPOINT sp_cleanup_assigns")
+                                cursor.execute("DELETE FROM entrenador_cliente_asignaciones WHERE cliente_id = %s", (cliente_id,))
+                                deleted_assigns = cursor.rowcount
+                                print(f"[DEBUG] update_user: eliminadas {deleted_assigns} asignaciones entrenador-cliente para cliente {cliente_id} por cambio de plan")
+                                cursor.execute("RELEASE SAVEPOINT sp_cleanup_assigns")
+                            except Exception as e:
+                                # Si falla la limpieza de asignaciones revertimos sólo hasta el savepoint
+                                print(f"[WARN] update_user: fallo al limpiar asignaciones por cambio de plan: {repr(e)} - rollback to savepoint")
+                                try:
+                                    cursor.execute("ROLLBACK TO SAVEPOINT sp_cleanup_assigns")
+                                except Exception as re:
+                                    print(f"[ERROR] update_user: rollback to savepoint failed: {repr(re)}")
 
                 if req.num_tarjeta:
                     update_fields.append("num_tarjeta = %s")
@@ -1209,6 +1248,7 @@ def update_user(user_id: int, req: UpdateUserRequest, response: Response):
                     update_query = f"UPDATE clientes SET {', '.join(update_fields)} WHERE id_usuario = %s"
                     print(f"[DEBUG] update_user -> executing: {update_query} with values={update_values}")
                     cursor.execute(update_query, update_values)
+                    print(f"[DEBUG] update_user: UPDATE clientes affected rows={cursor.rowcount} for user_id={user_id}")
             elif not cliente_exists and req.crear_cliente:
                 # Crear nuevo registro de cliente
                 cursor.execute("""
@@ -1245,9 +1285,18 @@ def update_user(user_id: int, req: UpdateUserRequest, response: Response):
                         cliente_row = cursor.fetchone()
                         if cliente_row:
                             cliente_id = cliente_row[0]
-                            cursor.execute("DELETE FROM entrenador_cliente_asignaciones WHERE cliente_id = %s", (cliente_id,))
-                            deleted = cursor.rowcount
-                            print(f"[DEBUG] Eliminadas {deleted} asignaciones entrenador-cliente para cliente {cliente_id} por cambio de plan sin acceso a entrenador")
+                            try:
+                                cursor.execute("SAVEPOINT sp_cleanup_acceso")
+                                cursor.execute("DELETE FROM entrenador_cliente_asignaciones WHERE cliente_id = %s", (cliente_id,))
+                                deleted = cursor.rowcount
+                                print(f"[DEBUG] Eliminadas {deleted} asignaciones entrenador-cliente para cliente {cliente_id} por cambio de plan sin acceso a entrenador")
+                                cursor.execute("RELEASE SAVEPOINT sp_cleanup_acceso")
+                            except Exception as e:
+                                print(f"[WARN] update_user: fallo al limpiar asignaciones por cambio de plan (acceso_entrenador): {repr(e)} - rollback to savepoint")
+                                try:
+                                    cursor.execute("ROLLBACK TO SAVEPOINT sp_cleanup_acceso")
+                                except Exception as re:
+                                    print(f"[ERROR] update_user: rollback to savepoint failed: {repr(re)}")
             except Exception as e:
                 # No detener la actualización por un problema al limpiar asignaciones; loguear y continuar
                 print(f"[WARN] No se pudo limpiar asignaciones de entrenador al cambiar plan: {e}")
@@ -1324,8 +1373,21 @@ def update_user(user_id: int, req: UpdateUserRequest, response: Response):
         conn.close()
         raise
     except Exception as e:
-        conn.close()
+        if 'conn' in locals():
+            try:
+                conn.rollback()
+            except Exception as re:
+                print(f"[ERROR] update_user: rollback failed in outer exception handler: {re}")
+            try:
+                conn.close()
+            except Exception:
+                pass
         print(f"[ERROR] Error al actualizar usuario: {str(e)}")
+        try:
+            import traceback
+            print(traceback.format_exc())
+        except Exception:
+            pass
         raise HTTPException(status_code=500, detail=f"Error al actualizar usuario: {str(e)}")
 
 # ----------------------------------------------------
