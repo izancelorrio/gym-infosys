@@ -655,26 +655,21 @@ export default function DetalleUsuarioPage() {
                     </Label>
                     <Input
                       id="fechaNacimiento"
-                      type={isMobile ? "text" : "date"}
-                      value={isMobile ? formatDateDDMMYYYY(usuarioData.cliente?.fecha_nacimiento || "") : (usuarioData.cliente?.fecha_nacimiento || "")}
+                      type="date"
+                      value={usuarioData.cliente?.fecha_nacimiento || ""}
                       onChange={(e) => {
-                        const v = e.target.value
-                        if (isMobile) {
-                          const iso = parseDDMMYYYYtoISO(v)
-                          setUsuarioData({
-                            ...usuarioData,
-                            cliente: ({ id: usuarioData.cliente?.id ?? 0, ...(usuarioData.cliente || {}), fecha_nacimiento: iso } as Cliente)
-                          })
-                        } else {
-                          setUsuarioData({
-                            ...usuarioData,
-                            cliente: ({ id: usuarioData.cliente?.id ?? 0, ...(usuarioData.cliente || {}), fecha_nacimiento: v } as Cliente)
-                          })
-                        }
+                        const v = e.target.value // native date value is YYYY-MM-DD
+                        setUsuarioData({
+                          ...usuarioData,
+                          cliente: ({ id: usuarioData.cliente?.id ?? 0, ...(usuarioData.cliente || {}), fecha_nacimiento: v } as Cliente)
+                        })
                       }}
                       required={!usuarioData.cliente?.id}
-                      placeholder={isMobile ? "DD/MM/YYYY" : undefined}
+                      placeholder={"YYYY-MM-DD"}
                     />
+                    {isMobile && (
+                      <p className="text-xs text-muted-foreground mt-1">Formato: {formatDateDDMMYYYY(usuarioData.cliente?.fecha_nacimiento)}</p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="genero">Género <span className="text-red-500">*</span></Label>
