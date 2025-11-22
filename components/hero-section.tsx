@@ -165,7 +165,12 @@ export function HeroSection() {
         onClose={() => setIsRegisterModalOpen(false)}
         onSwitchToLogin={() => {
           setIsRegisterModalOpen(false)
-          // Aquí puedes agregar lógica para abrir el modal de login si lo necesitas
+          try {
+            window.dispatchEvent(new Event('open-login'))
+          } catch (e) {
+            // Fallback: nada (si el header no está montado o window no está disponible)
+            console.warn('No se pudo abrir el modal de login vía evento global', e)
+          }
         }}
       />
     </section>

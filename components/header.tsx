@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Menu, X, Dumbbell, User, LogOut, Lock, ChevronDown } from "lucide-react"
 import { LoginModal } from "./login-modal"
@@ -34,6 +34,20 @@ export function Header() {
     setIsMenuOpen(false)
     setIsUserMenuOpen(false)
   }
+
+  // Escuchar eventos globales para abrir/modificar modales desde otras partes de la app
+  useEffect(() => {
+    const openLogin = () => setIsLoginOpen(true)
+    const openRegister = () => setIsRegisterOpen(true)
+
+    window.addEventListener('open-login', openLogin)
+    window.addEventListener('open-register', openRegister)
+
+    return () => {
+      window.removeEventListener('open-login', openLogin)
+      window.removeEventListener('open-register', openRegister)
+    }
+  }, [])
 
   return (
     <>
