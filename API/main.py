@@ -707,50 +707,42 @@ def verify_email_get(token: str, request: Request):
             except Exception:
                 pass
             frontend_base = _infer_frontend_base_from_request(request)
-            return RedirectResponse(f"{frontend_base}/verify-email?status=error&reason=invalid_token")
-
-        user_id, expires_at = row
-        if datetime.utcnow() > datetime.fromisoformat(expires_at):
-            cursor.execute("DELETE FROM email_verifications WHERE token=%s", (token,))
-            conn.commit()
-            try:
-                conn.close()
-            except Exception:
-                pass
-            frontend_base = _infer_frontend_base_from_request(request)
-            return RedirectResponse(f"{frontend_base}/verify-email?status=error&reason=expired")
-
-        # Mark verified
-        cursor.execute("UPDATE users SET email_verified=1 WHERE id = %s", (user_id,))
-        cursor.execute("DELETE FROM email_verifications WHERE token=%s", (token,))
-        conn.commit()
-        try:
-            conn.close()
-        except Exception:
-            pass
-
-        frontend_base = _infer_frontend_base_from_request(request)
-        return RedirectResponse(f"{frontend_base}/verify-email?status=success")
-
-    except Exception:
-        try:
-            conn.rollback()
-        except Exception:
-            pass
-        try:
-            conn.close()
-        except Exception:
-            pass
-        frontend_base = _infer_frontend_base_from_request(request)
-        return RedirectResponse(f"{frontend_base}/verify-email?status=error&reason=server_error")
+            redirect_url = f"{frontend_base}/verify-email?status=error&reason=invalid_token"
+            incoming_origin = f"{request.url.scheme}://{request.url.netloc}"
+            logger.info("/verify-email missing token -> frontend_base=%s redirect_url=%s incoming=%s", frontend_base, redirect_url, str(request.url))
+            if frontend_base and frontend_base.rstrip('/') == incoming_origin.rstrip('/'):
+                html = (
+                    '<html><head><title>Verificación de email</title></head><body>'
+                    '<p>Estamos intentando redirigirte al frontend para completar la verificación.</p>'
+                    '<p>Si no se redirige automáticamente, haz clic en el siguiente enlace:</p>'
+                    '<a id="link" href="{redirect_url}">Abrir verificación</a>'
+                    '<p>Si el enlace no funciona, copia y pega esta URL en tu navegador:</p>'
+                    '<pre>{redirect_url}</pre>'
+                    '</body></html>'
+                ).format(redirect_url=redirect_url)
+                return Response(content=html, media_type="text/html")
+            return RedirectResponse(redirect_url)
 
 
 @app.get("/reset-password")
 def reset_password_get(token: str, request: Request):
     """Redirect GET requests with token to the frontend reset-password page."""
     frontend_base = _infer_frontend_base_from_request(request)
-    # Preserve token in query so frontend can render the reset form
-    return RedirectResponse(f"{frontend_base}/reset-password?token={token}")
+    redirect_url = f"{frontend_base}/reset-password?token={token}"
+    logger.info("/reset-password GET -> frontend_base=%s redirect_url=%s incoming=%s", frontend_base, redirect_url, str(request.url))
+    incoming_origin = f"{request.url.scheme}://{request.url.netloc}"
+    if frontend_base and frontend_base.rstrip('/') == incoming_origin.rstrip('/'):
+        html = (
+            '<html><head><title>Restablecer contraseña</title></head><body>'
+            '<p>Vamos a abrir la página para restablecer la contraseña.</p>'
+            '<p>Si no se redirige automáticamente, haz clic en el siguiente enlace:</p>'
+            '<a id="link" href="{redirect_url}">Abrir restablecimiento</a>'
+            '<p>Si el enlace no funciona, copia y pega esta URL en tu navegador:</p>'
+            '<pre>{redirect_url}</pre>'
+            '</body></html>'
+        ).format(redirect_url=redirect_url)
+        return Response(content=html, media_type="text/html")
+    return RedirectResponse(redirect_url)
 
 ## Endpoint para obtener el número total de usuarios registrados
 @app.get("/count-members")
