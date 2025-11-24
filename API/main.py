@@ -7,6 +7,7 @@ import uuid
 import smtplib
 from email.mime.text import MIMEText
 from datetime import datetime, timedelta
+from urllib.parse import urlparse
 import socket
 import os
 import psycopg2
@@ -92,7 +93,33 @@ REQUIRED_TABLES = {
 
 # Configuración del entorno
 # Cambia esta URL según tu entorno: desarrollo local o producción
-FRONTEND_BASE_URL = "http://localhost:3000"  # Para desarrollo local
+FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL") or "http://localhost:3000"  # Fallback si no se puede deducir desde la petición
+
+
+def _infer_frontend_base_from_request(request: Request) -> str:
+    """Inferir la URL base del frontend a partir de los headers de la petición.
+    Prioriza `Origin`, luego `Referer`. Si ninguno está presente, usa la
+    variable de entorno `FRONTEND_BASE_URL` o el valor por defecto.
+    """
+    try:
+        origin = request.headers.get("origin")
+        if origin:
+            p = urlparse(origin)
+            if p.scheme and p.netloc:
+                return f"{p.scheme}://{p.netloc}"
+            return origin.rstrip('/')
+
+        referer = request.headers.get("referer") or request.headers.get("referrer")
+        if referer:
+            p = urlparse(referer)
+            if p.scheme and p.netloc:
+                return f"{p.scheme}://{p.netloc}"
+            return referer.rstrip('/')
+    except Exception as e:
+        logger.debug("_infer_frontend_base_from_request failed: %s", e)
+
+    # Fallback configurado por variable de entorno o localhost
+    return FRONTEND_BASE_URL
 
 
 app = FastAPI()
@@ -478,7 +505,7 @@ def login(req: LoginRequest):
 
 ## Endpoint para registrar un nuevo usuario
 @app.post("/register")
-def register(req: RegisterRequest):
+def register(req: RegisterRequest, request: Request):
     print(f"[DEBUG] Intentando registrar usuario: {req.email}")
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -501,7 +528,8 @@ def register(req: RegisterRequest):
         )
         conn.commit()
         
-        verify_link = f"{FRONTEND_BASE_URL}/verify-email?token={token}"
+        frontend_base = _infer_frontend_base_from_request(request)
+        verify_link = f"{frontend_base}/verify-email?token={token}"
         print(f"[DEBUG] Link de verificación generado: {verify_link}")
         
         try:
@@ -558,7 +586,7 @@ def change_password(req: ChangePasswordRequest):
 
 ## Endpoint para enviar email de recuperación de contraseña
 @app.post("/send-reset-email")
-def send_reset_email_endpoint(req: SendResetEmailRequest):
+def send_reset_email_endpoint(req: SendResetEmailRequest, request: Request):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT id FROM users WHERE email=%s", (req.email,))
@@ -572,7 +600,8 @@ def send_reset_email_endpoint(req: SendResetEmailRequest):
     cursor.execute("INSERT INTO reset_tokens (user_id, token, expires_at) VALUES (%s, %s, %s)", (user_id, token, expires_at))
     conn.commit()
     conn.close()    
-    reset_link = f"{FRONTEND_BASE_URL}/reset-password?token={token}"
+    frontend_base = _infer_frontend_base_from_request(request)
+    reset_link = f"{frontend_base}/reset-password?token={token}"
     try:
         send_reset_email(req.email, reset_link)
     except Exception as e:

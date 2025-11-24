@@ -147,6 +147,73 @@ export default function DetalleUsuarioPage() {
     return `${yyyy}-${mm}-${dd}`
   }
 
+  // Helpers para normalizar la fecha de caducidad de la tarjeta
+  const cardExpiryToISO = (v?: string | null) => {
+    if (!v) return ""
+    // Si ya es ISO (YYYY-MM-DD), devolver tal cual
+    if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v
+    // MM/YY -> convertir a 20YY-MM-01
+    const mmyy = v.match(/^\s*(\d{2})\/(\d{2})\s*$/)
+    if (mmyy) {
+      const mm = mmyy[1]
+      const yy = mmyy[2]
+      const yyyy = Number(yy) > 50 ? `19${yy}` : `20${yy}`
+      return `${yyyy}-${mm}-01`
+    }
+    // MM/YYYY -> convertir a YYYY-MM-01
+    const mmyyyy = v.match(/^\s*(\d{2})\/(\d{4})\s*$/)
+    if (mmyyyy) {
+      const mm = mmyyyy[1]
+      const yyyy = mmyyyy[2]
+      return `${yyyy}-${mm}-01`
+    }
+    // Si no podemos parsear, devolver vacío para que el input date quede vacío
+    return ""
+  }
+
+  const isoToCardDisplay = (iso?: string | null) => {
+    if (!iso) return ""
+    const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+    if (!m) return String(iso)
+    const yyyy = m[1]
+    const mm = m[2]
+    return `${mm}/${yyyy}`
+  }
+
+  // Helpers para número de tarjeta y CVV
+  const stripNonDigits = (s?: string | null) => {
+    if (!s) return ""
+    return String(s).replace(/[^0-9]/g, "")
+  }
+
+  const formatCardNumberForDisplay = (raw?: string | null) => {
+    const digits = stripNonDigits(raw)
+    if (!digits) return ""
+    // Agrupar en 4s: 1234 5678 9012 3456 or for AMEX 4-6-5 etc; keep simple grouping of 4s
+    return digits.replace(/(\d{4})(?=\d)/g, "$1 ")
+  }
+
+  const luhnCheck = (num: string) => {
+    const digits = stripNonDigits(num)
+    let sum = 0
+    let shouldDouble = false
+    for (let i = digits.length - 1; i >= 0; i--) {
+      let d = parseInt(digits.charAt(i), 10)
+      if (shouldDouble) {
+        d *= 2
+        if (d > 9) d -= 9
+      }
+      sum += d
+      shouldDouble = !shouldDouble
+    }
+    return digits.length > 0 && sum % 10 === 0
+  }
+
+  const isValidCVV = (cvv?: string | null) => {
+    if (!cvv) return false
+    return /^[0-9]{3,4}$/.test(String(cvv))
+  }
+
   // Debugging: monitorear cambios en usuarioData
   useEffect(() => {
     if (usuarioData) {
@@ -205,7 +272,7 @@ export default function DetalleUsuarioPage() {
       if (usuarioData.role === "cliente" && !usuarioData.cliente?.id) {
         // Validar DNI
         if (!usuarioData.cliente?.dni) {
-          setError("El DNI/NIE es obligatorio para crear un cliente")
+          setError("Formato de DNI/NIE inválido")
           return
         }
         // Validar Plan
@@ -215,7 +282,7 @@ export default function DetalleUsuarioPage() {
         }
         // Validar Fecha de nacimiento
         if (!usuarioData.cliente?.fecha_nacimiento) {
-          setError("La fecha de nacimiento es obligatoria para crear un cliente")
+          setError("Formato de fecha de nacimiento inválido")
           return
         }
         // Validar Género
@@ -225,7 +292,7 @@ export default function DetalleUsuarioPage() {
         }
         // Validar Teléfono
         if (!usuarioData.cliente?.numero_telefono) {
-          setError("El número de teléfono es obligatorio para crear un cliente")
+          setError('Formato de teléfono inválido. Debe ser un teléfono español de 9 dígitos, opcionalmente con +34.')
           return
         }
         // Normalizar y validar formato de DNI/NIE
@@ -254,19 +321,28 @@ export default function DetalleUsuarioPage() {
         }
         // Guardar normalizado
         usuarioData.cliente.numero_telefono = normalizedPhone
-        // Validar número de tarjeta
-        if (!usuarioData.cliente?.num_tarjeta) {
-          setError("El número de tarjeta es obligatorio para crear un cliente")
+        // Validar número de tarjeta (Luhn)
+        const numTarjetaRaw = usuarioData.cliente?.num_tarjeta || ""
+        if (!numTarjetaRaw) {
+          setError("Número de tarjeta inválido")
           return
         }
+        if (!luhnCheck(numTarjetaRaw)) {
+          setError("Número de tarjeta inválido")
+          return
+        }
+
         // Validar fecha de caducidad de tarjeta
-        if (!usuarioData.cliente?.fecha_tarjeta) {
-          setError("La fecha de caducidad de la tarjeta es obligatoria para crear un cliente")
+        const fechaTarjetaRaw = usuarioData.cliente?.fecha_tarjeta || ""
+        if (!fechaTarjetaRaw) {
+          setError("Formato de fecha de caducidad inválido")
           return
         }
-        // Validar CVV
-        if (!usuarioData.cliente?.cvv) {
-          setError("El CVV es obligatorio para crear un cliente")
+
+        // Validar CVV (3 o 4 dígitos según tipo)
+        const cvvRaw = usuarioData.cliente?.cvv || ""
+        if (!isValidCVV(cvvRaw)) {
+          setError("CVV inválido (debe tener 3 o 4 dígitos)")
           return
         }
       }
@@ -301,6 +377,31 @@ export default function DetalleUsuarioPage() {
           return
         }
         if (usuarioData.cliente) usuarioData.cliente.numero_telefono = normalizedPhoneAny
+        // Asegurar que número de tarjeta y CVV no estén vacíos al editar/guardar cliente
+        const numTarjetaAny = usuarioData.cliente?.num_tarjeta || ""
+        if (!numTarjetaAny) {
+          setGuardando(false)
+          setError("Número de tarjeta inválido")
+          return
+        }
+        const cvvAny = usuarioData.cliente?.cvv || ""
+        if (!cvvAny) {
+          setGuardando(false)
+          setError("CVV inválido (3 o 4 dígitos)")
+          return
+        }
+        // Validar número de tarjeta
+        if (numTarjetaAny && !luhnCheck(numTarjetaAny)) {
+          setGuardando(false)
+          setError('Número de tarjeta inválido')
+          return
+        }
+        // Validar CVV
+        if (cvvAny && !isValidCVV(cvvAny)) {
+          setGuardando(false)
+          setError('CVV inválido (3 o 4 dígitos)')
+          return
+        }
       }
       
       const updateData = {
@@ -734,28 +835,41 @@ export default function DetalleUsuarioPage() {
                     <Label htmlFor="numTarjeta">Número de Tarjeta <span className="text-red-500">*</span></Label>
                     <Input
                       id="numTarjeta"
-                      value={usuarioData.cliente?.num_tarjeta || ""}
-                      onChange={(e) => setUsuarioData({
-                        ...usuarioData,
-                        cliente: ({ id: usuarioData.cliente?.id ?? 0, ...(usuarioData.cliente || {}), num_tarjeta: e.target.value } as Cliente)
-                      })}
+                      value={formatCardNumberForDisplay(usuarioData.cliente?.num_tarjeta)}
+                      onChange={(e) => {
+                        // Guardamos la versión normalizada (solo dígitos) en el estado
+                        const raw = e.target.value
+                        const normalized = stripNonDigits(raw)
+                        setUsuarioData({
+                          ...usuarioData,
+                          cliente: ({ id: usuarioData.cliente?.id ?? 0, ...(usuarioData.cliente || {}), num_tarjeta: normalized } as Cliente)
+                        })
+                      }}
                       className="font-mono"
                       placeholder="1234 5678 9012 3456"
-                      required
+                      inputMode="numeric"
+                      maxLength={23}
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="fechaTarjeta">Fecha de Caducidad <span className="text-red-500">*</span></Label>
                     <Input
                       id="fechaTarjeta"
-                      value={usuarioData.cliente?.fecha_tarjeta || ""}
-                      onChange={(e) => setUsuarioData({
-                        ...usuarioData,
-                        cliente: ({ id: usuarioData.cliente?.id ?? 0, ...(usuarioData.cliente || {}), fecha_tarjeta: e.target.value } as Cliente)
-                      })}
-                      placeholder="MM/YY"
-                      required
+                      type="date"
+                      value={cardExpiryToISO(usuarioData.cliente?.fecha_tarjeta)}
+                      onChange={(e) => {
+                        // Guardamos en formato ISO (YYYY-MM-DD). El backend acepta string; si prefieres MM/YY
+                        // podemos transformar antes de enviar.
+                        const v = e.target.value // YYYY-MM-DD
+                        setUsuarioData({
+                          ...usuarioData,
+                          cliente: ({ id: usuarioData.cliente?.id ?? 0, ...(usuarioData.cliente || {}), fecha_tarjeta: v } as Cliente)
+                        })
+                      }}
                     />
+                    {isMobile && (
+                      <p className="text-xs text-muted-foreground mt-1">Formato: {formatDateDDMMYYYY(usuarioData.cliente?.fecha_tarjeta)}</p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="cvv">CVV <span className="text-red-500">*</span></Label>
@@ -764,13 +878,16 @@ export default function DetalleUsuarioPage() {
                       type="text"
                       maxLength={4}
                       value={usuarioData.cliente?.cvv || ""}
-                      onChange={(e) => setUsuarioData({
-                        ...usuarioData,
-                        cliente: ({ id: usuarioData.cliente?.id ?? 0, ...(usuarioData.cliente || {}), cvv: e.target.value } as Cliente)
-                      })}
+                      onChange={(e) => {
+                        const digits = stripNonDigits(e.target.value)
+                        setUsuarioData({
+                          ...usuarioData,
+                          cliente: ({ id: usuarioData.cliente?.id ?? 0, ...(usuarioData.cliente || {}), cvv: digits } as Cliente)
+                        })
+                      }}
                       className="font-mono w-24"
                       placeholder="123"
-                      required
+                      inputMode="numeric"
                     />
                   </div>
                 </div>
