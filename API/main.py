@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import sqlite3
@@ -650,11 +651,71 @@ def verify_email(req: VerifyEmailRequest):
         conn.close()
         raise HTTPException(status_code=400, detail="Token expirado")
     # Marcar email como verificado
-    cursor.execute("UPDATE users SET email_verified=1 WHERE id%s", (user_id,))
+    cursor.execute("UPDATE users SET email_verified=1 WHERE id = %s", (user_id,))
     cursor.execute("DELETE FROM email_verifications WHERE token=%s", (req.token,))
     conn.commit()
     conn.close()
     return {"success": True, "message": "Email verificado correctamente"}
+
+
+@app.get("/verify-email")
+def verify_email_get(token: str, request: Request):
+    """Verify email via GET (redirects to frontend). Accepts `token` as query param."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT user_id, expires_at FROM email_verifications WHERE token=%s", (token,))
+        row = cursor.fetchone()
+        if not row:
+            try:
+                conn.close()
+            except Exception:
+                pass
+            frontend_base = _infer_frontend_base_from_request(request)
+            return RedirectResponse(f"{frontend_base}/verify-email?status=error&reason=invalid_token")
+
+        user_id, expires_at = row
+        if datetime.utcnow() > datetime.fromisoformat(expires_at):
+            cursor.execute("DELETE FROM email_verifications WHERE token=%s", (token,))
+            conn.commit()
+            try:
+                conn.close()
+            except Exception:
+                pass
+            frontend_base = _infer_frontend_base_from_request(request)
+            return RedirectResponse(f"{frontend_base}/verify-email?status=error&reason=expired")
+
+        # Mark verified
+        cursor.execute("UPDATE users SET email_verified=1 WHERE id = %s", (user_id,))
+        cursor.execute("DELETE FROM email_verifications WHERE token=%s", (token,))
+        conn.commit()
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+        frontend_base = _infer_frontend_base_from_request(request)
+        return RedirectResponse(f"{frontend_base}/verify-email?status=success")
+
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        try:
+            conn.close()
+        except Exception:
+            pass
+        frontend_base = _infer_frontend_base_from_request(request)
+        return RedirectResponse(f"{frontend_base}/verify-email?status=error&reason=server_error")
+
+
+@app.get("/reset-password")
+def reset_password_get(token: str, request: Request):
+    """Redirect GET requests with token to the frontend reset-password page."""
+    frontend_base = _infer_frontend_base_from_request(request)
+    # Preserve token in query so frontend can render the reset form
+    return RedirectResponse(f"{frontend_base}/reset-password?token={token}")
 
 ## Endpoint para obtener el número total de usuarios registrados
 @app.get("/count-members")
