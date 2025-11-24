@@ -6,6 +6,7 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { useToast } from "@/components/ui/toast"
 import { Calendar, Clock, Users, ArrowLeft, MapPin, User2, CheckCircle } from "lucide-react"
 
 // Interfaces para las clases programadas
@@ -40,6 +41,7 @@ export default function ReservarClasePage() {
   const [tiposClase, setTiposClase] = useState<string[]>(["Todos"])
   const [loading, setLoading] = useState(true)
   const [reservasCliente, setReservasCliente] = useState<any[]>([])
+  const toast = useToast()
 
   // Cargar reservas existentes del cliente
   const cargarReservasCliente = async () => {
@@ -164,7 +166,7 @@ export default function ReservarClasePage() {
     try {
       // Obtener el ID del cliente del usuario autenticado
       if (!user?.cliente?.id) {
-        alert("❌ Error: No se pudo obtener la información del cliente")
+        toast({ title: 'Error', description: 'No se pudo obtener la información del cliente', type: 'error' })
         return
       }
 
@@ -197,14 +199,14 @@ export default function ReservarClasePage() {
       setClasesReservadas([...clasesReservadas, claseId])
       
       // Mostrar mensaje de éxito
-      alert(`✅ ¡RESERVA CONFIRMADA!\n\nClase: ${resultado.clase_info.tipo}\nFecha: ${resultado.clase_info.fecha}\nHora: ${resultado.clase_info.hora}\n\n¡Nos vemos en la clase!`)
+      toast({ title: 'Reserva confirmada', description: `Clase: ${resultado.clase_info.tipo} — ${resultado.clase_info.fecha} ${resultado.clase_info.hora}`, type: 'success' })
       
       // Recargar las clases para actualizar la ocupación
       await cargarClasesProgramadas()
       
     } catch (error) {
       console.error('Error al reservar clase:', error)
-      alert(`❌ Error al reservar la clase: ${error instanceof Error ? error.message : 'Error desconocido'}`)
+      toast({ title: 'Error al reservar', description: String(error instanceof Error ? error.message : 'Error desconocido'), type: 'error' })
     }
   }
 
@@ -212,7 +214,7 @@ export default function ReservarClasePage() {
     try {
       // Recargar las reservas del cliente para obtener datos actualizados
       if (!user?.cliente?.id) {
-        alert("❌ Error: No se pudo obtener la información del cliente")
+        toast({ title: 'Error', description: 'No se pudo obtener la información del cliente', type: 'error' })
         return
       }
 
@@ -235,7 +237,7 @@ export default function ReservarClasePage() {
       const reserva = reservasActualizadas.find((r: any) => r.id_clase_programada === claseId)
       
       if (!reserva) {
-        alert("❌ Error: No se pudo encontrar la reserva activa para esta clase")
+        toast({ title: 'Error', description: 'No se pudo encontrar la reserva activa para esta clase', type: 'error' })
         return
       }
 
@@ -283,7 +285,7 @@ export default function ReservarClasePage() {
       setClasesReservadas(clasesReservadas.filter(id => id !== claseId))
       
       // Mostrar mensaje de éxito
-      alert(`✅ RESERVA ANULADA\n\nLa reserva para la clase de ${tipoClase} del ${fechaFormateada} a las ${hora} ha sido anulada correctamente.`)
+      toast({ title: 'Reserva anulada', description: `La reserva para ${tipoClase} del ${fechaFormateada} a las ${hora} ha sido anulada.`, type: 'success' })
       
       // Recargar datos para actualizar la ocupación
       await cargarClasesProgramadas()
@@ -291,7 +293,7 @@ export default function ReservarClasePage() {
       
     } catch (error) {
       console.error('Error al anular reserva:', error)
-      alert(`❌ Error al anular la reserva: ${error instanceof Error ? error.message : 'Error desconocido'}`)
+      toast({ title: 'Error al anular reserva', description: String(error instanceof Error ? error.message : 'Error desconocido'), type: 'error' })
     }
   }
 

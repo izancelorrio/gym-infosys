@@ -6,6 +6,7 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Users, Calendar, BarChart3, LogOut, UserCheck, Clock, TrendingUp, UserPlus } from "lucide-react"
+import { useToast } from "@/components/ui/toast"
 
 export default function AdminPage() {
   const { user, logout } = useAuth()
@@ -22,6 +23,68 @@ export default function AdminPage() {
     await logout()
     router.push("/")
   }
+
+  const toast = useToast()
+
+  const [totalUsers, setTotalUsers] = useState<number | null>(null)
+  const [classesToday, setClassesToday] = useState<number | null>(null)
+  const [ingresosMes, setIngresosMes] = useState<number | null>(null)
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        // Total usuarios: obtener todos los usuarios desde el endpoint de admin
+        const adminUsersRes = await fetch(`/api/admin/users?_t=${Date.now()}`)
+        if (!adminUsersRes.ok) throw new Error("Error fetching admin users")
+        const adminUsersJson = await adminUsersRes.json()
+        const usersList = adminUsersJson.users || []
+        setTotalUsers(usersList.length)
+
+        // Clases hoy
+        const now = new Date()
+        const today = now.toISOString().slice(0, 10) // YYYY-MM-DD
+        const clasesRes = await fetch(`/api/clases-programadas?_t=${Date.now()}&filter_future=false`)
+        if (!clasesRes.ok) throw new Error("Error fetching clases programadas")
+        const clasesJson = await clasesRes.json()
+        const clasesHoy = Array.isArray(clasesJson)
+          ? clasesJson.filter((c: any) => String(c.fecha).slice(0, 10) === today).length
+          : 0
+        setClassesToday(clasesHoy)
+
+        // Ingresos mes: obtener planes
+        const planesRes = await fetch(`/api/admin/planes?_t=${Date.now()}`)
+        const planesJson = planesRes.ok ? await planesRes.json() : { planes: [] }
+        const planesList = planesJson.planes || planesJson || []
+        const planPriceById = new Map<number, number>()
+        for (const p of planesList) {
+          planPriceById.set(Number(p.id), Number(p.precio_mensual ?? 0))
+        }
+
+        const month = now.getMonth()
+        const year = now.getFullYear()
+        let ingresos = 0
+
+        for (const u of usersList) {
+          if (u.role !== "cliente") continue
+          const cliente = u.cliente
+          if (!cliente) continue
+          // Contar sólo clientes con estado activo, sin tener en cuenta la fecha de inscripcion
+          if ((cliente.estado || "").toLowerCase() !== "activo") continue
+          const planId = Number(cliente.plan_id)
+          const price = planPriceById.get(planId) ?? 0
+          ingresos += Number(price)
+        }
+        setIngresosMes(ingresos)
+      } catch (err) {
+        console.error("Error fetching admin stats:", err)
+        try {
+          toast({ title: "Error", description: "No se pudieron cargar las estadísticas", type: "destructive" })
+        } catch (e) {}
+      }
+    }
+
+    fetchStats()
+  }, [])
 
   if (!user || user.role !== "admin") {
     return null
@@ -61,10 +124,10 @@ export default function AdminPage() {
                 <div className="bg-primary/20 p-3 rounded-full">
                   <Users className="h-6 w-6 text-primary" />
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Usuarios</p>
-                  <p className="text-2xl font-bold text-primary">156</p>
-                </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Total Usuarios</p>
+                          <p className="text-2xl font-bold text-primary">{totalUsers === null ? "Cargando..." : totalUsers}</p>
+                        </div>
               </div>
             </CardContent>
           </Card>
@@ -77,7 +140,7 @@ export default function AdminPage() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Clases Hoy</p>
-                  <p className="text-2xl font-bold text-primary">12</p>
+                  <p className="text-2xl font-bold text-primary">{classesToday === null ? "Cargando..." : classesToday}</p>
                 </div>
               </div>
             </CardContent>
@@ -91,7 +154,7 @@ export default function AdminPage() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Ingresos Mes</p>
-                  <p className="text-2xl font-bold text-primary">€8,450</p>
+                  <p className="text-2xl font-bold text-primary">{ingresosMes === null ? "Cargando..." : ingresosMes.toLocaleString("es-ES", { style: "currency", currency: "EUR" })}</p>
                 </div>
               </div>
             </CardContent>

@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useToast } from '@/components/ui/toast'
 import { Button } from "@/components/ui/button"
 import { Calendar, Clock, Users, ArrowLeft, ChevronLeft, ChevronRight, BookOpen, Trash2 } from "lucide-react"
 
@@ -53,6 +54,7 @@ export default function CalendarioClasesPage() {
   const [clasesCalendario, setClasesCalendario] = useState<ClaseCalendario[]>([])
 
   const [isLoading, setIsLoading] = useState(true)
+  const toast = useToast()
 
 
 
@@ -82,6 +84,7 @@ export default function CalendarioClasesPage() {
     } catch (error) {
       console.error('Error al cargar clases programadas:', error)
       setClasesProgramadas([])
+      toast({ title: 'Error al cargar clases', description: String(error), type: 'error' })
     }
   }
 
@@ -190,7 +193,16 @@ export default function CalendarioClasesPage() {
   }
 
   const obtenerClasesPorDia = (dia: number) => {
-    return clasesCalendario.filter((clase) => clase.dia === dia)
+    // Devolver las clases del día ordenadas por hora (ascendente)
+    const clasesDia = clasesCalendario.filter((clase) => clase.dia === dia)
+    const toMinutes = (hora: string) => {
+      if (!hora) return 0
+      const parts = String(hora).trim().split(":")
+      const hh = Number(parts[0]) || 0
+      const mm = Number(parts[1]) || 0
+      return hh * 60 + mm
+    }
+    return clasesDia.sort((a, b) => toMinutes(a.hora) - toMinutes(b.hora))
   }
 
   const eliminarClase = async (id: number, tipo: string, fecha: string, hora: string) => {
@@ -201,52 +213,48 @@ export default function CalendarioClasesPage() {
       month: 'long',
       day: 'numeric'
     })
-    
-    // Pedir confirmación al usuario
-    const confirmacion = window.confirm(
-      `🗑️ ELIMINAR CLASE\n\n` +
-      `Clase: ${tipo}\n` +
-      `Fecha: ${fechaFormateada}\n` +
-      `Hora: ${hora}\n\n` +
-      `⚠️ Esta acción no se puede deshacer.\n\n` +
-      `¿Estás seguro de que quieres eliminar esta clase?`
-    )
-    
-    if (!confirmacion) {
-      return
-    }
+    // Mostrar confirmación mediante toast con acción
+    toast({
+      title: 'Confirmar eliminación',
+      description: `¿Eliminar la clase ${tipo} del ${fechaFormateada} a las ${hora}? Esta acción no se puede deshacer.`,
+      type: 'info',
+      actions: [
+        {
+          label: 'Eliminar',
+          onClick: async () => {
+            try {
+              const timestamp = new Date().getTime()
+              console.log(`[${timestamp}] Eliminando clase ID: ${id}`)
 
-    try {
-      const timestamp = new Date().getTime()
-      console.log(`[${timestamp}] Eliminando clase ID: ${id}`)
+              const response = await fetch(`/api/clases-programadas/${id}?_t=${timestamp}`, {
+                method: 'DELETE',
+                headers: {
+                  'Cache-Control': 'no-cache, no-store, must-revalidate',
+                  'Pragma': 'no-cache',
+                  'Expires': '0'
+                }
+              })
 
-      const response = await fetch(`/api/clases-programadas/${id}?_t=${timestamp}`, {
-        method: 'DELETE',
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        }
-      })
+              const resultado = await response.json()
 
-      const resultado = await response.json()
+              if (!response.ok) {
+                throw new Error(resultado.detail || 'Error al eliminar la clase')
+              }
 
-      if (!response.ok) {
-        throw new Error(resultado.detail || 'Error al eliminar la clase')
-      }
-
-      console.log(`[${timestamp}] Clase eliminada:`, resultado)
-      
-      // Mostrar mensaje de éxito
-      alert(`✅ CLASE ELIMINADA\n\nLa clase de ${tipo} del ${fechaFormateada} a las ${hora} ha sido eliminada correctamente.`)
-      
-      // Recargar las clases para actualizar el calendario
-      await cargarClasesProgramadas()
-      
-    } catch (error) {
-      console.error('Error al eliminar clase:', error)
-      alert(`❌ Error al eliminar la clase: ${error}`)
-    }
+              console.log(`[${timestamp}] Clase eliminada:`, resultado)
+              // Mostrar mensaje de éxito
+              toast({ title: 'Clase eliminada', description: `La clase de ${tipo} del ${fechaFormateada} a las ${hora} ha sido eliminada correctamente.`, type: 'success' })
+              // Recargar las clases para actualizar el calendario
+              await cargarClasesProgramadas()
+            } catch (error) {
+              console.error('Error al eliminar clase:', error)
+              toast({ title: 'Error al eliminar clase', description: String(error), type: 'error' })
+            }
+          }
+        },
+        { label: 'Cancelar' }
+      ]
+    })
   }
 
   return (

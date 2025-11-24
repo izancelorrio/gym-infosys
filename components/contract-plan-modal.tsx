@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/contexts/auth-context"
+import { useToast } from "@/components/ui/toast"
 import { CreditCard, User, Phone, IdCard, Crown, Users, Star, Loader2, AlertCircle } from "lucide-react"
 
 interface Plan {
@@ -39,6 +40,7 @@ export function ContractPlanModal({ isOpen, onClose }: ContractPlanModalProps) {
   const { user, updateUser } = useAuth()
   const [planes, setPlanes] = useState<Plan[]>([])
   const [loading, setLoading] = useState(true)
+  const toast = useToast()
   // `fatalError` para errores de carga que deben reemplazar el contenido
   const [fatalError, setFatalError] = useState<string | null>(null)
   // `formError` para errores de validación/envío que se muestran inline en el formulario
@@ -199,7 +201,7 @@ export function ContractPlanModal({ isOpen, onClose }: ContractPlanModalProps) {
         updateUser(data.user)
       }
 
-      alert(`¡Plan contratado exitosamente! ${data.message}`)
+      toast({ title: 'Plan contratado', description: data.message, type: 'success' })
       onClose()
       
       // Opcional: recargar la página para reflejar los cambios

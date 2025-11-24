@@ -5,11 +5,18 @@ import { X } from "lucide-react"
 
 type ToastType = "success" | "error" | "info"
 
+type ToastAction = {
+  label: string
+  // onClick can be any function; store it directly and call when action button pressed
+  onClick?: () => void
+}
+
 type ToastData = {
   id: string
   title: string
   description?: string
   type?: ToastType
+  actions?: ToastAction[]
 }
 
 const ToastContext = createContext<{ toast: (t: Omit<ToastData, "id">) => void } | undefined>(undefined)
@@ -21,10 +28,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     const id = Date.now().toString()
     const data: ToastData = { id, ...t }
     setToasts((s) => [...s, data])
-    // Auto dismiss
+    // Auto dismiss (unless actions provided; keep auto-dismiss but slightly longer)
     setTimeout(() => {
       setToasts((s) => s.filter((x) => x.id !== id))
-    }, 4000)
+    }, 6000)
   }, [])
 
   const remove = useCallback((id: string) => {
@@ -52,6 +59,26 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             <div className="flex-1">
               <div className="font-medium">{t.title}</div>
               {t.description && <div className="text-sm opacity-90 mt-1">{t.description}</div>}
+              {t.actions && t.actions.length > 0 && (
+                <div className="mt-3 flex gap-2">
+                  {t.actions.map((a, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => {
+                        try {
+                          a.onClick && a.onClick()
+                        } catch (e) {
+                          // swallow
+                        }
+                        remove(t.id)
+                      }}
+                      className="px-3 py-1 rounded bg-white/10 hover:bg-white/20 text-sm"
+                    >
+                      {a.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             <button
               onClick={() => remove(t.id)}

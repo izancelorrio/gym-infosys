@@ -6,6 +6,7 @@ import { useEffect, useState, useMemo } from "react"
 import { API_CONFIG } from "@/lib/config"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { useToast } from "@/components/ui/toast"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Activity, Users, Plus, Save, ArrowLeft, Trash2 } from "lucide-react"
@@ -44,6 +45,7 @@ export default function AsignarEntrenamientoPage() {
   const [entrenamientos, setEntrenamientos] = useState<Entrenamiento[]>([])
   const [ejercicios, setEjercicios] = useState<Ejercicio[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const toast = useToast()
 
   const availableDates = useMemo(() => {
     const dates = []
@@ -182,7 +184,7 @@ export default function AsignarEntrenamientoPage() {
       )
 
       if (entrenamientosCompletos.length === 0) {
-        alert("Por favor, completa al menos un entrenamiento con fecha, ejercicio y series")
+        toast({ title: 'Atención', description: 'Por favor, completa al menos un entrenamiento con fecha, ejercicio y series', type: 'info' })
         return
       }
 
@@ -207,7 +209,7 @@ export default function AsignarEntrenamientoPage() {
       console.log("[DEBUG] Respuesta del servidor:", data)
 
       if (data.success) {
-        alert(`Plan de entrenamiento guardado exitosamente. ${data.total} entrenamientos asignados.`)
+        toast({ title: 'Plan guardado', description: `${data.total} entrenamientos asignados.`, type: 'success' })
         router.push("/entrenador")
       } else {
         throw new Error(data.message || "Error al guardar el plan")
@@ -215,7 +217,7 @@ export default function AsignarEntrenamientoPage() {
 
     } catch (error) {
       console.error("[ERROR] Error al guardar entrenamientos:", error)
-      alert(`Error al guardar el plan de entrenamiento: ${error instanceof Error ? error.message : 'Error desconocido'}`)
+      toast({ title: 'Error', description: String(error instanceof Error ? error.message : 'Error desconocido'), type: 'error' })
     }
   }
 

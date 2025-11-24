@@ -4,10 +4,10 @@ import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
 import { useEffect, useState, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useToast } from "@/components/ui/toast"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
-import { useToast } from "@/components/ui/toast"
 import { Calendar, Clock, Activity, Plus, Save, ArrowLeft, Trash2 } from "lucide-react"
 
 interface ClaseProgramada {
@@ -492,7 +492,7 @@ export default function ProgramarClasePage() {
                         const v = e.target.value
                         const ocupado = clase.instructor && clase.hora && isHorarioOcupado(clase.instructor, v, clase.hora)
                         if (ocupado) {
-                          alert('La fecha y hora seleccionadas están ocupadas para este instructor.')
+                          toast({ title: 'Horario ocupado', description: 'La fecha y hora seleccionadas están ocupadas para este instructor.', type: 'info' })
                           return
                         }
                         actualizarClase(clase.id, "fecha", v)

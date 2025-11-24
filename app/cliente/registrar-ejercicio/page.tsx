@@ -6,6 +6,7 @@ import { useEffect, useState, useMemo } from "react"
 import { API_CONFIG } from "@/lib/config"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { useToast } from "@/components/ui/toast"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
@@ -62,6 +63,7 @@ export default function RegistrarEjercicioPage() {
   const [entrenamientosPendientes, setEntrenamientosPendientes] = useState<EntrenamientoPendiente[]>([])
   const [clasesReservadas, setClasesReservadas] = useState<ClaseReservada[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const toast = useToast()
 
   // Generar fechas del último mes hasta hoy
   const fechasDisponibles = useMemo(() => {
@@ -303,7 +305,7 @@ export default function RegistrarEjercicioPage() {
       console.log("[DEBUG] Actividad registrada:", data)
 
       if (data.success) {
-        alert("¡Actividad registrada exitosamente!")
+        toast({ title: 'Actividad registrada', description: '¡Actividad registrada exitosamente!', type: 'success' })
         // Solo eliminamos el entrenamiento de la lista
         setEntrenamientosPendientes(prev => prev.filter(e => e.id !== entrenamiento.id))
       } else {
@@ -312,7 +314,7 @@ export default function RegistrarEjercicioPage() {
 
     } catch (error) {
       console.error("[ERROR] Error al registrar actividad:", error)
-      alert(`Error al registrar actividad: ${error instanceof Error ? error.message : 'Error desconocido'}`)
+      toast({ title: 'Error', description: String(error instanceof Error ? error.message : 'Error desconocido'), type: 'error' })
     }
   }
 
@@ -336,11 +338,11 @@ export default function RegistrarEjercicioPage() {
       console.log("[DEBUG] Asistencia registrada:", data)
 
       if (data.success) {
-        alert(`¡Asistencia a ${claseReservada.clase.tipo} registrada exitosamente!`)
+        toast({ title: 'Asistencia registrada', description: `Asistencia a ${claseReservada.clase.tipo} registrada correctamente.`, type: 'success' })
         // Remover la clase de la lista de reservadas activas
         setClasesReservadas(prev => prev.filter(c => c.id !== claseReservada.id))
       } else if (data.already_registered) {
-        alert("Ya se registró la asistencia a esta clase")
+        toast({ title: 'Ya registrada', description: 'Ya se registró la asistencia a esta clase', type: 'info' })
         // También remover de la lista si ya fue registrada
         setClasesReservadas(prev => prev.filter(c => c.id !== claseReservada.id))
       } else {
@@ -349,7 +351,7 @@ export default function RegistrarEjercicioPage() {
 
     } catch (error) {
       console.error("[ERROR] Error al registrar asistencia:", error)
-      alert(`Error al registrar asistencia: ${error instanceof Error ? error.message : 'Error desconocido'}`)
+      toast({ title: 'Error', description: String(error instanceof Error ? error.message : 'Error desconocido'), type: 'error' })
     }
   }
 
@@ -360,7 +362,7 @@ export default function RegistrarEjercicioPage() {
     )
     
     if (ejerciciosCompletos.length === 0) {
-      alert("Por favor, completa al menos una actividad antes de guardar.")
+      toast({ title: 'Atención', description: 'Por favor, completa al menos una actividad antes de guardar.', type: 'info' })
       return
     }
 
@@ -402,7 +404,7 @@ export default function RegistrarEjercicioPage() {
         }
       }
       
-      alert(`Se registraron ${actividadesRegistradas.length} actividades correctamente en la base de datos.`)
+      toast({ title: 'Actividades guardadas', description: `Se registraron ${actividadesRegistradas.length} actividades correctamente.`, type: 'success' })
       // Limpiar el formulario y añadir uno nuevo vacío
       const hoy = new Date()
       const dia = hoy.getDate().toString().padStart(2, '0')
@@ -417,7 +419,7 @@ export default function RegistrarEjercicioPage() {
       
     } catch (error) {
       console.error("[ERROR] Error al guardar ejercicios:", error)
-      alert(`Error al guardar actividades: ${error instanceof Error ? error.message : 'Error desconocido'}`)
+      toast({ title: 'Error al guardar', description: String(error instanceof Error ? error.message : 'Error desconocido'), type: 'error' })
     }
   }
 
@@ -708,7 +710,7 @@ export default function RegistrarEjercicioPage() {
                           </div>
                           
                           <div>
-                            <label className="text-sm font-medium text-foreground mb-2 block">Valoración (1-10)</label>
+                            <label className="text-sm font-medium text-foreground mb-2 block">Valoración (1-5)</label>
                             <Select
                               value={ejercicio.valoracion?.toString() || ""}
                               onValueChange={(value) => actualizarEjercicio(ejercicio.id, "valoracion", Number(value))}
@@ -717,9 +719,9 @@ export default function RegistrarEjercicioPage() {
                                 <SelectValue placeholder="Califica tu ejercicio" />
                               </SelectTrigger>
                               <SelectContent>
-                                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((rating) => (
+                                {[1, 2, 3, 4, 5].map((rating) => (
                                   <SelectItem key={rating} value={rating.toString()}>
-                                    {rating} - {rating <= 3 ? 'Difícil' : rating <= 6 ? 'Moderado' : rating <= 8 ? 'Bueno' : 'Excelente'}
+                                    {rating === 1 ? '⭐ - Muy difícil' : rating === 2 ? '⭐⭐ - Difícil' : rating === 3 ? '⭐⭐⭐ - Normal' : rating === 4 ? '⭐⭐⭐⭐ - Bien' : '⭐⭐⭐⭐⭐ - Excelente'}
                                   </SelectItem>
                                 ))}
                               </SelectContent>
@@ -813,11 +815,12 @@ function EntrenamientoPendienteCard({ entrenamiento, onRegistrar }: Entrenamient
     notas: '',
     valoracion: ''
   })
+  const toast = useToast()
 
   const handleRegistrar = () => {
     // Validar datos obligatorios
     if (!datosActividad.series_realizadas || datosActividad.series_realizadas <= 0) {
-      alert("Por favor, ingresa el número de series realizadas")
+      toast({ title: 'Atención', description: 'Por favor, ingresa el número de series realizadas', type: 'info' })
       return
     }
 

@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { useRouter } from "next/navigation";
 import { API_CONFIG } from "@/lib/config";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/toast"
 import {
   Card,
   CardContent,
@@ -54,6 +55,7 @@ export default function AsignacionesEntrenadorPage() {
   const router = useRouter();
   const [data, setData] = useState<AsignacionesData | null>(null);
   const [loading, setLoading] = useState(false);
+  const toast = useToast()
   const [selectedEntrenador, setSelectedEntrenador] = useState<string>("");
   const [selectedCliente, setSelectedCliente] = useState<string>("");
   const [notas, setNotas] = useState("");
@@ -86,7 +88,7 @@ export default function AsignacionesEntrenadorPage() {
       setData(result);
     } catch (error) {
       console.error("Error:", error);
-      alert("Error al cargar las asignaciones");
+      toast({ title: 'Error al cargar asignaciones', description: String(error), type: 'error' })
     } finally {
       setLoading(false);
     }
@@ -94,7 +96,7 @@ export default function AsignacionesEntrenadorPage() {
 
   const handleAsignar = async () => {
     if (!selectedEntrenador || !selectedCliente) {
-      alert("Debe seleccionar un entrenador y un cliente");
+      toast({ title: 'Falta información', description: 'Debe seleccionar un entrenador y un cliente', type: 'error' })
       return;
     }
 
@@ -118,7 +120,7 @@ export default function AsignacionesEntrenadorPage() {
       }
 
       const result = await response.json();
-      alert(result.message);
+      toast({ title: 'Asignación creada', description: result.message, type: 'success' })
       
       // Limpiar formulario
       setSelectedEntrenador("");
@@ -129,7 +131,7 @@ export default function AsignacionesEntrenadorPage() {
       await fetchAsignaciones();
     } catch (error) {
       console.error("Error:", error);
-      alert(error instanceof Error ? error.message : "Error al asignar entrenador");
+      toast({ title: 'Error al asignar', description: String(error instanceof Error ? error.message : "Error al asignar entrenador"), type: 'error' })
     } finally {
       setAssigningLoading(false);
     }
@@ -151,13 +153,13 @@ export default function AsignacionesEntrenadorPage() {
       }
 
       const result = await response.json();
-      alert(result.message);
+      toast({ title: 'Desasignado', description: result.message, type: 'success' })
       
       // Refrescar datos
       await fetchAsignaciones();
     } catch (error) {
       console.error("Error:", error);
-      alert(error instanceof Error ? error.message : "Error al desasignar entrenador");
+      toast({ title: 'Error al desasignar', description: String(error instanceof Error ? error.message : "Error al desasignar entrenador"), type: 'error' })
     }
   };
 
