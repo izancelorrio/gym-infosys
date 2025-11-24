@@ -94,7 +94,7 @@ REQUIRED_TABLES = {
 
 # Configuración del entorno
 # Cambia esta URL según tu entorno: desarrollo local o producción
-FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL") or "http://localhost:3000"  # Fallback si no se puede deducir desde la petición
+FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL")
 
 
 def _infer_frontend_base_from_request(request: Request) -> str:
@@ -103,6 +103,16 @@ def _infer_frontend_base_from_request(request: Request) -> str:
     variable de entorno `FRONTEND_BASE_URL` o el valor por defecto.
     """
     try:
+        # First, allow the frontend to explicitly send its base URL using a
+        # custom header. This is the most reliable when the frontend triggers
+        # the request (and the user asked not to persist the URL in the DB).
+        explicit = request.headers.get("x-frontend-base") or request.headers.get("X-Frontend-Base")
+        if explicit:
+            p = urlparse(explicit)
+            if p.scheme and p.netloc:
+                return f"{p.scheme}://{p.netloc}"
+            return explicit.rstrip('/')
+
         origin = request.headers.get("origin")
         if origin:
             p = urlparse(origin)
@@ -119,7 +129,7 @@ def _infer_frontend_base_from_request(request: Request) -> str:
     except Exception as e:
         logger.debug("_infer_frontend_base_from_request failed: %s", e)
 
-    # Fallback configurado por variable de entorno o localhost
+    # Fallback configurado por variable de entorno
     return FRONTEND_BASE_URL
 
 

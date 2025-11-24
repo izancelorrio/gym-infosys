@@ -29,6 +29,12 @@ cambiar node.js de modo development a definitivo
 quitar comentarios de la ia en distinto ficheros
 en el script habra que crear el directorio del volumen del postgres, probar en otra maquina
 quitar y no exponer puertos api frontend
+pantalla asiganciones cambiar botones y cambiar la estetica
+
+
+[WARN] update_user: fallo al limpiar asignaciones por cambio de plan (acceso_entrenador): InvalidSavepointSpecification('savepoint "sp_cleanup_acceso" does not exist\n') - attempting rollback to savepoint
+
+[ERROR] update_user: rollback to savepoint failed: InvalidSavepointSpecification('savepoint "sp_cleanup_acceso" does not exist\n') - performing full conn.rollback()
 
 
 
