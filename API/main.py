@@ -129,7 +129,32 @@ def _infer_frontend_base_from_request(request: Request) -> str:
     except Exception as e:
         logger.debug("_infer_frontend_base_from_request failed: %s", e)
 
-    # Fallback configurado por variable de entorno
+    # Si no hubo headers útiles, intentar componer la base desde la petición
+    # misma (host + esquema). `request.base_url` normalmente contiene
+    # scheme://host/ y es el más fiable cuando la petición llega al dominio
+    # que debe actuar como frontend en producción.
+    try:
+        base = None
+        # Preferir X-Forwarded proto/host si existe (por proxies)
+        forwarded_proto = request.headers.get("x-forwarded-proto")
+        forwarded_host = request.headers.get("x-forwarded-host")
+        if forwarded_host:
+            scheme = forwarded_proto or request.url.scheme or "https"
+            base = f"{scheme}://{forwarded_host.rstrip('/') }"
+
+        if not base:
+            # request.base_url devuelve un objeto URL; convertir a str
+            try:
+                base = str(request.base_url).rstrip('/')
+            except Exception:
+                base = None
+
+        if base:
+            return base
+    except Exception as e:
+        logger.debug("_infer_frontend_base_from_request fallback build failed: %s", e)
+
+    # Último recurso: usar la variable de entorno (puede ser None también)
     return FRONTEND_BASE_URL
 
 
