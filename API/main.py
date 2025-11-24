@@ -723,6 +723,31 @@ def verify_email_get(token: str, request: Request):
                 return Response(content=html, media_type="text/html")
             return RedirectResponse(redirect_url)
 
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        try:
+            conn.close()
+        except Exception:
+            pass
+        frontend_base = _infer_frontend_base_from_request(request)
+        redirect_url = f"{frontend_base}/verify-email?status=error&reason=server_error"
+        incoming_origin = f"{request.url.scheme}://{request.url.netloc}"
+        logger.info("/verify-email GET error -> frontend_base=%s redirect_url=%s incoming=%s", frontend_base, redirect_url, str(request.url))
+        if frontend_base and frontend_base.rstrip('/') == incoming_origin.rstrip('/'):
+            html = (
+                '<html><head><title>Error verificación</title></head><body>'
+                '<p>Ocurrió un error procesando la verificación.</p>'
+                '<a id="link" href="{redirect_url}">Abrir detalles</a>'
+                '<p>Si el enlace no funciona, copia y pega esta URL en tu navegador:</p>'
+                '<pre>{redirect_url}</pre>'
+                '</body></html>'
+            ).format(redirect_url=redirect_url)
+            return Response(content=html, media_type="text/html")
+        return RedirectResponse(redirect_url)
+
 
 @app.get("/reset-password")
 def reset_password_get(token: str, request: Request):
