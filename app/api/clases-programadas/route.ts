@@ -8,7 +8,13 @@ export async function GET(request: NextRequest) {
     const timestamp = new Date().getTime()
     console.log(`[${timestamp}] API /clases-programadas GET - Obteniendo clases programadas`)
 
-    const response = await fetch(buildApiUrl(API_CONFIG.ENDPOINTS.CLASES_PROGRAMADAS, { _t: timestamp }), {
+    // Forward optional `filter_future` query param from the client to the backend
+    const urlParams = new URL(request.url).searchParams
+    const filterFutureParam = urlParams.get('filter_future')
+    const params: any = { _t: timestamp }
+    if (filterFutureParam !== null) params.filter_future = filterFutureParam
+
+    const response = await fetch(buildApiUrl(API_CONFIG.ENDPOINTS.CLASES_PROGRAMADAS, params), {
       method: 'GET',
       headers: withApiHeaders({
         'Cache-Control': 'no-cache, no-store, must-revalidate',

@@ -62,7 +62,7 @@ export default function CalendarioClasesPage() {
       const timestamp = new Date().getTime()
       console.log(`[${timestamp}] Cargando clases programadas para calendario...`)
       
-      const response = await fetch(`/api/clases-programadas?_t=${timestamp}`, {
+      const response = await fetch(`/api/clases-programadas?_t=${timestamp}&filter_future=false`, {
         method: 'GET',
         headers: {
           'Cache-Control': 'no-cache, no-store, must-revalidate',

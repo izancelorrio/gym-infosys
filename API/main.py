@@ -16,10 +16,11 @@ from dotenv import load_dotenv
 from pathlib import Path
 import logging
 
-# Load environment variables from project root .env.local (development)
- 
-# the project root or from the API folder. If DATABASE_URL is set it will be
-# used by the existing logic in get_db_connection().
+# Cargar variables de entorno desde .env.local en la raíz del proyecto (desarrollo)
+#
+# Se busca el fichero .env.local en la raíz del proyecto o en la carpeta API.
+# Si está definida la variable DATABASE_URL, ésta será usada por la lógica
+# existente en get_db_connection().
 API_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = API_DIR.parent
 POSTGRES_DIR = API_DIR / "postgres"
@@ -29,8 +30,9 @@ SEED_SCRIPT_PATH = POSTGRES_DIR / "seed_postgres.sql"
 env_path = PROJECT_ROOT / ".env.local"
 load_dotenv(env_path)
 
-# Configure basic logging for the application. Prefer uvicorn's logger when
-# running under uvicorn so messages appear in the server output.
+# Configurar logging básico para la aplicación. Preferir el logger de uvicorn
+# cuando la aplicación se ejecute bajo uvicorn para que los mensajes aparezcan
+# en la salida del servidor.
 logging.basicConfig(level=logging.INFO)
 _uvicorn_logger = logging.getLogger("uvicorn.error")
 if _uvicorn_logger.handlers:
@@ -48,34 +50,36 @@ logger.setLevel(logging.INFO)
 # POST   /change-password                             - Cambio de contraseña autenticado por email.
 # POST   /send-reset-email                            - Envío de enlace de recuperación de contraseña.
 # POST   /reset-password                              - Restablecer contraseña mediante token válido.
-# POST   /verify-email                                - Confirmación de correo electrónico de usuario.
+# POST   /verify-email                                - Confirmación de correo electrónico de usuario (POST).
+# GET    /verify-email                                - Verificación vía GET (redirección a frontend).
+# GET    /reset-password                              - Redirección GET para reset (frontend).
 # GET    /count-members                               - Conteo total de usuarios con rol cliente.
 # GET    /count-trainers                              - Conteo total de entrenadores activos.
 # GET    /planes                                      - Listado de planes disponibles.
 # GET    /planes/{plan_id}                            - Detalle de un plan específico.
-# POST   /contract-plan                               - Contratación de plan y conversión a cliente.
+# POST   /contract-plan                               - Contratación de plan y creación de cliente.
 # GET    /admin/users                                 - Listado completo de usuarios (solo admin).
 # GET    /admin/users/{user_id}                       - Detalle de usuario individual (solo admin).
 # PUT    /admin/users/{user_id}                       - Actualización de usuario (solo admin).
 # GET    /gym-clases                                  - Catálogo de tipos de clases activas.
 # GET    /entrenadores                                - Listado de entrenadores registrados.
 # POST   /clases-programadas                          - Alta masiva de clases programadas.
-# GET    /clases-programadas                          - Clases programadas con plazas disponibles.
-# DELETE /clases-programadas/{clase_id}               - Eliminación de clase programada.
+# GET    /clases-programadas                          - Listado de clases programadas (opcionalmente sólo futuras).
+# DELETE /clases-programadas/{clase_id}              - Eliminación de clase programada.
 # POST   /reservas                                    - Creación de reservas de clase.
 # GET    /reservas/{id_cliente}                       - Reservas asociadas a un cliente.
 # GET    /user/{user_id}/reservas                     - Reservas asociadas a un usuario.
 # DELETE /reservas/{reserva_id}                       - Cancelación de reserva activa.
-# POST   /reservas/{reserva_id}/registrar-asistencia  - Registro de asistencia a clase reservada.
+# POST   /reservas/{reserva_id}/registrar-asistencia  - Registro de asistencia a reserva.
 # GET    /asignaciones-entrenador                     - Asignaciones activas entrenador-cliente.
-# POST   /asignar-entrenador                          - Creación de nueva asignación.
-# DELETE /desasignar-entrenador/{asignacion_id}       - Finaliza una asignación existente.
+# POST   /asignar-entrenador                          - Crear asignación entrenador-cliente.
+# DELETE /desasignar-entrenador/{asignacion_id}       - Finalizar una asignación existente.
 # GET    /entrenador/{entrenador_id}/clientes         - Clientes asignados a un entrenador.
 # GET    /entrenador/{entrenador_id}/estadisticas     - Indicadores agregados por entrenador.
 # GET    /ejercicios                                  - Catálogo de ejercicios disponibles.
-# POST   /entrenador/{entrenador_id}/cliente/{id_cliente}/plan-entrenamiento - Asignación de plan.
-# GET    /cliente/{cliente_user_id}/entrenamientos-pendientes               - Entrenamientos pendientes.
-# POST   /cliente/{cliente_user_id}/registrar-actividad                     - Registro de actividad realizada.
+# POST   /entrenador/{entrenador_id}/cliente/{id_cliente}/plan-entrenamiento - Asignación de plan a cliente.
+# GET    /cliente/{cliente_user_id}/entrenamientos-pendientes - Entrenamientos pendientes de un cliente.
+# POST   /cliente/{cliente_user_id}/registrar-actividad - Registro de actividad realizada por cliente.
 
 REQUIRED_TABLES = {
     "users",
@@ -103,9 +107,10 @@ def _infer_frontend_base_from_request(request: Request) -> str:
     variable de entorno `FRONTEND_BASE_URL` o el valor por defecto.
     """
     try:
-        # First, allow the frontend to explicitly send its base URL using a
-        # custom header. This is the most reliable when the frontend triggers
-        # the request (and the user asked not to persist the URL in the DB).
+        # Primero, permitir que el frontend envíe explícitamente su URL base
+        # mediante un header personalizado. Esto es lo más fiable cuando el
+        # frontend origina la petición (y el usuario pidió no persistir la URL
+        # en la base de datos).
         explicit = request.headers.get("x-frontend-base") or request.headers.get("X-Frontend-Base")
         if explicit:
             p = urlparse(explicit)
@@ -403,6 +408,7 @@ class ClaseProgramadaRequest(BaseModel):
     hora: str
     idClase: int  # Cambiado de tipoClase a idClase
     instructor: str
+    capacidad_maxima: int = None
 
 class GuardarClasesRequest(BaseModel):
     clases: list[ClaseProgramadaRequest]
@@ -415,7 +421,7 @@ class CancelarReservaRequest(BaseModel):
     id_reserva: int
 
 def send_reset_email(to_email: str, reset_link: str):
-    # Load SMTP configuration from environment variables.
+    # Cargar configuración SMTP desde variables de entorno.
     SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")
     SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
     SMTP_USER = os.getenv("SMTP_USER")
@@ -429,7 +435,8 @@ def send_reset_email(to_email: str, reset_link: str):
     msg["From"] = FROM_EMAIL
     msg["To"] = to_email
 
-    # If SMTP credentials are not configured, log and skip sending email to avoid exposing secrets.
+    # Si no hay credenciales SMTP configuradas, registrar y omitir el envío
+    # para evitar exponer secretos.
     if not SMTP_USER or not SMTP_PASS:
         logger.warning("SMTP credentials not configured; skipping reset email to %s", to_email)
         return
@@ -440,7 +447,7 @@ def send_reset_email(to_email: str, reset_link: str):
         server.sendmail(FROM_EMAIL, [to_email], msg.as_string())
 
 def send_verification_email(to_email: str, verify_link: str):
-    # Load SMTP configuration from environment variables.
+    # Cargar configuración SMTP desde variables de entorno.
     SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")
     SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
     SMTP_USER = os.getenv("SMTP_USER")
@@ -454,7 +461,8 @@ def send_verification_email(to_email: str, verify_link: str):
     msg["From"] = FROM_EMAIL
     msg["To"] = to_email
 
-    # If SMTP credentials are not configured, log and skip sending email to avoid exposing secrets.
+    # Si no hay credenciales SMTP configuradas, registrar y omitir el envío
+    # para evitar exponer secretos.
     if not SMTP_USER or not SMTP_PASS:
         logger.warning("SMTP credentials not configured; skipping verification email to %s", to_email)
         return
@@ -1745,7 +1753,10 @@ async def guardar_clases_programadas(request: GuardarClasesRequest, response: Re
                     })
                     continue
                 
-                capacidad_maxima = capacidad_result[0]
+                # Preferir la capacidad enviada por el admin en el payload
+                # Si no viene, usar el valor por defecto de la tabla gym_clases
+                capacidad_default = capacidad_result[0]
+                capacidad_maxima = clase.capacidad_maxima if getattr(clase, 'capacidad_maxima', None) is not None else capacidad_default
                 nombre_clase = capacidad_result[1]
                 
                 # Verificar si ya existe una clase con el mismo instructor, fecha y hora
@@ -1806,9 +1817,14 @@ async def guardar_clases_programadas(request: GuardarClasesRequest, response: Re
         raise HTTPException(status_code=500, detail=f"Error al guardar clases: {str(e)}")
 
 @app.get("/clases-programadas")
-async def get_clases_programadas(response: Response):
+async def get_clases_programadas(response: Response, filter_future: bool = True):
     """
-    Obtener todas las clases programadas activas
+    Obtener las clases programadas.
+
+    Query params:
+    - `filter_future` (bool, default True): si True devuelve sólo clases futuras
+      (comportamiento por defecto, usado por el cliente). Si False devuelve
+      todas las clases (útil para la vista de calendario del admin).
     """
     # Headers anti-cache
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
@@ -1821,8 +1837,8 @@ async def get_clases_programadas(response: Response):
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Obtener clases programadas disponibles a partir de la fecha y hora actual
-        cursor.execute("""
+        # Construir la consulta, incluyendo condicionalmente el filtro de fecha/hora
+        base_query = """
             SELECT cp.id, cp.fecha, cp.hora, cp.id_clase, gc.nombre as tipo_clase, gc.color,
                    cp.id_instructor, u.name as instructor_nombre,
                    cp.capacidad_maxima, cp.estado, 
@@ -1838,11 +1854,18 @@ async def get_clases_programadas(response: Response):
                 GROUP BY id_clase_programada
             ) r ON cp.id = r.id_clase_programada
             WHERE cp.estado IN ('activa', 'programada')
-            AND (cp.fecha > CURRENT_DATE 
-                 OR (cp.fecha = CURRENT_DATE AND cp.hora > CURRENT_TIME))
-            AND (COALESCE(r.reservas_activas, 0) < cp.capacidad_maxima OR cp.capacidad_maxima IS NULL)
-            ORDER BY cp.fecha, cp.hora
-        """)
+        """
+
+        if filter_future:
+            # Filtrar sólo clases futuras (comportamiento usado por cliente)
+            base_query += """
+                AND (cp.fecha > CURRENT_DATE 
+                     OR (cp.fecha = CURRENT_DATE AND cp.hora > CURRENT_TIME))
+            """
+
+
+        logger.debug("/clases-programadas -> filter_future=%s", filter_future)
+        cursor.execute(base_query)
         
         clases_data = cursor.fetchall()
         conn.close()

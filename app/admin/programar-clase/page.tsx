@@ -6,6 +6,8 @@ import { useEffect, useState, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Input } from "@/components/ui/input"
+import { useToast } from "@/components/ui/toast"
 import { Calendar, Clock, Activity, Plus, Save, ArrowLeft, Trash2 } from "lucide-react"
 
 interface ClaseProgramada {
@@ -14,6 +16,7 @@ interface ClaseProgramada {
   hora: string
   idClase: number
   instructor: string
+  capacidad?: number
 }
 
 interface GymClase {
@@ -58,6 +61,7 @@ interface ClaseProgramadaDB {
 export default function ProgramarClasePage() {
   const { user, isAdmin, isAuthenticated } = useAuth()
   const router = useRouter()
+  const toast = useToast()
 
   const [clases, setClases] = useState<ClaseProgramada[]>([])
   const [tiposDeClase, setTiposDeClase] = useState<GymClase[]>([])
@@ -164,7 +168,7 @@ export default function ProgramarClasePage() {
       const timestamp = new Date().getTime()
       console.log(`[${timestamp}] Cargando clases programadas...`)
       
-      const response = await fetch(`/api/clases-programadas?_t=${timestamp}`, {
+      const response = await fetch(`/api/clases-programadas?_t=${timestamp}&filter_future=false`, {
         method: 'GET',
         headers: {
           'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -208,15 +212,16 @@ export default function ProgramarClasePage() {
       await cargarClasesProgramadas()
       
       // Inicializar con una clase vacía
-      setClases([
-        {
-          id: Date.now().toString(),
-          fecha: "",
-          hora: "",
-          idClase: 0,
-          instructor: "",
-        },
-      ])
+        setClases([
+          {
+            id: Date.now().toString(),
+            fecha: "",
+            hora: "",
+            idClase: 0,
+            instructor: "",
+            capacidad: 0,
+          },
+        ])
 
       setIsLoading(false)
     }
@@ -231,6 +236,7 @@ export default function ProgramarClasePage() {
       hora: "",
       idClase: 0,
       instructor: "",
+      capacidad: 0,
     }
     setClases([...clases, nuevaClase])
   }
@@ -252,7 +258,22 @@ export default function ProgramarClasePage() {
   }
 
   const actualizarClase = (id: string, campo: keyof ClaseProgramada, valor: string | number) => {
-    setClases(clases.map((c) => (c.id === id ? { ...c, [campo]: valor } : c)))
+    setClases(clases.map((c) => {
+      if (c.id !== id) return c
+      const updated: any = { ...c, [campo]: valor }
+      // Si se cambia el tipo de clase (idClase), usar el max_participantes por defecto
+      if (campo === 'idClase') {
+        const tipo = tiposDeClase.find(t => t.id === Number(valor))
+        if (tipo) {
+          updated.capacidad = tipo.max_participantes || 0
+        }
+      }
+      // Normalizar capacidad a número cuando se cambie
+      if (campo === 'capacidad') {
+        updated.capacidad = Number(valor) || 0
+      }
+      return updated
+    }))
   }
 
   const guardarClases = async () => {
@@ -266,7 +287,7 @@ export default function ProgramarClasePage() {
       )
 
       if (clasesCompletas.length === 0) {
-        alert("No hay clases completas para guardar. Asegúrate de llenar todos los campos.")
+        toast({ title: "Campos incompletos", description: "Rellena todos los campos antes de guardar.", type: "error" })
         return
       }
 
@@ -278,7 +299,8 @@ export default function ProgramarClasePage() {
           fecha: clase.fecha,
           hora: clase.hora,
           idClase: clase.idClase,
-          instructor: clase.instructor
+          instructor: clase.instructor,
+          capacidad_maxima: clase.capacidad || null
         }))
       }
 
@@ -303,17 +325,13 @@ export default function ProgramarClasePage() {
 
       // Mostrar mensaje de éxito/error
       if (resultado.success) {
-        const mensaje = `✅ ${resultado.total_guardadas} clases guardadas correctamente`
-        const errores = resultado.total_errores > 0 ? `\n⚠️ ${resultado.total_errores} clases con errores` : ''
-        const detalleErrores = resultado.clases_con_error?.length > 0 
-          ? `\n\nErrores:\n${resultado.clases_con_error.map((e: any) => `• ${e.clase}: ${e.error}`).join('\n')}`
-          : ''
-        
-        alert(mensaje + errores + detalleErrores)
-        
-        // Si todas las clases se guardaron correctamente, volver al admin
         if (resultado.total_errores === 0) {
-          router.push("/admin")
+          toast({ title: `✅ ${resultado.total_guardadas} clases guardadas`, type: "success" })
+          // pequeño delay para que el usuario vea la notificación
+          setTimeout(() => router.push("/admin"), 800)
+        } else {
+          // Mostrar resumen de guardado con errores en un toast (descripcion corta)
+          toast({ title: `Guardadas: ${resultado.total_guardadas}`, description: `Errores: ${resultado.total_errores}`, type: "info" })
         }
       } else {
         throw new Error(resultado.error || 'Error desconocido al guardar clases')
@@ -321,7 +339,7 @@ export default function ProgramarClasePage() {
 
     } catch (error) {
       console.error('Error al guardar clases:', error)
-      alert(`❌ Error al guardar clases: ${error instanceof Error ? error.message : 'Error desconocido'}`)
+      toast({ title: "Error guardando clases", description: error instanceof Error ? error.message : 'Error desconocido', type: "error" })
     }
   }
 
@@ -406,9 +424,10 @@ export default function ProgramarClasePage() {
           </CardHeader>
           <CardContent className="p-6">
             <div className="space-y-4">
-              <div className="grid grid-cols-13 gap-4 p-4 bg-primary/5 rounded-lg border border-primary/20">
+              <div className="grid grid-cols-14 gap-4 p-4 bg-primary/5 rounded-lg border border-primary/20">
                 <div className="col-span-4 font-semibold text-foreground">Instructor</div>
                 <div className="col-span-3 font-semibold text-foreground">Tipo de Clase</div>
+                <div className="col-span-1 font-semibold text-foreground">Capacidad</div>
                 <div className="col-span-3 font-semibold text-foreground">Fecha</div>
                 <div className="col-span-2 font-semibold text-foreground">Hora</div>
                 <div className="col-span-1 font-semibold text-foreground">Acción</div>
@@ -417,7 +436,7 @@ export default function ProgramarClasePage() {
               {clases.map((clase) => (
                 <div
                   key={clase.id}
-                  className="grid grid-cols-13 gap-4 p-4 border border-border rounded-lg bg-card hover:border-primary/50 transition-all duration-200"
+                  className="grid grid-cols-14 gap-4 p-4 border border-border rounded-lg bg-card hover:border-primary/50 transition-all duration-200"
                 >
                   <div className="col-span-4">
                     <Select
@@ -453,32 +472,34 @@ export default function ProgramarClasePage() {
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="col-span-1 flex items-center">
+                    <input
+                      type="number"
+                      min={1}
+                      value={clase.capacidad ?? ''}
+                      onChange={(e) => actualizarClase(clase.id, 'capacidad', Number(e.target.value))}
+                      className="w-full bg-background border-border rounded px-2 py-1 text-sm"
+                      placeholder="Cap"
+                    />
+                  </div>
                   <div className="col-span-3">
-                    <Select value={clase.fecha} onValueChange={(value) => actualizarClase(clase.id, "fecha", value)}>
-                      <SelectTrigger className="bg-background border-border text-foreground">
-                        <SelectValue placeholder="Seleccionar fecha" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableDates.map((fecha) => {
-                          const isOcupado = clase.instructor && isHorarioOcupado(clase.instructor, fecha, clase.hora)
-                          return (
-                            <SelectItem 
-                              key={fecha} 
-                              value={fecha}
-                              disabled={!!isOcupado}
-                              className={isOcupado ? "text-red-500 bg-red-50" : ""}
-                            >
-                              {new Date(fecha).toLocaleDateString("es-ES", {
-                                weekday: "short",
-                                day: "numeric",
-                                month: "short",
-                              })}
-                              {isOcupado && " (Ocupado)"}
-                            </SelectItem>
-                          )
-                        })}
-                      </SelectContent>
-                    </Select>
+                    <Input
+                      type="date"
+                      value={clase.fecha}
+                      min={availableDates[0]}
+                      max={availableDates[availableDates.length - 1]}
+                      onChange={(e) => {
+                        const v = e.target.value
+                        const ocupado = clase.instructor && clase.hora && isHorarioOcupado(clase.instructor, v, clase.hora)
+                        if (ocupado) {
+                          alert('La fecha y hora seleccionadas están ocupadas para este instructor.')
+                          return
+                        }
+                        actualizarClase(clase.id, "fecha", v)
+                      }}
+                      className="w-full bg-background border-border rounded px-2 py-1 text-sm"
+                      placeholder="Seleccionar fecha"
+                    />
                   </div>
                   <div className="col-span-2">
                     <Select value={clase.hora} onValueChange={(value) => actualizarClase(clase.id, "hora", value)}>

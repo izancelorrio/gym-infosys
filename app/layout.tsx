@@ -6,6 +6,7 @@ import { AuthProvider } from "@/contexts/auth-context"
 import { ThemeProvider } from "next-themes"
 import { Suspense } from "react"
 import "./globals.css"
+import ToastProvider from "@/components/ui/toast"
 
 const inter = Inter({
   subsets: ["latin"],
@@ -29,7 +30,9 @@ export default function RootLayout({
         <Suspense fallback={null}>
           <AuthProvider>
             <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-              {children}
+              <ToastProvider>
+                {children}
+              </ToastProvider>
             </ThemeProvider>
           </AuthProvider>
         </Suspense>
