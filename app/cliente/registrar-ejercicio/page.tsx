@@ -590,21 +590,13 @@ export default function RegistrarEjercicioPage() {
                   {/* Primera fila: Fecha y Actividad */}
                   <div className="grid grid-cols-12 gap-4">
                     <div className="col-span-3">
-                      <Select
+                      <label className="text-sm font-medium text-foreground mb-2 block">Fecha</label>
+                      <Input
+                        type="date"
                         value={ejercicio.fecha}
-                        onValueChange={(value) => actualizarEjercicio(ejercicio.id, "fecha", value)}
-                      >
-                        <SelectTrigger className="bg-background border-border text-foreground">
-                          <SelectValue placeholder="Seleccionar fecha" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {fechasDisponibles.map((fecha) => (
-                            <SelectItem key={fecha.valor} value={fecha.valor}>
-                              {fecha.etiqueta}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        onChange={(e) => actualizarEjercicio(ejercicio.id, "fecha", e.target.value)}
+                        className="bg-background border-border text-foreground"
+                      />
                     </div>
                     
                     <div className="col-span-8">

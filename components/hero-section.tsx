@@ -11,7 +11,7 @@ import { RegisterModal } from "./register-modal"
 import { useRouter } from "next/navigation"
 
 export function HeroSection() {
-  const [membersCount, setMembersCount] = useState<number>(500)
+  const [membersCount, setMembersCount] = useState<number>(0)
   const [trainersCount, setTrainersCount] = useState<number>(15)
   const [isLoading, setIsLoading] = useState(true)
   const [isContractModalOpen, setIsContractModalOpen] = useState(false)
@@ -23,16 +23,24 @@ export function HeroSection() {
   useEffect(() => {
     const fetchCounts = async () => {
       try {
-        // Fetch members count
-        const membersResponse = await fetch(`/api${API_CONFIG.ENDPOINTS.COUNT_MEMBERS}`)
-        if (membersResponse.ok) {
-          const membersData = await membersResponse.json()
-          if (membersData.count !== undefined) {
-            setMembersCount(membersData.count)
+        // Fetch admin users and compute active clients
+        const usersRes = await fetch(`/api${API_CONFIG.ENDPOINTS.ADMIN_USERS}`)
+        if (usersRes.ok) {
+          const usersData = await usersRes.json()
+          if (usersData.success && Array.isArray(usersData.users)) {
+            const activeClients = usersData.users.filter((u: any) => u.role === 'cliente' && u.cliente && u.cliente.estado === 'activo')
+            setMembersCount(activeClients.length)
+          }
+        } else {
+          // Fallback to older count endpoint if admin/users not allowed
+          const membersResponse = await fetch(`/api${API_CONFIG.ENDPOINTS.COUNT_MEMBERS}`)
+          if (membersResponse.ok) {
+            const membersData = await membersResponse.json()
+            if (membersData.count !== undefined) setMembersCount(membersData.count)
           }
         }
 
-        // Fetch trainers count
+        // Fetch trainers count (keep existing behavior)
         const trainersResponse = await fetch(`/api${API_CONFIG.ENDPOINTS.COUNT_TRAINERS}`)
         if (trainersResponse.ok) {
           const trainersData = await trainersResponse.json()
@@ -129,11 +137,11 @@ export function HeroSection() {
         {/* Stats */}
         <div className="grid grid-cols-3 gap-8 mt-16 pt-8 border-t border-white/20">
           <div>
-            <div className="text-3xl sm:text-4xl font-bold text-primary">{isLoading ? "..." : `${membersCount}+`}</div>
-            <div className="text-sm sm:text-base text-gray-300">Miembros Activos</div>
+            <div className="text-3xl sm:text-4xl font-bold text-primary">{isLoading ? "..." : membersCount}</div>
+            <div className="text-sm sm:text-base text-gray-300">Clientes Activos</div>
           </div>
           <div>
-            <div className="text-3xl sm:text-4xl font-bold text-primary">{isLoading ? "..." : `${trainersCount}+`}</div>
+            <div className="text-3xl sm:text-4xl font-bold text-primary">{isLoading ? "..." : trainersCount}</div>
             <div className="text-sm sm:text-base text-gray-300">Entrenadores Expertos</div>
           </div>
           <div>

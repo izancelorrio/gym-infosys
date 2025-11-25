@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/toast"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Input } from "@/components/ui/input"
 import { Activity, Users, Plus, Save, ArrowLeft, Trash2 } from "lucide-react"
 
 interface Cliente {
@@ -47,16 +48,16 @@ export default function AsignarEntrenamientoPage() {
   const [isLoading, setIsLoading] = useState(true)
   const toast = useToast()
 
-  const availableDates = useMemo(() => {
-    const dates = []
-    const today = new Date()
+  // Fecha mínima (hoy) y máxima (hoy + 1 mes) para el input de fecha
+  const minDate = useMemo(() => {
+    const d = new Date()
+    return d.toISOString().split("T")[0]
+  }, [])
 
-    // Generar 15 días a partir de hoy
-    for (let i = 0; i < 15; i++) {
-      const date = new Date(today.getTime() + i * 24 * 60 * 60 * 1000)
-      dates.push(date.toISOString().split("T")[0])
-    }
-    return dates
+  const maxDate = useMemo(() => {
+    const d = new Date()
+    d.setMonth(d.getMonth() + 1)
+    return d.toISOString().split("T")[0]
   }, [])
 
 
@@ -145,11 +146,11 @@ export default function AsignarEntrenamientoPage() {
       }
     }
 
-    // Inicializar entrenamientos
+    // Inicializar entrenamientos (por defecto fecha = hoy)
     setEntrenamientos([
       {
         id: Date.now().toString(),
-        fecha: "",
+        fecha: minDate,
         ejercicio: "",
         series: 0,
       },
@@ -161,7 +162,7 @@ export default function AsignarEntrenamientoPage() {
   const agregarEntrenamiento = () => {
     const nuevoEntrenamiento: Entrenamiento = {
       id: Date.now().toString(),
-      fecha: "",
+      fecha: minDate,
       ejercicio: "",
       series: 0,
     }
@@ -327,26 +328,14 @@ export default function AsignarEntrenamientoPage() {
                   className="grid grid-cols-12 gap-4 p-4 border border-border rounded-lg bg-card hover:border-primary/50 transition-all duration-200"
                 >
                   <div className="col-span-4">
-                    <Select
+                    <Input
+                      type="date"
+                      min={minDate}
+                      max={maxDate}
                       value={entrenamiento.fecha}
-                      onValueChange={(value) => actualizarEntrenamiento(entrenamiento.id, "fecha", value)}
-                    >
-                      <SelectTrigger className="bg-background border-border text-foreground">
-                        <SelectValue placeholder="Seleccionar fecha" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableDates.map((fecha: string) => (
-                          <SelectItem key={fecha} value={fecha}>
-                            {new Date(fecha).toLocaleDateString("es-ES", {
-                              weekday: "long",
-                              year: "numeric",
-                              month: "long",
-                              day: "numeric",
-                            })}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      onChange={(e) => actualizarEntrenamiento(entrenamiento.id, "fecha", e.target.value)}
+                      className="bg-background border-border text-foreground"
+                    />
                   </div>
                   <div className="col-span-5">
                     <Select
