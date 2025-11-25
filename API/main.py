@@ -2954,6 +2954,84 @@ async def get_entrenamientos_pendientes(cliente_user_id: int, response: Response
         print(f"[ERROR] Error al obtener entrenamientos pendientes: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error al obtener entrenamientos pendientes: {str(e)}")
 
+
+@app.get("/cliente/{cliente_user_id}/entrenamientos-asignados")
+async def get_entrenamientos_asignados(cliente_user_id: int, response: Response):
+    """
+    Obtener todos los entrenamientos asignados a un cliente (cualquier estado: pendiente/completado)
+    """
+    # Headers anti-cache
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+
+    try:
+        print(f"[DEBUG] Obteniendo entrenamientos asignados del cliente {cliente_user_id}...")
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Obtener id_cliente real desde user_id
+        cursor.execute("SELECT c.id FROM clientes c JOIN users u ON c.id_usuario = u.id WHERE u.id = %s", (cliente_user_id,))
+        cliente_row = cursor.fetchone()
+        if not cliente_row:
+            conn.close()
+            raise HTTPException(status_code=404, detail="Cliente no encontrado")
+
+        id_cliente = cliente_row[0]
+
+        # Obtener entrenamientos asignados con información del ejercicio (todos los estados)
+        cursor.execute("""
+            SELECT 
+                ea.id,
+                ea.fecha_entrenamiento,
+                ea.series,
+                e.id as ejercicio_id,
+                e.nombre as ejercicio_nombre,
+                e.categoria as ejercicio_categoria,
+                e.descripcion as ejercicio_descripcion,
+                u.name as entrenador_nombre,
+                ea.estado
+            FROM entrenamientos_asignados ea
+            JOIN ejercicios e ON ea.id_ejercicio = e.id
+            JOIN users u ON ea.id_entrenador = u.id
+            WHERE ea.id_cliente = %s
+            ORDER BY ea.fecha_entrenamiento ASC
+        """, (id_cliente,))
+
+        entrenamientos_data = cursor.fetchall()
+        conn.close()
+
+        # Formatear datos
+        entrenamientos = []
+        for entrenamiento in entrenamientos_data:
+            entrenamiento_info = {
+                "id": entrenamiento[0],
+                "fecha_entrenamiento": entrenamiento[1],
+                "series_planificadas": entrenamiento[2],
+                "ejercicio": {
+                    "id": entrenamiento[3],
+                    "nombre": entrenamiento[4],
+                    "categoria": entrenamiento[5],
+                    "descripcion": entrenamiento[6] or ""
+                },
+                "entrenador_nombre": entrenamiento[7],
+                "estado": entrenamiento[8]
+            }
+            entrenamientos.append(entrenamiento_info)
+
+        return {
+            "success": True,
+            "entrenamientos_asignados": entrenamientos,
+            "total": len(entrenamientos)
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[ERROR] Error al obtener entrenamientos asignados: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al obtener entrenamientos asignados: {str(e)}")
+
 @app.post("/cliente/{cliente_user_id}/registrar-actividad")
 async def registrar_actividad(cliente_user_id: int, actividad_data: dict, response: Response):
     """

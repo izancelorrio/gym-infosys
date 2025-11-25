@@ -346,14 +346,29 @@ export default function CalendarioClasesPage() {
                           {clase.instructor}
                         </div>
                         
-                        {/* Botón de eliminar en la esquina inferior derecha */}
-                        <button
-                          onClick={() => eliminarClase(clase.id, clase.tipo, clase.fecha, clase.hora)}
-                          className="absolute bottom-0 right-0 p-0.5 hover:bg-red-100/50 rounded-tl transition-all duration-200 group"
-                          title="Eliminar clase"
-                        >
-                          <Trash2 className="h-3 w-3 text-red-500 group-hover:text-red-700" />
-                        </button>
+                        {/* Botón de eliminar en la esquina inferior derecha (solo para clases futuras) */}
+                        {(() => {
+                          try {
+                            const fechaHoraStr = `${clase.fecha}T${clase.hora}` // esperar ISO-like
+                            const fechaClase = new Date(fechaHoraStr)
+                            const ahora = new Date()
+                            if (fechaClase > ahora) {
+                              return (
+                                <button
+                                  onClick={() => eliminarClase(clase.id, clase.tipo, clase.fecha, clase.hora)}
+                                  className="absolute bottom-0 right-0 p-0.5 hover:bg-red-100/50 rounded-tl transition-all duration-200 group"
+                                  title="Eliminar clase"
+                                >
+                                  <Trash2 className="h-3 w-3 text-red-500 group-hover:text-red-700" />
+                                </button>
+                              )
+                            }
+                          } catch (e) {
+                            // En caso de parseo fallido, por seguridad no mostramos el botón
+                            console.warn('Error parseando fecha de clase para mostrar botón eliminar:', e)
+                          }
+                          return null
+                        })()}
                       </div>
                     ))
                   )}
