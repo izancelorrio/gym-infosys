@@ -1,65 +1,67 @@
 "use client"
 
+import { useEffect, useRef } from "react"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { X, Play } from "lucide-react"
+import { X } from "lucide-react"
 
 interface PromotionalVideoModalProps {
   isOpen: boolean
   onClose: () => void
-  onStartToday: () => void
+  onStartToday?: () => void
 }
 
 export function PromotionalVideoModal({ isOpen, onClose, onStartToday }: PromotionalVideoModalProps) {
+  const videoRef = useRef<HTMLVideoElement | null>(null)
+
+  useEffect(() => {
+    // Play when opened, pause + reset when closed
+    if (isOpen) {
+      try {
+        videoRef.current?.play()
+      } catch (e) {
+        // Autoplay may be blocked; ignore
+      }
+    } else {
+      if (videoRef.current) {
+        try {
+          videoRef.current.pause()
+          videoRef.current.currentTime = 0
+        } catch (e) {
+          // ignore
+        }
+      }
+    }
+  }, [isOpen])
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[800px] p-0 overflow-hidden">
+      <DialogContent showCloseButton={false} className="sm:max-w-[900px] p-0 overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-center p-6 border-b">
-          <h2 className="text-2xl font-bold text-foreground">
-            🏋️‍♂️ Transforma Tu Vida en Nuestro Gimnasio
-          </h2>
+        <div className="flex items-center justify-between p-4 border-b">
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg font-bold">🎬 Video Promocional</h2>
+            <div className="text-sm text-muted-foreground">Mira nuestro video</div>
+          </div>
+          <div>
+            <Button variant="ghost" onClick={onClose} className="h-8 w-8 p-0">
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
         </div>
 
         {/* Video Area */}
-        <div className="relative bg-gradient-to-br from-gray-900 to-black aspect-video flex items-center justify-center">
-          {/* Video Placeholder */}
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-secondary/20" />
-          
-          {/* Video Content - Aquí puedes reemplazar con un video real */}
-          <div className="relative z-10 text-center text-white px-8">
-            <div className="bg-white/10 backdrop-blur-sm rounded-full p-4 mb-6 mx-auto w-fit">
-              <Play className="h-12 w-12 text-white" />
-            </div>
-            <h3 className="text-3xl font-bold mb-4">¡Únete a la Mejor Experiencia Fitness!</h3>
-            <p className="text-lg text-gray-200 mb-6 max-w-2xl">
-              Descubre entrenamientos personalizados, equipos de última generación, 
-              clases grupales motivadoras y una comunidad que te apoyará en cada paso 
-              de tu transformación.
-            </p>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-              <div>
-                <div className="text-2xl font-bold text-primary">500+</div>
-                <div className="text-sm text-gray-300">Miembros Activos</div>
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-primary">15+</div>
-                <div className="text-sm text-gray-300">Clases Semanales</div>
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-primary">24/7</div>
-                <div className="text-sm text-gray-300">Acceso</div>
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-primary">5★</div>
-                <div className="text-sm text-gray-300">Valoraciones</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Decorative Elements */}
-          <div className="absolute top-4 left-4 w-20 h-20 border-2 border-primary/30 rounded-full" />
-          <div className="absolute bottom-4 right-4 w-32 h-32 border-2 border-secondary/30 rounded-full" />
+        <div className="relative bg-black aspect-video flex items-center justify-center">
+          <video
+            ref={videoRef}
+            src="/video.mp4"
+            controls
+            preload="metadata"
+            playsInline
+            className="w-full h-full object-cover bg-black"
+            onError={(e) => console.error('Video load error', e)}
+            onLoadedMetadata={() => console.debug('Video metadata loaded')}
+          />
         </div>
       </DialogContent>
     </Dialog>

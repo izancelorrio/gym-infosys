@@ -80,6 +80,10 @@ logger.setLevel(logging.INFO)
 # POST   /entrenador/{entrenador_id}/cliente/{id_cliente}/plan-entrenamiento - Asignación de plan a cliente.
 # GET    /cliente/{cliente_user_id}/entrenamientos-pendientes - Entrenamientos pendientes de un cliente.
 # POST   /cliente/{cliente_user_id}/registrar-actividad - Registro de actividad realizada por cliente.
+# GET    /cliente/{cliente_user_id}/entrenamientos-asignados - Todos los entrenamientos asignados a un cliente (pendiente/completado).
+# GET    /cliente/{cliente_user_id}/estadisticas - Estadísticas agregadas para un cliente (ejercicios realizados, clases, rachas, etc.).
+# GET    /entrenador/estadisticas/{cliente_user_id} - Alias para que la vista de entrenador obtenga las mismas estadísticas del cliente.
+# GET    /admin/estadisticas                         - Estadísticas globales para el panel de administración.
 
 REQUIRED_TABLES = {
     "users",
