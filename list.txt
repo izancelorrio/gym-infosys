@@ -30,7 +30,7 @@ quitar comentarios de la ia en distinto ficheros
 en el script habra que crear el directorio del volumen del postgres, probar en otra maquina
 quitar y no exponer puertos api frontend
 pantalla asiganciones cambiar botones y cambiar la estetica
-
+en el zip final dejar el env.local del docker y quitar los otros dos env.local t quitar la carpeta node_modules
 
 [WARN] update_user: fallo al limpiar asignaciones por cambio de plan (acceso_entrenador): InvalidSavepointSpecification('savepoint "sp_cleanup_acceso" does not exist\n') - attempting rollback to savepoint
 
@@ -41,4 +41,100 @@ pantalla asiganciones cambiar botones y cambiar la estetica
 
 git clone https://github.com/izancelorrio/gym-infosys.git
 cd gym-infosys
-docker compose --env-file .env.local.docker up --build
+docker-compose --env-file .env.local.docker up --build
+
+
+
+
+
+prerequisitos:
+apt update
+apt install docker.io -y
+systemctl enable --now docker
+curl -L "https://github.com/docker/compose/releases/download/v2.29.1/docker-compose-$(uname -s)-$(uname -m)" \
+    -o /usr/local/bin/docker-compose
+chmod +x /usr/local/bin/docker-compose
+sudo apt install unzip 
+unzip gym-infosys
+cd gym-infosys
+docker-compose --env-file .env.local.docker up --build
+
+
+
+-----------------------------------------------------------------------------------------------------------
+services:
+  postgres:
+    image: postgres:17
+    container_name: gym-postgres    
+    restart: unless-stopped    
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: ${DB_NAME}
+    ports:      
+      - "${DB_PORT}:${DB_PORT}"
+    volumes:      
+      - /srv/docker/postgres/data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./API
+      dockerfile: Dockerfile
+    container_name: gym-api
+    restart: unless-stopped
+    environment:
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASS=${DB_PASS}
+      - SMTP_SERVER=${SMTP_SERVER}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - FROM_EMAIL=${FROM_EMAIL}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  frontend:
+    build:
+      context: .                # <--- porque el Dockerfile está en la RAÍZ
+      dockerfile: Dockerfile    # <--- tu Dockerfile del frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    container_name: gym-frontend
+    restart: unless-stopped    
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    container_name: gym-nginx
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    depends_on:
+      - frontend
+
+networks:
+  default:
+    name: gymnet
+
