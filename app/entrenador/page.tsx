@@ -146,66 +146,65 @@ export default function EntrenadorPage() {
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-7xl mx-auto space-y-8">
-        <Card className="border-border shadow-lg bg-card rounded-lg">
-          <CardHeader className="bg-gradient-to-r from-primary to-secondary text-white rounded-t-lg">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <div className="p-2 bg-white/20 rounded-full">
-                  <Users className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <CardTitle className="text-xl font-bold text-white">Panel de Entrenador</CardTitle>
-                  <p className="text-orange-100">Bienvenido, {user?.name}</p>
-                  <p className="text-sm text-orange-100">{user?.email}</p>
-                </div>
+        {/* Header */}
+        <div className="bg-gradient-to-r from-primary to-secondary text-white p-6 rounded-lg shadow-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="p-2 bg-white/20 rounded-full">
+                <Users className="h-5 w-5 text-white" />
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="border-white/20 text-white hover:bg-white/10 bg-transparent"
-                onClick={handleLogout}
-              >
-                <LogOut className="h-4 w-4 mr-2" />
-                Cerrar Sesión
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="flex items-center space-x-3 p-4 bg-primary/10 rounded-lg border border-primary/20">
-                <div className="p-2 bg-primary rounded-full">
-                  <Users className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-primary">{estadisticas?.total_clientes || 0}</p>
-                  <p className="text-sm text-muted-foreground">Clientes asignados</p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-3 p-4 bg-primary/10 rounded-lg border border-primary/20">
-                <div className="p-2 bg-green-600 rounded-full">
-                  <Activity className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-green-600">
-                    {estadisticas?.clientes_activos || 0}
-                  </p>
-                  <p className="text-sm text-muted-foreground">Clientes activos</p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-3 p-4 bg-primary/10 rounded-lg border border-primary/20">
-                <div className="p-2 bg-red-600 rounded-full">
-                  <Calendar className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-red-600">
-                    {estadisticas?.clientes_inactivos || 0}
-                  </p>
-                  <p className="text-sm text-muted-foreground">Clientes inactivos</p>
-                </div>
+              <div>
+                <h2 className="text-xl font-bold">Panel de Entrenador</h2>
+                <p className="text-orange-100">Bienvenido, {user?.name}</p>
+                <p className="text-sm text-orange-100">{user?.email}</p>
               </div>
             </div>
-          </CardContent>
-        </Card>
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-white/20 text-white hover:bg-white/10 bg-transparent"
+              onClick={handleLogout}
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              Cerrar Sesión
+            </Button>
+          </div>
+        </div>
+
+        {/* Stats under header */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="flex items-center space-x-3 p-4 bg-primary/10 rounded-lg border border-primary/20">
+            <div className="p-2 bg-primary rounded-full">
+              <Users className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-primary">{estadisticas?.total_clientes || 0}</p>
+              <p className="text-sm text-muted-foreground">Clientes asignados</p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-3 p-4 bg-primary/10 rounded-lg border border-primary/20">
+            <div className="p-2 bg-green-600 rounded-full">
+              <Activity className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-green-600">
+                {estadisticas?.clientes_activos || 0}
+              </p>
+              <p className="text-sm text-muted-foreground">Clientes activos</p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-3 p-4 bg-primary/10 rounded-lg border border-primary/20">
+            <div className="p-2 bg-red-600 rounded-full">
+              <Calendar className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-red-600">
+                {estadisticas?.clientes_inactivos || 0}
+              </p>
+              <p className="text-sm text-muted-foreground">Clientes inactivos</p>
+            </div>
+          </div>
+        </div>
 
         <Card className="border-border shadow-lg bg-card rounded-lg">
           <CardHeader className="bg-gradient-to-r from-primary to-secondary text-white rounded-t-lg">

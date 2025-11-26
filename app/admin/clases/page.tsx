@@ -90,21 +90,21 @@ export default function CalendarioClasesPage() {
 
   // Función para obtener duración estimada por tipo de clase
   const obtenerDuracionPorTipo = (tipo: string): number => {
-    const duraciones: { [key: string]: number } = {
-      'Pilates': 50,
-      'Zumba': 45,
-      'CrossFit': 60,
-      'Spinning': 45,
-      'Yoga': 60,
-      'Aeróbicos': 45,
-      'Funcional': 50,
-      'Boxing': 45,
-      'Aqua Aeróbicos': 45,
-      'Body Pump': 55,
-      'Body Combat': 50,
-      'Stretching': 30
+    // Intentar obtener la duración desde el campo `duracion_minutos` que
+    // viene del JOIN con `gym_clases` en el endpoint `/clases-programadas`.
+    // Buscamos una muestra en `clasesProgramadas` que coincida con el tipo
+    // y tenga el valor disponible. Si no lo encontramos, se usa el
+    // valor por defecto de 45 minutos.
+    try {
+      const ejemplo = clasesProgramadas.find(c => c.tipo_clase === tipo && c.duracion_minutos != null)
+      if (ejemplo && typeof ejemplo.duracion_minutos === 'number') {
+        return ejemplo.duracion_minutos
+      }
+    } catch (e) {
+      // En caso de cualquier fallo, caemos al valor por defecto
+      console.warn('obtenerDuracionPorTipo: error buscando duracion en clasesProgramadas', e)
     }
-    return duraciones[tipo] || 45
+    return 45
   }
 
   // Función para convertir datos de BD al formato del calendario

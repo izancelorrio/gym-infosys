@@ -241,64 +241,34 @@ export default function AsignarEntrenamientoPage() {
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-7xl mx-auto space-y-8">
-        <Card className="border-border shadow-lg bg-card">
-          <CardHeader className="bg-gradient-to-r from-primary to-secondary text-white rounded-t-lg">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <Avatar className="h-16 w-16 border-4 border-white/20">
-                  <AvatarImage src={cliente.avatar || "/placeholder.svg"} />
-                  <AvatarFallback className="bg-secondary text-secondary-foreground font-semibold text-xl">
-                    {cliente.name.charAt(0).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <CardTitle className="text-2xl font-bold text-white">Asignar Entrenamiento</CardTitle>
-                  <p className="text-orange-100">{cliente.name}</p>
-                  <p className="text-sm text-orange-200">{cliente.email}</p>
-                </div>
-              </div>
-              <Button
-                variant="outline"
-                className="border-white/20 text-white hover:bg-white/10 bg-transparent"
-                onClick={() => router.push("/entrenador")}
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Volver
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="flex items-center space-x-3 p-4 bg-primary/10 rounded-lg border border-primary/20">
-                <div className="p-2 bg-primary rounded-full">
-                  <Activity className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-primary">{cliente.totalWorkouts}</p>
-                  <p className="text-sm text-muted-foreground">Entrenamientos totales</p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-3 p-4 bg-primary/10 rounded-lg border border-primary/20">
-                <div className="p-2 bg-primary rounded-full">
-                  <Users className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-primary">{cliente.status}</p>
-                  <p className="text-sm text-muted-foreground">Estado actual</p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-3 p-4 bg-primary/10 rounded-lg border border-primary/20">
-                <div className="p-2 bg-primary rounded-full">
-                  <Activity className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-primary">{cliente.lastActivity}</p>
-                  <p className="text-sm text-muted-foreground">Última actividad</p>
-                </div>
+        {/* Header */}
+        <div className="bg-gradient-to-r from-primary to-secondary text-white p-6 rounded-lg shadow-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <Avatar className="h-16 w-16 border-4 border-white/20">
+                <AvatarImage src={cliente.avatar || "/placeholder.svg"} />
+                <AvatarFallback className="bg-secondary text-secondary-foreground font-semibold text-xl">
+                  {cliente.name.charAt(0).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <h2 className="text-2xl font-bold">Asignar Entrenamiento</h2>
+                <p className="text-orange-100">{cliente.name}</p>
+                <p className="text-sm text-orange-200">{cliente.email}</p>
               </div>
             </div>
-          </CardContent>
-        </Card>
+            <Button
+              variant="outline"
+              className="border-white/20 text-white hover:bg-white/10 bg-transparent"
+              onClick={() => router.push("/entrenador")}
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Volver
+            </Button>
+          </div>
+        </div>
+
+        {/* Stats removed as requested */}
 
         <Card className="border-border shadow-lg bg-card">
           <CardHeader className="bg-gradient-to-r from-primary/10 to-secondary/10 border-b border-border">

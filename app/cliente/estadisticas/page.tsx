@@ -3,6 +3,7 @@
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
 import { useEffect, useState, useMemo } from "react"
+import { API_CONFIG } from "@/lib/config"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
@@ -51,6 +52,7 @@ export default function EstadisticasPage() {
   const router = useRouter()
 
   const [ejercicios, setEjercicios] = useState<Ejercicio[]>([])
+  const [serverStats, setServerStats] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
@@ -59,22 +61,43 @@ export default function EstadisticasPage() {
       return
     }
 
-    // Cargar datos guardados del localStorage
-    const datosGuardados = localStorage.getItem(`ejercicios-${user.email}`)
-    if (datosGuardados) {
+    const cargarEstadisticas = async () => {
+      if (!user?.id) return
+      setIsLoading(true)
       try {
-        const ejerciciosCargados = JSON.parse(datosGuardados)
-        setEjercicios(ejerciciosCargados)
-      } catch (error) {
-        console.error("Error al cargar datos:", error)
+        const url = `${API_CONFIG.BASE_URL}/cliente/${user.id}/estadisticas`
+        const resp = await fetch(url, { headers: { "Content-Type": "application/json" } })
+        if (!resp.ok) {
+          console.error("Error al obtener estadísticas del servidor:", resp.status)
+          setServerStats(null)
+          setIsLoading(false)
+          return
+        }
+
+        const data = await resp.json()
+        setServerStats(data)
+      } catch (err) {
+        console.error("Error al cargar estadísticas:", err)
+        setServerStats(null)
+      } finally {
+        setIsLoading(false)
       }
     }
-    
-    setIsLoading(false)
+
+    cargarEstadisticas()
   }, [isAuthenticated, user, router])
 
   // Estadísticas de clases
   const estadisticasClases = useMemo((): EstadisticaClase[] => {
+    if (serverStats && serverStats.estadisticasClases) {
+      return serverStats.estadisticasClases.map((c: any) => ({
+        nombre: c.nombre,
+        frecuencia: c.frecuencia,
+        duracionTotal: c.duracionTotal || 0,
+        porcentaje: c.porcentaje || 0
+      }))
+    }
+
     const clases = ejercicios.filter(e => e.tipo === "clase")
     const conteoClases: { [key: string]: { count: number; duracionTotal: number } } = {}
 
@@ -96,10 +119,20 @@ export default function EstadisticasPage() {
         porcentaje: totalClases > 0 ? (data.count / totalClases) * 100 : 0
       }))
       .sort((a, b) => b.frecuencia - a.frecuencia)
-  }, [ejercicios])
+  }, [serverStats, ejercicios])
 
   // Estadísticas de ejercicios de fuerza
   const estadisticasEjercicios = useMemo((): EstadisticaEjercicio[] => {
+    if (serverStats && serverStats.estadisticasEjercicios) {
+      return serverStats.estadisticasEjercicios.map((e: any) => ({
+        nombre: e.nombre,
+        frecuencia: e.frecuencia,
+        pesoMaximo: e.pesoMaximo || 0,
+        volumenTotal: e.volumenTotal || 0,
+        porcentaje: e.porcentaje || 0
+      }))
+    }
+
     const ejerciciosFuerza = ejercicios.filter(e => e.tipo === "fuerza")
     const conteoEjercicios: { [key: string]: { count: number; pesos: number[]; volumen: number } } = {}
 
@@ -127,10 +160,24 @@ export default function EstadisticasPage() {
         porcentaje: totalEjercicios > 0 ? (data.count / totalEjercicios) * 100 : 0
       }))
       .sort((a, b) => b.frecuencia - a.frecuencia)
-  }, [ejercicios])
+  }, [serverStats, ejercicios])
 
   // Métricas generales
   const metricas = useMemo(() => {
+    // Preferir datos del servidor si están disponibles
+    if (serverStats && serverStats.estadisticas_generales) {
+      const g = serverStats.estadisticas_generales
+      return {
+        totalActividades: g.totalActividades || 0,
+        totalClases: g.totalClases || 0,
+        totalEjercicios: g.totalEjercicios || 0,
+        duracionTotalClases: g.duracionTotalClases || 0,
+        diasActivos: g.diasActivos || 0,
+        rachaActual: g.rachaActual || 0
+      }
+    }
+
+    // Fallback: calcular desde ejercicios en cliente
     const totalActividades = ejercicios.length
     const totalClases = ejercicios.filter(e => e.tipo === "clase").length
     const totalEjercicios = ejercicios.filter(e => e.tipo === "fuerza").length
@@ -166,7 +213,7 @@ export default function EstadisticasPage() {
       diasActivos,
       rachaActual
     }
-  }, [ejercicios])
+  }, [serverStats, ejercicios])
 
   if (isLoading) {
     return (

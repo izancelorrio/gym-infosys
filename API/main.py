@@ -555,44 +555,60 @@ def register(req: RegisterRequest, request: Request):
     cursor = conn.cursor()
     hashed_pw = hash_password(req.password)
     try:
+        # Insertar usuario y obtener el id creado de forma segura usando RETURNING
         cursor.execute(
-            "INSERT INTO users (name, email, password, role, created_at, updated_at) VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+            "INSERT INTO users (name, email, password, role, created_at, updated_at) VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING id",
             (req.name, req.email, hashed_pw, "usuario")
         )
-        conn.commit()
-        user_id = cursor.lastrowid
+        user_row = cursor.fetchone()
+        if not user_row:
+            conn.rollback()
+            conn.close()
+            raise HTTPException(status_code=500, detail="No se pudo crear el usuario")
+        user_id = user_row[0]
         print(f"[DEBUG] Usuario registrado con id: {user_id}")
-        
-        # Generar token de verificación y enviar email
+
+        # Generar token de verificación y preparar inserción
         token = str(uuid.uuid4())
         expires_at = (datetime.utcnow() + timedelta(hours=24)).isoformat()
         cursor.execute(
             "INSERT INTO email_verifications (user_id, token, expires_at) VALUES (%s, %s, %s)",
             (user_id, token, expires_at)
         )
+
+        # Commit único al final para mantener consistencia transaccional
         conn.commit()
-        
+
         frontend_base = _infer_frontend_base_from_request(request)
         verify_link = f"{frontend_base}/verify-email?token={token}"
         print(f"[DEBUG] Link de verificación generado: {verify_link}")
-        
+
         try:
             send_verification_email(req.email, verify_link)
             print("[DEBUG] Email de verificación enviado correctamente")
         except Exception as e:
             print("[DEBUG] Error enviando email de verificación:", e)
             print("[DEBUG] Link de verificación (solo debug):", verify_link)
-            
-    except sqlite3.IntegrityError as e:
+
+    except psycopg2.IntegrityError as e:
+        # Error de integridad (p. ej. email duplicado)
+        try:
+            conn.rollback()
+        except Exception:
+            pass
         print(f"[DEBUG] Error de integridad en la base de datos: {e}")
         print(f"[DEBUG] Email que causó el error: {req.email}")
         conn.close()
         raise HTTPException(status_code=400, detail="El email ya está registrado")
     except Exception as e:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
         print(f"[DEBUG] Error inesperado durante el registro: {e}")
         conn.close()
         raise HTTPException(status_code=500, detail="Error interno del servidor")
-        
+
     conn.close()
     return {
         "success": True,
@@ -1366,7 +1382,6 @@ def update_user(user_id: int, req: UpdateUserRequest, response: Response):
                     if cliente_exists and old_plan_id == 1 and int(req.plan_id) in (2, 3):
                             print(f"[DEBUG] update_user: plan cambiado de premium({old_plan_id}) a básico/estandar({req.plan_id}) para id_cliente={id_cliente}, eliminando asignaciones...")
                             try:
-                                cursor.execute("SAVEPOINT sp_cleanup_assigns")
                                 print(f"[DEBUG] update_user: about to delete assignments for id_cliente={id_cliente} (type={type(id_cliente)})")
                                 cursor.execute("SELECT COUNT(*) FROM entrenador_cliente_asignaciones WHERE id_cliente = %s", (id_cliente,))
                                 existing_assigns = cursor.fetchone()[0]
@@ -1382,27 +1397,19 @@ def update_user(user_id: int, req: UpdateUserRequest, response: Response):
                                     print(f"[DEBUG] update_user: conn.commit() after DELETE assignments for user_id={user_id}")
                                 except Exception as ce:
                                     print(f"[ERROR] update_user: commit failed after DELETE assignments: {repr(ce)}")
-                                cursor.execute("RELEASE SAVEPOINT sp_cleanup_assigns")
                             except Exception as e:
-                                # Si falla la limpieza de asignaciones intentamos revertir hasta el savepoint.
-                                # Si eso falla, ejecutamos un `conn.rollback()` para limpiar el estado abortado
-                                print(f"[WARN] update_user: fallo al limpiar asignaciones por cambio de plan: {repr(e)} - attempting rollback to savepoint")
+                                # Si falla la limpieza de asignaciones hacemos rollback de la transacción
+                                print(f"[ERROR] update_user: fallo al eliminar asignaciones entrenador-cliente: {repr(e)}")
                                 try:
-                                    cursor.execute("ROLLBACK TO SAVEPOINT sp_cleanup_assigns")
-                                    print(f"[DEBUG] update_user: ROLLBACK TO SAVEPOINT sp_cleanup_assigns succeeded")
-                                except Exception as re:
-                                    print(f"[ERROR] update_user: rollback to savepoint failed: {repr(re)} - performing full conn.rollback()")
-                                    try:
-                                        conn.rollback()
-                                        print(f"[DEBUG] update_user: conn.rollback() executed to clear aborted transaction")
-                                    except Exception as cre:
-                                        print(f"[ERROR] update_user: conn.rollback() also failed: {repr(cre)}")
-                                finally:
-                                    # Recreate cursor to ensure it's usable after rollback
-                                    try:
-                                        cursor = conn.cursor()
-                                    except Exception as ce:
-                                        print(f"[ERROR] update_user: failed to recreate cursor after rollback: {repr(ce)}")
+                                    conn.rollback()
+                                    print(f"[DEBUG] update_user: conn.rollback() executed to clear aborted transaction after failed delete")
+                                except Exception as cre:
+                                    print(f"[ERROR] update_user: conn.rollback() also failed: {repr(cre)}")
+                                # Recreate cursor to ensure it's usable after rollback
+                                try:
+                                    cursor = conn.cursor()
+                                except Exception as ce:
+                                    print(f"[ERROR] update_user: failed to recreate cursor after rollback: {repr(ce)}")
 
                 if req.num_tarjeta:
                     update_fields.append("num_tarjeta = %s")
@@ -1461,7 +1468,6 @@ def update_user(user_id: int, req: UpdateUserRequest, response: Response):
                         if cliente_row:
                             id_cliente = cliente_row[0]
                             try:
-                                cursor.execute("SAVEPOINT sp_cleanup_acceso")
                                 print(f"[DEBUG] update_user: about to delete assignments (acceso_entrenador) for id_cliente={id_cliente} (type={type(id_cliente)})")
                                 cursor.execute("SELECT COUNT(*) FROM entrenador_cliente_asignaciones WHERE id_cliente = %s", (id_cliente,))
                                 existing_assigns = cursor.fetchone()[0]
@@ -1477,25 +1483,17 @@ def update_user(user_id: int, req: UpdateUserRequest, response: Response):
                                     print(f"[DEBUG] update_user: conn.commit() after DELETE assignments (acceso) for user_id={user_id}")
                                 except Exception as ce:
                                     print(f"[ERROR] update_user: commit failed after DELETE assignments (acceso): {repr(ce)}")
-                                cursor.execute("RELEASE SAVEPOINT sp_cleanup_acceso")
                             except Exception as e:
-                                print(f"[WARN] update_user: fallo al limpiar asignaciones por cambio de plan (acceso_entrenador): {repr(e)} - attempting rollback to savepoint")
+                                print(f"[ERROR] update_user: fallo al eliminar asignaciones por acceso_entrenador: {repr(e)}")
                                 try:
-                                    cursor.execute("ROLLBACK TO SAVEPOINT sp_cleanup_acceso")
-                                    print(f"[DEBUG] update_user: ROLLBACK TO SAVEPOINT sp_cleanup_acceso succeeded")
-                                except Exception as re:
-                                    print(f"[ERROR] update_user: rollback to savepoint failed: {repr(re)} - performing full conn.rollback()")
-                                    try:
-                                        conn.rollback()
-                                        print(f"[DEBUG] update_user: conn.rollback() executed to clear aborted transaction")
-                                    except Exception as cre:
-                                        print(f"[ERROR] update_user: conn.rollback() also failed: {repr(cre)}")
-                                finally:
-                                    # Recreate cursor to ensure it's usable after rollback
-                                    try:
-                                        cursor = conn.cursor()
-                                    except Exception as ce:
-                                        print(f"[ERROR] update_user: failed to recreate cursor after rollback: {repr(ce)}")
+                                    conn.rollback()
+                                    print(f"[DEBUG] update_user: conn.rollback() executed to clear aborted transaction after failed delete (acceso)")
+                                except Exception as cre:
+                                    print(f"[ERROR] update_user: conn.rollback() also failed: {repr(cre)}")
+                                try:
+                                    cursor = conn.cursor()
+                                except Exception as ce:
+                                    print(f"[ERROR] update_user: failed to recreate cursor after rollback: {repr(ce)}")
             except Exception as e:
                 # No detener la actualización por un problema al limpiar asignaciones; loguear y continuar.
                 # Pero si la excepción dejó la transacción abortada, hacer rollback para poder seguir con otras operaciones.
@@ -1777,9 +1775,10 @@ async def guardar_clases_programadas(request: GuardarClasesRequest, response: Re
                     INSERT INTO clases_programadas 
                     (fecha, hora, id_clase, id_instructor, capacidad_maxima)
                     VALUES (%s, %s, %s, %s, %s)
+                    RETURNING id
                 """, (clase.fecha, clase.hora, clase.idClase, id_instructor, capacidad_maxima))
-                
-                clase_id = cursor.lastrowid
+                clase_row = cursor.fetchone()
+                clase_id = clase_row[0] if clase_row else None
                 clases_guardadas.append({
                     "id": clase_id,
                     "fecha": clase.fecha,
@@ -2020,9 +2019,10 @@ async def crear_reserva(request: CrearReservaRequest, response: Response):
         cursor.execute("""
             INSERT INTO reservas (id_cliente, id_clase_programada, estado)
             VALUES (%s, %s, 'activa')
+            RETURNING id
         """, (request.id_cliente, request.id_clase_programada))
-        
-        reserva_id = cursor.lastrowid
+        reserva_row = cursor.fetchone()
+        reserva_id = reserva_row[0] if reserva_row else None
         conn.commit()
         conn.close()
         
@@ -2478,9 +2478,10 @@ async def asignar_entrenador(request: dict):
             INSERT INTO entrenador_cliente_asignaciones 
             (id_entrenador, id_cliente, notas) 
             VALUES (%s, %s, %s)
+            RETURNING id
         """, (id_entrenador, cliente_table_id, notas))
-        
-        asignacion_id = cursor.lastrowid
+        asignacion_row = cursor.fetchone()
+        asignacion_id = asignacion_row[0] if asignacion_row else None
         conn.commit()
         conn.close()
         
@@ -2502,44 +2503,57 @@ async def asignar_entrenador(request: dict):
 @app.delete("/desasignar-entrenador/{asignacion_id}")
 async def desasignar_entrenador(asignacion_id: int):
     """
-    Desasignar un entrenador de un cliente (cambiar estado a inactiva)
+    Desasignar un entrenador de un cliente (eliminar el registro de asignación)
     """
     try:
         print(f"[DEBUG] Desasignando entrenador - asignación ID: {asignacion_id}")
-        
+
         conn = get_db_connection()
         cursor = conn.cursor()
-        
-        # Verificar que la asignación existe y está activa
+
+        # Verificar que la asignación existe y obtener nombres para respuesta
         cursor.execute("""
             SELECT eca.id, u1.name as entrenador_nombre, u2.name as cliente_nombre
             FROM entrenador_cliente_asignaciones eca
             JOIN users u1 ON eca.id_entrenador = u1.id
             JOIN clientes cl ON eca.id_cliente = cl.id
             JOIN users u2 ON cl.id_usuario = u2.id
-            WHERE eca.id = %s AND eca.estado = 'activa'
+            WHERE eca.id = %s
         """, (asignacion_id,))
-        
+
         asignacion = cursor.fetchone()
         if not asignacion:
-            raise HTTPException(status_code=404, detail="Asignación no encontrada o ya está inactiva")
-        
-        # Cambiar estado a inactiva
-        cursor.execute("""
-            UPDATE entrenador_cliente_asignaciones 
-            SET estado = 'inactiva', updated_at = CURRENT_TIMESTAMP
-            WHERE id = %s
-        """, (asignacion_id,))
-        
+            conn.close()
+            raise HTTPException(status_code=404, detail="Asignación no encontrada")
+
+        _, entrenador_nombre, cliente_nombre = asignacion
+
+        # Eliminar la asignación definitivamente
+        try:
+            cursor.execute("DELETE FROM entrenador_cliente_asignaciones WHERE id = %s", (asignacion_id,))
+            filas = cursor.rowcount
+            if filas == 0:
+                conn.rollback()
+                conn.close()
+                raise HTTPException(status_code=500, detail="No se pudo eliminar la asignación")
+        except Exception as e:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            conn.close()
+            print(f"[ERROR] Error eliminando asignación {asignacion_id}: {e}")
+            raise HTTPException(status_code=500, detail=f"Error al desasignar entrenador: {e}")
+
         conn.commit()
         conn.close()
-        
+
         return {
             "success": True,
-            "message": f"Asignación desactivada: {asignacion[1]} ya no entrena a {asignacion[2]}",
+            "message": f"Asignación eliminada: {entrenador_nombre} ya no entrena a {cliente_nombre}",
             "asignacion_id": asignacion_id
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -2770,6 +2784,132 @@ async def get_ejercicios(response: Response):
         print(f"[ERROR] Error al obtener ejercicios: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error al obtener ejercicios: {str(e)}")
 
+
+@app.get("/admin/estadisticas")
+async def get_estadisticas_admin(response: Response):
+    """
+    Estadísticas agregadas para el panel de administración.
+    Devuelve totales globales, distribución por planes, top clases y top ejercicios.
+    """
+    # Anti-cache
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+
+    try:
+        print(f"[DEBUG] Obteniendo estadísticas globales para admin...")
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Totales básicos
+        cursor.execute("SELECT COUNT(*) FROM users")
+        total_users = cursor.fetchone()[0]
+
+        cursor.execute("SELECT COUNT(*) FROM clientes WHERE estado = 'activo'")
+        total_clientes = cursor.fetchone()[0]
+
+        cursor.execute("SELECT COUNT(*) FROM users WHERE role = 'entrenador'")
+        total_entrenadores = cursor.fetchone()[0]
+
+        cursor.execute("SELECT COUNT(*) FROM planes WHERE activo = 1")
+        total_planes = cursor.fetchone()[0]
+
+        cursor.execute("SELECT COUNT(*) FROM reservas WHERE estado = 'activa'")
+        total_reservas_activas = cursor.fetchone()[0]
+
+        cursor.execute("SELECT COUNT(*) FROM reservas WHERE estado = 'completada'")
+        total_reservas_completadas = cursor.fetchone()[0]
+
+        cursor.execute("SELECT COUNT(*) FROM clases_programadas WHERE estado IN ('activa', 'programada')")
+        total_clases_programadas = cursor.fetchone()[0]
+
+        cursor.execute("SELECT COUNT(*) FROM entrenamientos_realizados")
+        total_entrenamientos_realizados = cursor.fetchone()[0]
+
+        # Distribución de clientes por plan
+        cursor.execute("""
+            SELECT p.id, p.nombre, COALESCE(COUNT(c.id), 0) as cantidad
+            FROM planes p
+            LEFT JOIN clientes c ON c.plan_id = p.id AND c.estado = 'activo'
+            GROUP BY p.id, p.nombre
+            ORDER BY cantidad DESC, p.nombre
+        """)
+        planes_data = cursor.fetchall()
+        planes = [{"id": row[0], "nombre": row[1], "clientes": row[2]} for row in planes_data]
+
+        # Top clases por reservas completadas
+        cursor.execute("""
+            SELECT gc.nombre, COUNT(*) as reservas
+            FROM reservas r
+            JOIN clases_programadas cp ON r.id_clase_programada = cp.id
+            JOIN gym_clases gc ON cp.id_clase = gc.id
+            WHERE r.estado = 'completada'
+            GROUP BY gc.nombre
+            ORDER BY reservas DESC
+            LIMIT 10
+        """)
+        top_clases_data = cursor.fetchall()
+        top_clases = [{"nombre": row[0], "reservas": row[1]} for row in top_clases_data]
+
+        # Top ejercicios por frecuencia en entrenamientos_realizados
+        cursor.execute("""
+            SELECT e.nombre, COUNT(*) as frecuencia
+            FROM entrenamientos_realizados er
+            LEFT JOIN ejercicios e ON er.id_ejercicio = e.id
+            WHERE e.nombre IS NOT NULL
+            GROUP BY e.nombre
+            ORDER BY frecuencia DESC
+            LIMIT 10
+        """)
+        top_ejercicios_data = cursor.fetchall()
+        top_ejercicios = [{"nombre": row[0], "frecuencia": row[1]} for row in top_ejercicios_data]
+
+        # Nuevas inscripciones por mes (últimos 12 meses)
+        cursor.execute("""
+            SELECT to_char(DATE_TRUNC('month', fecha_inscripcion), 'YYYY-MM') as mes, COUNT(*)
+            FROM clientes
+            WHERE fecha_inscripcion IS NOT NULL
+            GROUP BY mes
+            ORDER BY mes DESC
+            LIMIT 12
+        """)
+        mensualidades = cursor.fetchall()
+        nuevos_por_mes = [{"mes": row[0], "cantidad": row[1]} for row in mensualidades]
+
+        conn.close()
+
+        respuesta = {
+            "success": True,
+            "totales": {
+                "total_users": total_users,
+                "total_clientes": total_clientes,
+                "total_entrenadores": total_entrenadores,
+                "total_planes": total_planes,
+                "total_reservas_activas": total_reservas_activas,
+                "total_reservas_completadas": total_reservas_completadas,
+                "total_clases_programadas": total_clases_programadas,
+                "total_entrenamientos_realizados": total_entrenamientos_realizados
+            },
+            "planes": planes,
+            "top_clases": top_clases,
+            "top_ejercicios": top_ejercicios,
+            "nuevos_por_mes": nuevos_por_mes
+        }
+
+        print(f"[DEBUG] /admin/estadisticas response: {respuesta}")
+
+        return respuesta
+
+    except Exception as e:
+        if 'conn' in locals():
+            try:
+                conn.close()
+            except Exception:
+                pass
+        print(f"[ERROR] Error al obtener estadísticas admin: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al obtener estadísticas admin: {str(e)}")
+
 @app.post("/entrenador/{entrenador_id}/cliente/{id_cliente}/plan-entrenamiento")
 async def guardar_plan_entrenamiento(
     entrenador_id: int, 
@@ -2849,9 +2989,10 @@ async def guardar_plan_entrenamiento(
                 VALUES (%s, %s, %s, %s, %s, 'pendiente')
                 ON CONFLICT (id_entrenador, id_cliente, id_ejercicio, fecha_entrenamiento) 
                 DO UPDATE SET series = EXCLUDED.series
+                RETURNING id
             """, (entrenador_id, cliente_real_id, ejercicio_id, fecha, series))
-            
-            entrenamiento_id = cursor.lastrowid
+            entrenamiento_row = cursor.fetchone()
+            entrenamiento_id = entrenamiento_row[0] if entrenamiento_row else None
             entrenamientos_guardados.append({
                 "id": entrenamiento_id,
                 "ejercicio": ejercicio_nombre,
@@ -3084,11 +3225,12 @@ async def registrar_actividad(cliente_user_id: int, actividad_data: dict, respon
              series_realizadas, repeticiones, peso_kg, tiempo_segundos, distancia_metros, 
              notas, valoracion, tipo_registro)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id
         """, (id_cliente, id_ejercicio, id_entrenamiento_asignado, fecha_realizacion,
               series_realizadas, repeticiones, peso_kg, tiempo_segundos, distancia_metros,
               notas, valoracion, tipo_registro))
-        
-        actividad_id = cursor.lastrowid
+        actividad_row = cursor.fetchone()
+        actividad_id = actividad_row[0] if actividad_row else None
         
         # Si es un entrenamiento planificado, actualizamos su estado a completado
         if id_entrenamiento_asignado:
@@ -3114,3 +3256,231 @@ async def registrar_actividad(cliente_user_id: int, actividad_data: dict, respon
     except Exception as e:
         print(f"[ERROR] Error al registrar actividad: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error al registrar actividad: {str(e)}")
+
+
+@app.get("/cliente/{cliente_user_id}/estadisticas")
+async def get_estadisticas_cliente(cliente_user_id: int, response: Response):
+    """
+    Agregación de estadísticas para la pantalla de cliente
+    Devuelve métricas generales, estadísticas de clases y de ejercicios basadas en registros en la base de datos.
+    """
+    # Anti-cache
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+
+    try:
+        print(f"[DEBUG] Obteniendo estadísticas del cliente {cliente_user_id}...")
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Obtener id_cliente real desde user_id
+        cursor.execute("SELECT c.id FROM clientes c JOIN users u ON c.id_usuario = u.id WHERE u.id = %s", (cliente_user_id,))
+        cliente_row = cursor.fetchone()
+        if not cliente_row:
+            conn.close()
+            raise HTTPException(status_code=404, detail="Cliente no encontrado")
+
+        id_cliente = cliente_row[0]
+
+        # 1) Obtener entrenamientos realizados (ejercicios)
+        cursor.execute("""
+            SELECT er.fecha_realizacion, er.series_realizadas, er.repeticiones, er.peso_kg,
+                   e.id as ejercicio_id, e.nombre as ejercicio_nombre, e.categoria
+            FROM entrenamientos_realizados er
+            LEFT JOIN ejercicios e ON er.id_ejercicio = e.id
+            WHERE er.id_cliente = %s
+            ORDER BY er.fecha_realizacion ASC
+        """, (id_cliente,))
+        realizados = cursor.fetchall()
+
+        # 2) Obtener reservas completadas (clases)
+        cursor.execute("""
+            SELECT r.id, cp.fecha, gc.nombre as clase_nombre, gc.duracion_minutos
+            FROM reservas r
+            JOIN clases_programadas cp ON r.id_clase_programada = cp.id
+            JOIN gym_clases gc ON cp.id_clase = gc.id
+            WHERE r.id_cliente = %s AND r.estado = 'completada'
+            ORDER BY cp.fecha ASC
+        """, (id_cliente,))
+        reservas_completadas = cursor.fetchall()
+
+        # Cerrar conexión pronto
+        # Obtener también información del usuario (nombre y email) para la cabecera
+        try:
+            cursor.execute("SELECT u.name, u.email FROM users u JOIN clientes c ON c.id_usuario = u.id WHERE c.id = %s", (id_cliente,))
+            user_row = cursor.fetchone()
+            cliente_info = { 'name': user_row[0], 'email': user_row[1] } if user_row else { 'name': None, 'email': None }
+        except Exception:
+            cliente_info = { 'name': None, 'email': None }
+
+        conn.close()
+
+        # Procesar métricas generales
+        total_entrenamientos_realizados = len(realizados)
+        total_reservas_completadas = len(reservas_completadas)
+        total_actividades = total_entrenamientos_realizados + total_reservas_completadas
+
+        total_clases = total_reservas_completadas
+        total_ejercicios = total_entrenamientos_realizados
+
+        # Duración total de clases
+        duracion_total_clases = sum([row[3] or 0 for row in reservas_completadas])
+
+        # Fechas únicas con actividad (from both realizados.fecha_realizacion and reservas.fecha)
+        fechas_set = set()
+        for row in realizados:
+            fecha = row[0]
+            if fecha:
+                fechas_set.add(str(fecha))
+        for row in reservas_completadas:
+            fecha = row[1]
+            if fecha:
+                fechas_set.add(str(fecha))
+
+        dias_activos = len(fechas_set)
+
+        # Calcular racha actual (días consecutivos hasta hoy)
+        from datetime import datetime, timedelta, date
+
+        fechas_date_set = set()
+        for f in fechas_set:
+            try:
+                fechas_date_set.add(datetime.strptime(f, "%Y-%m-%d").date())
+            except Exception:
+                try:
+                    fechas_date_set.add(datetime.fromisoformat(f).date())
+                except Exception:
+                    pass
+
+        hoy = date.today()
+        racha_actual = 0
+        dia_check = hoy
+        while True:
+            if dia_check in fechas_date_set:
+                racha_actual += 1
+                dia_check = dia_check - timedelta(days=1)
+            else:
+                break
+
+        # Estadísticas de clases (frecuencia y duración por tipo)
+        clases_map = {}
+        for row in reservas_completadas:
+            clase_nombre = row[2] or 'Clase'
+            dur = row[3] or 0
+            if clase_nombre not in clases_map:
+                clases_map[clase_nombre] = { 'count': 0, 'dur_total': 0 }
+            clases_map[clase_nombre]['count'] += 1
+            clases_map[clase_nombre]['dur_total'] += dur
+
+        estadisticas_clases = []
+        for nombre, data in clases_map.items():
+            estadisticas_clases.append({
+                'nombre': nombre,
+                'frecuencia': data['count'],
+                'duracionTotal': data['dur_total'],
+            })
+
+        # Ordenar por frecuencia descendente
+        estadisticas_clases.sort(key=lambda x: x['frecuencia'], reverse=True)
+
+        # Añadir porcentaje relativo
+        for c in estadisticas_clases:
+            c['porcentaje'] = (c['frecuencia'] / total_clases * 100) if total_clases > 0 else 0
+
+        # Estadísticas de ejercicios (frecuencia, peso máximo, volumen total)
+        ejercicios_map = {}
+        for row in realizados:
+            fecha_real, series_realizadas, repeticiones, peso_kg, ej_id, ej_nombre, ej_categoria = row
+            nombre = ej_nombre or 'Ejercicio'
+            if nombre not in ejercicios_map:
+                ejercicios_map[nombre] = { 'count': 0, 'pesos': [], 'volumen': 0 }
+            ejercicios_map[nombre]['count'] += 1
+            if peso_kg:
+                try:
+                    ejercicios_map[nombre]['pesos'].append(float(peso_kg))
+                except Exception:
+                    pass
+            # volumen = peso * series * repeticiones
+            try:
+                s = float(series_realizadas) if series_realizadas else 0
+                rps = float(repeticiones) if repeticiones else 1
+                p = float(peso_kg) if peso_kg else 0
+                ejercicios_map[nombre]['volumen'] += p * s * rps
+            except Exception:
+                pass
+
+        estadisticas_ejercicios = []
+        for nombre, data in ejercicios_map.items():
+            estadisticas_ejercicios.append({
+                'nombre': nombre,
+                'frecuencia': data['count'],
+                'pesoMaximo': max(data['pesos']) if data['pesos'] else 0,
+                'volumenTotal': data['volumen']
+            })
+
+        estadisticas_ejercicios.sort(key=lambda x: x['frecuencia'], reverse=True)
+
+        total_ej = total_ejercicios if total_ejercicios > 0 else 0
+        for e in estadisticas_ejercicios:
+            e['porcentaje'] = (e['frecuencia'] / total_ej * 100) if total_ej > 0 else 0
+
+        # Lista detallada de ejercicios realizados por el cliente (filas individuales)
+        ejercicios_realizados = []
+        for row in realizados:
+            # row: fecha_realizacion, series_realizadas, repeticiones, peso_kg, ejercicio_id, ejercicio_nombre, ejercicio_categoria
+            ejercicios_realizados.append({
+                'fecha_realizacion': row[0],
+                'series_realizadas': row[1],
+                'repeticiones': row[2],
+                'peso_kg': row[3],
+                'ejercicio_id': row[4],
+                'ejercicio_nombre': row[5],
+                'ejercicio_categoria': row[6]
+            })
+
+        # Formar el objeto de respuesta
+        respuesta = {
+            'cliente': cliente_info,
+            'success': True,
+            'estadisticas_generales': {
+                'totalActividades': total_actividades,
+                'totalClases': total_clases,
+                'totalEjercicios': total_ejercicios,
+                'duracionTotalClases': duracion_total_clases,
+                'diasActivos': dias_activos,
+                'rachaActual': racha_actual
+            },
+            'estadisticasClases': estadisticas_clases,
+            'estadisticasEjercicios': estadisticas_ejercicios,
+            'ejercicios_realizados': ejercicios_realizados,
+            'total_registros': {
+                'entrenamientos_realizados': total_entrenamientos_realizados,
+                'reservas_completadas': total_reservas_completadas
+            }
+        }
+
+        return respuesta
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[ERROR] Error al obtener estadísticas del cliente: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al obtener estadísticas del cliente: {str(e)}")
+
+
+@app.get("/entrenador/estadisticas/{cliente_user_id}")
+async def get_estadisticas_entrenador_cliente(cliente_user_id: int, response: Response):
+    """
+    Endpoint alias para que la interfaz de entrenador pueda solicitar
+    las mismas estadísticas de un cliente sin conocer la ruta /cliente/...
+    """
+    # Reutilizar la lógica existente llamando a la función de cliente
+    try:
+        return await get_estadisticas_cliente(cliente_user_id, response)
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[ERROR] Error en alias /entrenador/estadisticas: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al obtener estadísticas: {str(e)}")

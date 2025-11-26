@@ -354,60 +354,59 @@ export default function ProgramarClasePage() {
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-7xl mx-auto space-y-8">
-        <Card className="border-border shadow-lg bg-card">
-          <CardHeader className="bg-gradient-to-r from-primary to-secondary text-white rounded-t-lg">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <div className="p-3 bg-white/20 rounded-full">
-                  <Calendar className="h-8 w-8 text-white" />
-                </div>
-                <div>
-                  <CardTitle className="text-2xl font-bold text-white">Programar Clases</CardTitle>
-                  <p className="text-orange-100">Gestión del calendario de clases grupales</p>
-                </div>
+        {/* Header */}
+        <div className="bg-gradient-to-r from-primary to-secondary text-white p-6 rounded-lg shadow-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="p-3 bg-white/20 rounded-full">
+                <Calendar className="h-8 w-8 text-white" />
               </div>
-              <Button
-                variant="outline"
-                className="border-white/20 text-white hover:bg-white/10 bg-transparent"
-                onClick={() => router.push("/admin")}
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Volver
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="flex items-center space-x-3 p-4 bg-primary/10 rounded-lg border border-primary/20">
-                <div className="p-2 bg-primary rounded-full">
-                  <Calendar className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-primary">{clases.length}</p>
-                  <p className="text-sm text-muted-foreground">Clases programadas</p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-3 p-4 bg-primary/10 rounded-lg border border-primary/20">
-                <div className="p-2 bg-primary rounded-full">
-                  <Clock className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-primary">{tiposDeClase.length}</p>
-                  <p className="text-sm text-muted-foreground">Tipos disponibles</p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-3 p-4 bg-primary/10 rounded-lg border border-primary/20">
-                <div className="p-2 bg-primary rounded-full">
-                  <Activity className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-primary">7</p>
-                  <p className="text-sm text-muted-foreground">Días programables</p>
-                </div>
+              <div>
+                <h2 className="text-2xl font-bold">Programar Clases</h2>
+                <p className="text-orange-100">Gestión del calendario de clases grupales</p>
               </div>
             </div>
-          </CardContent>
-        </Card>
+            <Button
+              variant="outline"
+              className="border-white/20 text-white hover:bg-white/10 bg-transparent"
+              onClick={() => router.push("/admin")}
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Volver
+            </Button>
+          </div>
+        </div>
+
+        {/* Stats under header */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="flex items-center space-x-3 p-4 bg-primary/10 rounded-lg border border-primary/20">
+            <div className="p-2 bg-primary rounded-full">
+              <Calendar className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-primary">{clases.length}</p>
+              <p className="text-sm text-muted-foreground">Clases programadas</p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-3 p-4 bg-primary/10 rounded-lg border border-primary/20">
+            <div className="p-2 bg-primary rounded-full">
+              <Clock className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-primary">{tiposDeClase.length}</p>
+              <p className="text-sm text-muted-foreground">Tipos disponibles</p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-3 p-4 bg-primary/10 rounded-lg border border-primary/20">
+            <div className="p-2 bg-primary rounded-full">
+              <Activity className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-primary">7</p>
+              <p className="text-sm text-muted-foreground">Días programables</p>
+            </div>
+          </div>
+        </div>
 
         <Card className="border-border shadow-lg bg-card">
           <CardHeader className="bg-gradient-to-r from-primary/10 to-secondary/10 border-b border-border">

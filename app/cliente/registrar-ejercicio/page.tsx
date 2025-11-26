@@ -11,7 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Activity, Users, Plus, Save, ArrowLeft, Trash2, CheckCircle2, Clock, Calendar, Check } from "lucide-react"
+import { Activity, Users, Plus, Save, ArrowLeft, Trash2, CheckCircle2, Clock, Calendar, Check, ChevronDown } from "lucide-react"
 
 interface Ejercicio {
   id: string
@@ -449,6 +449,30 @@ export default function RegistrarEjercicioPage() {
     return actividades.sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime())
   }, [entrenamientosPendientes, clasesReservadas])
 
+  // UI state for collapsed days
+  const [openDays, setOpenDays] = useState<Record<string, boolean>>({})
+
+  const groupedByDate = useMemo(() => {
+    const map = new Map<string, Array<typeof actividadesPendientes[number]>>()
+    actividadesPendientes.forEach((act) => {
+      const key = act.fecha
+      if (!map.has(key)) map.set(key, [])
+      map.get(key)!.push(act)
+    })
+    const arr = Array.from(map.entries()).map(([date, items]) => ({ date, items }))
+    // ordenar por fecha descendente (más reciente primero)
+    arr.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    return arr
+  }, [actividadesPendientes])
+
+  const formatDateLabel = (fecha: string) => {
+    try {
+      return new Date(fecha).toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" })
+    } catch {
+      return fecha
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -468,97 +492,91 @@ export default function RegistrarEjercicioPage() {
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-7xl mx-auto space-y-8">
-        <Card className="border-border shadow-lg bg-card">
-          <CardHeader className="bg-gradient-to-r from-primary to-secondary text-white rounded-t-lg">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <Avatar className="h-16 w-16 border-4 border-white/20">
-                  <AvatarImage src={"/placeholder.svg"} />
-                  <AvatarFallback className="bg-secondary text-secondary-foreground font-semibold text-xl">
-                    {user?.name?.charAt(0).toUpperCase() || "U"}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <CardTitle className="text-2xl font-bold text-white">Registrar Actividad</CardTitle>
-                  <p className="text-orange-100">{user?.name}</p>
-                  <p className="text-sm text-orange-200">{user?.email}</p>
-                </div>
-              </div>
-              <Button
-                variant="outline"
-                className="border-white/20 text-white hover:bg-white/10 bg-transparent"
-                onClick={() => router.push("/")}
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Volver
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="flex items-center space-x-3 p-4 bg-primary/10 rounded-lg border border-primary/20">
-                <div className="p-2 bg-primary rounded-full">
-                  <Activity className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-primary">En Progreso</p>
-                  <p className="text-sm text-muted-foreground">Estado</p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-3 p-4 bg-primary/10 rounded-lg border border-primary/20">
-                <div className="p-2 bg-primary rounded-full">
-                  <Users className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-primary">Cliente</p>
-                  <p className="text-sm text-muted-foreground">Tipo de cuenta</p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-3 p-4 bg-primary/10 rounded-lg border border-primary/20">
-                <div className="p-2 bg-primary rounded-full">
-                  <Activity className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-primary">{new Date().toLocaleDateString("es-ES")}</p>
-                  <p className="text-sm text-muted-foreground">Fecha actual</p>
-                </div>
+        {/* Header */}
+        <div className="bg-gradient-to-r from-primary to-secondary text-white p-6 rounded-lg shadow-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <Avatar className="h-16 w-16 border-4 border-white/20">
+                <AvatarImage src={"/placeholder.svg"} />
+                <AvatarFallback className="bg-secondary text-secondary-foreground font-semibold text-xl">
+                  {user?.name?.charAt(0).toUpperCase() || "U"}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <h2 className="text-2xl font-bold">Registrar Actividad</h2>
+                <p className="text-orange-100">{user?.name}</p>
+                <p className="text-sm text-orange-200">{user?.email}</p>
               </div>
             </div>
-          </CardContent>
-        </Card>
+            <Button
+              variant="outline"
+              className="border-white/20 text-white hover:bg-white/10 bg-transparent"
+              onClick={() => router.push("/")}
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Volver
+            </Button>
+          </div>
+        </div>
 
-        {/* Card de Entrenamientos Planificados */}
-        {actividadesPendientes.length > 0 && (
-          <Card className="border-border shadow-lg bg-card">
-            <CardHeader className="bg-gradient-to-r from-green-500/10 to-blue-500/10 border-b border-border">
-              <CardTitle className="flex items-center space-x-2 text-foreground">
-                <Clock className="h-5 w-5" />
-                <span>Actividades Planificadas</span>
-                <span className="text-sm text-muted-foreground">
-                  ({entrenamientosPendientes.length} entrenamientos, {clasesReservadas.length} clases)
-                </span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-6">
-              <div className="space-y-4">
-                {actividadesPendientes.map((actividad, index) => (
-                  <div key={`${actividad.tipo}-${index}`}>
-                    {actividad.tipo === 'entrenamiento' ? (
-                      <EntrenamientoPendienteCard 
-                        entrenamiento={actividad.data as EntrenamientoPendiente}
-                        onRegistrar={registrarActividadPlanificada}
-                      />
-                    ) : (
-                      <ClaseReservadaCard 
-                        claseReservada={actividad.data as ClaseReservada}
-                        onRegistrar={registrarAsistenciaClase}
-                      />
-                    )}
+        {/* Stats removed as requested */}
+
+        {/* Actividades planificadas agrupadas por día (colapsables) */}
+        {groupedByDate.length > 0 && (
+          <div className="space-y-4">
+            {groupedByDate.map((group) => {
+              const ejerciciosCount = group.items.filter((i) => i.tipo === "entrenamiento").length
+              const clasesCount = group.items.filter((i) => i.tipo === "clase").length
+              const isOpen = !!openDays[group.date]
+
+              return (
+                <div key={group.date} className="mb-1">
+                  {/* Compact green header band (no outer frame) */}
+                  <div className="bg-gradient-to-r from-green-900 to-green-800 text-white py-1 px-3">
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-3 truncate">
+                        <Calendar className="h-4 w-4" />
+                        <span className="font-medium truncate">{formatDateLabel(group.date)}</span>
+                        <span className="text-white/80 mx-1">•</span>
+                        <span className="text-white/90">{ejerciciosCount} ejercicios</span>
+                        <span className="text-white/90 ml-2">{clasesCount} clases</span>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="p-1"
+                        onClick={() => setOpenDays((prev) => ({ ...prev, [group.date]: !prev[group.date] }))}
+                      >
+                        <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                      </Button>
+                    </div>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+
+                  {isOpen && (
+                    <div className="px-3 py-2">
+                      <div className="space-y-3">
+                        {group.items.map((actividad, index) => (
+                          <div key={`${actividad.tipo}-${group.date}-${index}`}>
+                            {actividad.tipo === 'entrenamiento' ? (
+                              <EntrenamientoPendienteCard
+                                entrenamiento={actividad.data as EntrenamientoPendiente}
+                                onRegistrar={registrarActividadPlanificada}
+                              />
+                            ) : (
+                              <ClaseReservadaCard
+                                claseReservada={actividad.data as ClaseReservada}
+                                onRegistrar={registrarAsistenciaClase}
+                              />
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
         )}
 
         <Card className="border-border shadow-lg bg-card">
