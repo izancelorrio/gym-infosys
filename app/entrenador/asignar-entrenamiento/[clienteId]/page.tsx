@@ -115,8 +115,8 @@ export default function AsignarEntrenamientoPage() {
           setCliente(null)
         }
 
-        // Obtener ejercicios disponibles
-  const ejerciciosResponse = await fetch(`${API_CONFIG.BASE_URL}/ejercicios`, {
+        // Obtener ejercicios disponibles (usar proxy interno)
+  const ejerciciosResponse = await fetch(`/api/ejercicios`, {
           method: "GET",
           headers: {
             "Content-Type": "application/json",

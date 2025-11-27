@@ -44,9 +44,10 @@ chmod +x /usr/local/bin/docker-compose
 sudo apt install unzip 
 unzip gym-infosys
 cd gym-infosys
+chmod +x docker-compose
 docker-compose --env-file .env.local.docker up --build
 
-
+chmod +x docker-compose
 
 -----------------------------------------------------------------------------------------------------------
 services:

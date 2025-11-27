@@ -103,7 +103,7 @@ export function PromotionalVideoModal({ isOpen, onClose, onStartToday }: Promoti
           ) : videos.length === 0 ? (
             <div className="text-sm text-muted-foreground">No se han encontrado archivos .mp4 en la carpeta public</div>
           ) : (
-            <div className="grid grid-cols-1 gap-2">
+            <div className="grid grid-cols-1 gap-2 max-h-64 md:max-h-80 overflow-auto">
               {videos.map((v) => (
                 <button
                   type="button"
