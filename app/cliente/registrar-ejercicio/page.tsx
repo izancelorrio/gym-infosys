@@ -22,8 +22,6 @@ interface Ejercicio {
   series_realizadas?: number
   repeticiones?: number
   peso_kg?: number
-  tiempo_minutos?: number
-  distancia_metros?: number
   notas?: string
   valoracion?: number // 1-10
 }
@@ -280,8 +278,6 @@ export default function RegistrarEjercicioPage() {
         series_realizadas: datosCompletados.series_realizadas,
         repeticiones: datosCompletados.repeticiones || null,
         peso_kg: datosCompletados.peso_kg || null,
-        tiempo_segundos: datosCompletados.tiempo_segundos || null,
-        distancia_metros: datosCompletados.distancia_metros || null,
         notas: datosCompletados.notas || "",
         valoracion: datosCompletados.valoracion || null
       }
@@ -316,6 +312,45 @@ export default function RegistrarEjercicioPage() {
       console.error("[ERROR] Error al registrar actividad:", error)
       toast({ title: 'Error', description: String(error instanceof Error ? error.message : 'Error desconocido'), type: 'error' })
     }
+  }
+
+  const descartarEntrenamiento = async (id_asignado: number) => {
+    // Mostrar un toast de confirmación con acción 'Descartar'
+    toast({
+      title: 'Confirmar descartado',
+      description: '¿Descartar esta asignación? Esta acción eliminará la asignación del entrenador.',
+      type: 'info',
+      actions: [
+        {
+          label: 'Descartar',
+          onClick: async () => {
+            try {
+              const response = await fetch(`${API_CONFIG.BASE_URL}/entrenamientos-asignados/${id_asignado}?cliente_user_id=${user?.id}`, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' }
+              })
+
+              if (!response.ok) {
+                const err = await response.json().catch(() => ({}))
+                throw new Error(err.detail || `Error HTTP: ${response.status}`)
+              }
+
+              const data = await response.json()
+              if (data.success) {
+                toast({ title: 'Asignación descartada', description: 'La asignación fue eliminada correctamente.', type: 'success' })
+                setEntrenamientosPendientes(prev => prev.filter(e => e.id !== id_asignado))
+              } else {
+                throw new Error(data.message || 'No se pudo descartar la asignación')
+              }
+            } catch (error) {
+              console.error('[ERROR] Error al descartar asignación:', error)
+              toast({ title: 'Error', description: String(error instanceof Error ? error.message : 'Error desconocido'), type: 'error' })
+            }
+          }
+        },
+        { label: 'Cancelar' }
+      ]
+    })
   }
 
   const registrarAsistenciaClase = async (claseReservada: ClaseReservada) => {
@@ -379,8 +414,6 @@ export default function RegistrarEjercicioPage() {
           series_realizadas: ejercicio.series_realizadas || null,
           repeticiones: ejercicio.repeticiones || null,
           peso_kg: ejercicio.peso_kg || null,
-          tiempo_segundos: ejercicio.tiempo_minutos ? ejercicio.tiempo_minutos * 60 : null,
-          distancia_metros: ejercicio.distancia_metros || null,
           notas: ejercicio.notas || "",
           valoracion: ejercicio.valoracion || null
         }
@@ -561,6 +594,7 @@ export default function RegistrarEjercicioPage() {
                               <EntrenamientoPendienteCard
                                 entrenamiento={actividad.data as EntrenamientoPendiente}
                                 onRegistrar={registrarActividadPlanificada}
+                                onDescartar={descartarEntrenamiento}
                               />
                             ) : (
                               <ClaseReservadaCard
@@ -698,28 +732,6 @@ export default function RegistrarEjercicioPage() {
                         {/* Columna derecha */}
                         <div className="space-y-4">
                           <div>
-                            <label className="text-sm font-medium text-foreground mb-2 block">Tiempo (minutos)</label>
-                            <Input
-                              type="number"
-                              placeholder="Duración en minutos"
-                              value={ejercicio.tiempo_minutos || ""}
-                              onChange={(e) => actualizarEjercicio(ejercicio.id, "tiempo_minutos", Number(e.target.value))}
-                              className="bg-background border-border text-foreground"
-                            />
-                          </div>
-                          
-                          <div>
-                            <label className="text-sm font-medium text-foreground mb-2 block">Distancia (metros)</label>
-                            <Input
-                              type="number"
-                              placeholder="Distancia recorrida"
-                              value={ejercicio.distancia_metros || ""}
-                              onChange={(e) => actualizarEjercicio(ejercicio.id, "distancia_metros", Number(e.target.value))}
-                              className="bg-background border-border text-foreground"
-                            />
-                          </div>
-                          
-                          <div>
                             <label className="text-sm font-medium text-foreground mb-2 block">Valoración (1-5)</label>
                             <Select
                               value={ejercicio.valoracion?.toString() || ""}
@@ -812,24 +824,25 @@ function ClaseReservadaCard({ claseReservada, onRegistrar }: ClaseReservadaCardP
 interface EntrenamientoPendienteCardProps {
   entrenamiento: EntrenamientoPendiente
   onRegistrar: (entrenamiento: EntrenamientoPendiente, datos: any) => void
+  onDescartar?: (id_asignado: number) => void
 }
 
-function EntrenamientoPendienteCard({ entrenamiento, onRegistrar }: EntrenamientoPendienteCardProps) {
+function EntrenamientoPendienteCard({ entrenamiento, onRegistrar, onDescartar }: EntrenamientoPendienteCardProps) {
   const [mostrarFormulario, setMostrarFormulario] = useState(false)
-  const [datosActividad, setDatosActividad] = useState({
-    series_realizadas: entrenamiento.series_planificadas,
+  const emptyDatos = {
+    series_realizadas: entrenamiento.series_planificadas || '',
     repeticiones: '',
     peso_kg: '',
-    tiempo_segundos: '',
-    distancia_metros: '',
     notas: '',
     valoracion: ''
-  })
+  }
+  const [datosActividad, setDatosActividad] = useState(() => ({ ...emptyDatos }))
   const toast = useToast()
 
   const handleRegistrar = () => {
     // Validar datos obligatorios
-    if (!datosActividad.series_realizadas || datosActividad.series_realizadas <= 0) {
+    const seriesVal = Number(datosActividad.series_realizadas)
+    if (!seriesVal || seriesVal <= 0) {
       toast({ title: 'Atención', description: 'Por favor, ingresa el número de series realizadas', type: 'info' })
       return
     }
@@ -839,15 +852,14 @@ function EntrenamientoPendienteCard({ entrenamiento, onRegistrar }: Entrenamient
       series_realizadas: Number(datosActividad.series_realizadas),
       repeticiones: datosActividad.repeticiones ? Number(datosActividad.repeticiones) : null,
       peso_kg: datosActividad.peso_kg ? Number(datosActividad.peso_kg) : null,
-      tiempo_segundos: datosActividad.tiempo_segundos ? Number(datosActividad.tiempo_segundos) : null,
-      distancia_metros: datosActividad.distancia_metros ? Number(datosActividad.distancia_metros) : null,
       notas: datosActividad.notas,
       valoracion: datosActividad.valoracion ? Number(datosActividad.valoracion) : null
     }
 
     onRegistrar(entrenamiento, datosParaEnviar)
-    // Cerramos el formulario después de registrar
+    // Cerramos el formulario después de registrar y reiniciamos los campos
     setMostrarFormulario(false)
+    setDatosActividad({ ...emptyDatos })
   }
 
   return (
@@ -865,13 +877,35 @@ function EntrenamientoPendienteCard({ entrenamiento, onRegistrar }: Entrenamient
             <p className="text-xs text-green-600">Asignado por: {entrenamiento.entrenador_nombre}</p>
           </div>
         </div>
-        <Button
-          size="sm"
-          onClick={() => setMostrarFormulario(!mostrarFormulario)}
-          className="bg-green-600 hover:bg-green-700 text-white"
-        >
-          {mostrarFormulario ? "Cancelar" : "Registrar"}
-        </Button>
+        <div className="flex flex-col items-end gap-2">
+          <Button
+            size="sm"
+            onClick={() => {
+              // Al abrir el formulario reiniciar los campos para que siempre salgan vacíos
+              setMostrarFormulario((prev) => {
+                const opening = !prev
+                if (opening) setDatosActividad({ ...emptyDatos })
+                return opening
+              })
+            }}
+            className="bg-green-600 hover:bg-green-700 text-white"
+          >
+            {mostrarFormulario ? "Cancelar" : "Registrar"}
+          </Button>
+
+          <Button
+            size="sm"
+            onClick={() => {
+              if (!onDescartar) return
+              // Parent will ask for confirmation and perform deletion
+              onDescartar(entrenamiento.id)
+            }}
+            className="bg-red-600 hover:bg-red-700 text-white"
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Descartar
+          </Button>
+        </div>
       </div>
 
       {entrenamiento.ejercicio.descripcion && (
@@ -918,29 +952,6 @@ function EntrenamientoPendienteCard({ entrenamiento, onRegistrar }: Entrenamient
                 placeholder="Ej: 20"
               />
             </div>
-            
-            <div>
-              <label className="text-sm font-medium mb-1 block">Tiempo (segundos)</label>
-              <Input
-                type="number"
-                min="1"
-                value={datosActividad.tiempo_segundos}
-                onChange={(e) => setDatosActividad(prev => ({ ...prev, tiempo_segundos: e.target.value }))}
-                placeholder="Ej: 300"
-              />
-            </div>
-            
-            <div>
-              <label className="text-sm font-medium mb-1 block">Distancia (metros)</label>
-              <Input
-                type="number"
-                min="1"
-                value={datosActividad.distancia_metros}
-                onChange={(e) => setDatosActividad(prev => ({ ...prev, distancia_metros: e.target.value }))}
-                placeholder="Ej: 1000"
-              />
-            </div>
-            
             <div>
               <label className="text-sm font-medium mb-1 block">Valoración (1-5)</label>
               <Select
@@ -971,21 +982,15 @@ function EntrenamientoPendienteCard({ entrenamiento, onRegistrar }: Entrenamient
             />
           </div>
           
-          <div className="flex space-x-2">
-            <Button
-              onClick={handleRegistrar}
-              className="bg-green-600 hover:bg-green-700 text-white"
-            >
-              <CheckCircle2 className="h-4 w-4 mr-2" />
-              Completar Entrenamiento
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => setMostrarFormulario(false)}
-            >
-              Cancelar
-            </Button>
-          </div>
+            <div className="flex space-x-2">
+              <Button
+                onClick={handleRegistrar}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+                Completar Entrenamiento
+              </Button>
+            </div>
         </div>
       )}
     </div>

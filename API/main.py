@@ -838,35 +838,57 @@ def get_planes():
         cursor = conn.cursor()
         
         cursor.execute("""
-            SELECT id, nombre, precio_mensual, acceso_entrenador, activo
+            SELECT id, nombre, precio_mensual, caracteristicas, acceso_entrenador, activo, color_tema, orden_display, created_at, updated_at
             FROM planes 
             WHERE activo = 1 
-            ORDER BY id ASC
+            ORDER BY orden_display ASC, id ASC
         """)
-        
+
         planes = []
+        import json
         for row in cursor.fetchall():
+            # row mapping: 0:id,1:nombre,2:precio_mensual,3:caracteristicas_json,4:acceso_entrenador,5:activo,6:color_tema,7:orden_display,8:created_at,9:updated_at
+            # `caracteristicas` column is JSONB; depending on psycopg2 settings it may be
+            # returned as a Python list already or as a JSON string. Handle both.
+            caracteristicas = []
+            raw_car = row[3]
+            try:
+                if raw_car is None:
+                    caracteristicas = []
+                elif isinstance(raw_car, (list, tuple)):
+                    caracteristicas = list(raw_car)
+                elif isinstance(raw_car, (str, bytes)):
+                    try:
+                        caracteristicas = json.loads(raw_car)
+                    except Exception:
+                        # Fallback: treat the string as single feature or empty
+                        caracteristicas = [raw_car] if raw_car else []
+                else:
+                    # Unexpected type; try to coerce to list
+                    caracteristicas = list(raw_car)
+            except Exception:
+                caracteristicas = []
+
             plan = {
                 "id": row[0],
                 "nombre": row[1],
-                "precio_mensual": float(row[2]) if row[2] is not None else 0.0,
-                "acceso_entrenador": bool(row[3]),
-                "activo": bool(row[4]),
-                # Campos opcionales con valores por defecto
                 "descripcion": "",
-                "caracteristicas": [],
-                "color_tema": "#000000",
-                "orden_display": 0,
-                "created_at": None,
-                "updated_at": None,
+                "precio_mensual": float(row[2]) if row[2] is not None else 0.0,
+                "caracteristicas": caracteristicas,
+                "acceso_entrenador": bool(row[4]),
+                "activo": bool(row[5]),
+                "color_tema": row[6] or "#000000",
+                "orden_display": int(row[7]) if row[7] is not None else 0,
+                "created_at": row[8],
+                "updated_at": row[9],
                 # Campos de compatibilidad con el frontend
                 "precio_anual": None,
                 "duracion_meses": 1,
                 "limite_clases": None,
-                "acceso_nutricionista": row[1].lower() in ['estándar', 'premium'],
-                "acceso_entrenador_personal": bool(row[3]),
-                "acceso_areas_premium": bool(row[3]),
-                "popular": row[1].lower() == 'estándar'
+                "acceso_nutricionista": (row[1] or '').lower() in ['estándar', 'premium'],
+                "acceso_entrenador_personal": bool(row[4]),
+                "acceso_areas_premium": bool(row[4]),
+                "popular": (row[1] or '').lower() == 'estándar'
             }
             planes.append(plan)
         
@@ -888,47 +910,57 @@ def get_plan_by_id(plan_id: int):
         cursor = conn.cursor()
         
         cursor.execute("""
-            SELECT id, nombre, descripcion, precio_mensual, caracteristicas, 
-                   acceso_entrenador, activo, color_tema, orden_display, 
-                   created_at, updated_at
+            SELECT id, nombre, precio_mensual, caracteristicas, acceso_entrenador, activo, color_tema, orden_display, created_at, updated_at
             FROM planes 
             WHERE id =%s AND activo = 1
         """, (plan_id,))
-        
+
         row = cursor.fetchone()
         if not row:
             conn.close()
             raise HTTPException(status_code=404, detail="Plan no encontrado")
-        
+
         # Parsear características JSON
         import json
+        # Parsear características flexible (JSON string o estructura ya parseada)
+        caracteristicas = []
+        raw_car = row[3]
         try:
-            caracteristicas = json.loads(row[4])
-        except:
+            if raw_car is None:
+                caracteristicas = []
+            elif isinstance(raw_car, (list, tuple)):
+                caracteristicas = list(raw_car)
+            elif isinstance(raw_car, (str, bytes)):
+                try:
+                    caracteristicas = json.loads(raw_car)
+                except Exception:
+                    caracteristicas = [raw_car] if raw_car else []
+            else:
+                caracteristicas = list(raw_car)
+        except Exception:
             caracteristicas = []
-        
-            plan = {
-                "id": row[0],
-                "nombre": row[1],
-                "precio_mensual": float(row[2]) if row[2] is not None else 0.0,
-                "acceso_entrenador": bool(row[3]),
-                "activo": bool(row[4]),
-                # Campos opcionales con valores por defecto
-                "descripcion": "",
-                "caracteristicas": [],
-                "color_tema": "#000000",
-                "orden_display": 0,
-                "created_at": None,
-                "updated_at": None,
-                # Campos de compatibilidad con el frontend
-                "precio_anual": None,
-                "duracion_meses": 1,
-                "limite_clases": None,
-                "acceso_nutricionista": row[1].lower() in ['estándar', 'premium'],
-                "acceso_entrenador_personal": bool(row[3]),
-                "acceso_areas_premium": bool(row[3]),
-                "popular": row[1].lower() == 'estándar'
-            }
+
+        plan = {
+            "id": row[0],
+            "nombre": row[1],
+            "descripcion": "",
+            "precio_mensual": float(row[2]) if row[2] is not None else 0.0,
+            "caracteristicas": caracteristicas,
+            "acceso_entrenador": bool(row[4]),
+            "activo": bool(row[5]),
+            "color_tema": row[6] or "#000000",
+            "orden_display": int(row[7]) if row[7] is not None else 0,
+            "created_at": row[8],
+            "updated_at": row[9],
+            "precio_anual": None,
+            "duracion_meses": 1,
+            "limite_clases": None,
+            "acceso_nutricionista": (row[1] or '').lower() in ['estándar', 'premium'],
+            "acceso_entrenador_personal": bool(row[4]),
+            "acceso_areas_premium": bool(row[4]),
+            "popular": (row[1] or '').lower() == 'estándar'
+        }
+
         conn.close()
         return plan
         
@@ -3216,6 +3248,19 @@ async def registrar_actividad(cliente_user_id: int, actividad_data: dict, respon
         valoracion = actividad_data.get("valoracion")
         
         # Validaciones
+        # Si la actividad corresponde a un entrenamiento asignado, preferir la fecha de la asignación
+        if id_entrenamiento_asignado:
+            try:
+                cursor.execute("SELECT fecha_entrenamiento FROM entrenamientos_asignados WHERE id = %s AND id_cliente = %s", (id_entrenamiento_asignado, id_cliente))
+                fila = cursor.fetchone()
+                if fila and fila[0]:
+                    fecha_realizacion = fila[0]
+                    print(f"[DEBUG] Usando fecha_entrenamiento from asignado {id_entrenamiento_asignado}: {fecha_realizacion}")
+                else:
+                    print(f"[WARN] No se encontró fecha_entrenamiento para asignacion id={id_entrenamiento_asignado}, usando fecha proporcionada")
+            except Exception as e:
+                print(f"[ERROR] Error al obtener fecha_entrenamiento para asignacion {id_entrenamiento_asignado}: {e}")
+
         if not id_ejercicio or not fecha_realizacion or not series_realizadas:
             raise HTTPException(status_code=400, detail="Faltan datos obligatorios: ejercicio, fecha y series")
         
@@ -3262,6 +3307,65 @@ async def registrar_actividad(cliente_user_id: int, actividad_data: dict, respon
         raise HTTPException(status_code=500, detail=f"Error al registrar actividad: {str(e)}")
 
 
+@app.delete("/entrenamientos-asignados/{asignado_id}")
+async def eliminar_entrenamiento_asignado(asignado_id: int, cliente_user_id: int | None = None, response: Response = None):
+    """
+    Eliminar una asignación de entrenamiento por su ID.
+    Opcionalmente se puede proporcionar `cliente_user_id` (user.id) como query param
+    para validar que la asignación pertenece al cliente que la solicita.
+    """
+    response = response or Response()
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Si nos pasan cliente_user_id, resolver el id_cliente real
+        if cliente_user_id is not None:
+            cursor.execute("SELECT c.id FROM clientes c JOIN users u ON c.id_usuario = u.id WHERE u.id = %s", (cliente_user_id,))
+            cliente_row = cursor.fetchone()
+            if not cliente_row:
+                conn.close()
+                raise HTTPException(status_code=404, detail="Cliente no encontrado")
+            id_cliente = cliente_row[0]
+            # Verificar que la asignación pertenece a ese cliente
+            cursor.execute("SELECT id FROM entrenamientos_asignados WHERE id = %s AND id_cliente = %s", (asignado_id, id_cliente))
+            if not cursor.fetchone():
+                conn.close()
+                raise HTTPException(status_code=404, detail="Asignación no encontrada para este cliente")
+        else:
+            # Si no se pasó cliente_user_id, verificar que la asignación exista
+            cursor.execute("SELECT id FROM entrenamientos_asignados WHERE id = %s", (asignado_id,))
+            if not cursor.fetchone():
+                conn.close()
+                raise HTTPException(status_code=404, detail="Asignación no encontrada")
+
+        # Borrar la asignación (las filas en entrenamientos_realizados que referencian a esta asignación tienen ON DELETE SET NULL)
+        cursor.execute("DELETE FROM entrenamientos_asignados WHERE id = %s", (asignado_id,))
+        filas = cursor.rowcount
+        conn.commit()
+        conn.close()
+
+        if filas > 0:
+            return {"success": True, "message": "Asignación descartada correctamente", "id": asignado_id}
+        else:
+            raise HTTPException(status_code=500, detail="No se pudo eliminar la asignación")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        try:
+            conn.close()
+        except Exception:
+            pass
+        print(f"[ERROR] Error al eliminar asignación: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al eliminar asignación: {str(e)}")
+
+
 @app.get("/cliente/{cliente_user_id}/estadisticas")
 async def get_estadisticas_cliente(cliente_user_id: int, response: Response):
     """
@@ -3291,7 +3395,8 @@ async def get_estadisticas_cliente(cliente_user_id: int, response: Response):
         # 1) Obtener entrenamientos realizados (ejercicios)
         cursor.execute("""
             SELECT er.fecha_realizacion, er.series_realizadas, er.repeticiones, er.peso_kg,
-                   e.id as ejercicio_id, e.nombre as ejercicio_nombre, e.categoria
+                   e.id as ejercicio_id, e.nombre as ejercicio_nombre, e.categoria,
+                   er.notas, er.valoracion
             FROM entrenamientos_realizados er
             LEFT JOIN ejercicios e ON er.id_ejercicio = e.id
             WHERE er.id_cliente = %s
@@ -3396,7 +3501,9 @@ async def get_estadisticas_cliente(cliente_user_id: int, response: Response):
         # Estadísticas de ejercicios (frecuencia, peso máximo, volumen total)
         ejercicios_map = {}
         for row in realizados:
-            fecha_real, series_realizadas, repeticiones, peso_kg, ej_id, ej_nombre, ej_categoria = row
+            # row now includes: fecha_realizacion, series_realizadas, repeticiones, peso_kg,
+            # ejercicio_id, ejercicio_nombre, ejercicio_categoria, notas, valoracion
+            fecha_real, series_realizadas, repeticiones, peso_kg, ej_id, ej_nombre, ej_categoria, notas, valoracion = row
             nombre = ej_nombre or 'Ejercicio'
             if nombre not in ejercicios_map:
                 ejercicios_map[nombre] = { 'count': 0, 'pesos': [], 'volumen': 0 }
@@ -3433,7 +3540,8 @@ async def get_estadisticas_cliente(cliente_user_id: int, response: Response):
         # Lista detallada de ejercicios realizados por el cliente (filas individuales)
         ejercicios_realizados = []
         for row in realizados:
-            # row: fecha_realizacion, series_realizadas, repeticiones, peso_kg, ejercicio_id, ejercicio_nombre, ejercicio_categoria
+            # row: fecha_realizacion, series_realizadas, repeticiones, peso_kg,
+            # ejercicio_id, ejercicio_nombre, ejercicio_categoria, notas, valoracion
             ejercicios_realizados.append({
                 'fecha_realizacion': row[0],
                 'series_realizadas': row[1],
@@ -3441,7 +3549,9 @@ async def get_estadisticas_cliente(cliente_user_id: int, response: Response):
                 'peso_kg': row[3],
                 'ejercicio_id': row[4],
                 'ejercicio_nombre': row[5],
-                'ejercicio_categoria': row[6]
+                'ejercicio_categoria': row[6],
+                'notas': row[7],
+                'valoracion': row[8]
             })
 
         # Formar el objeto de respuesta

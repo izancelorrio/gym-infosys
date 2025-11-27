@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Clock, Dumbbell, Hash } from "lucide-react"
+import { ArrowLeft, Dumbbell, Hash } from "lucide-react"
+import { API_CONFIG } from "@/lib/config"
 
 interface EjercicioDetalle {
   id: number
@@ -15,6 +15,8 @@ interface EjercicioDetalle {
   repeticiones: string
   peso: string
   tiempoDescanso: number
+  valoracion?: number | null
+  notas?: string | null
 }
 
 interface DetalleEntrenamiento {
@@ -45,57 +47,86 @@ export default function DesgloseEntrenamientoPage({
       return
     }
 
-    // Datos simulados del desglose del entrenamiento
-    const detalleSimulado: DetalleEntrenamiento = {
-      id: Number.parseInt(params.estadisticaId),
-      fecha: "2024-01-15",
-      tiempoTotal: 75,
-      ejercicios: [
-        {
-          id: 1,
-          ejercicio: "Press de banca",
-          series: 4,
-          repeticiones: "12, 10, 8, 6",
-          peso: "60, 65, 70, 75 kg",
-          tiempoDescanso: 90,
-        },
-        {
-          id: 2,
-          ejercicio: "Sentadillas",
-          series: 3,
-          repeticiones: "15, 12, 10",
-          peso: "80, 85, 90 kg",
-          tiempoDescanso: 120,
-        },
-        {
-          id: 3,
-          ejercicio: "Remo con barra",
-          series: 3,
-          repeticiones: "12, 10, 8",
-          peso: "50, 55, 60 kg",
-          tiempoDescanso: 90,
-        },
-        {
-          id: 4,
-          ejercicio: "Press militar",
-          series: 3,
-          repeticiones: "10, 8, 6",
-          peso: "40, 45, 50 kg",
-          tiempoDescanso: 90,
-        },
-        {
-          id: 5,
-          ejercicio: "Dominadas",
-          series: 3,
-          repeticiones: "8, 6, 5",
-          peso: "Peso corporal",
-          tiempoDescanso: 120,
-        },
-      ],
+    const fetchDetalle = async () => {
+      setIsLoading(true)
+      try {
+        // Si el parámetro es fecha (YYYY-MM-DD) pedimos las estadisticas del cliente y filtramos por fecha
+        const fechaParam = params.estadisticaId
+        const isFecha = /^\d{4}-\d{2}-\d{2}$/.test(fechaParam)
+
+        if (isFecha) {
+          const res = await fetch(`${API_CONFIG.BASE_URL}/cliente/${params.clienteId}/estadisticas`)
+          if (res.ok) {
+            const json = await res.json()
+            const realizados = json.ejercicios_realizados || []
+            // Filtrar por fecha (comparamos YYYY-MM-DD)
+            const itemsDelDia = realizados.filter((r: any) => {
+              const d = new Date(r.fecha_realizacion || r.fecha || '')
+              if (isNaN(d.getTime())) return false
+              return d.toISOString().slice(0, 10) === fechaParam
+            })
+
+            if (itemsDelDia.length > 0) {
+              const detalle: DetalleEntrenamiento = {
+                id: 0,
+                fecha: fechaParam,
+                tiempoTotal: 0,
+                ejercicios: itemsDelDia.map((it: any, idx: number) => ({
+                  id: idx + 1,
+                  ejercicio: it.ejercicio_nombre || it.nombre || 'Ejercicio',
+                  series: Number(it.series_realizadas ?? it.series ?? 0) || 0,
+                  repeticiones: String(it.repeticiones ?? ''),
+                  peso: String(it.peso_kg != null ? it.peso_kg : it.peso ?? '—'),
+                  tiempoDescanso: Number(it.tiempo_descanso ?? 60),
+                  valoracion: it.valoracion ?? it.rating ?? null,
+                  notas: it.notas ?? it.notes ?? null,
+                })),
+              }
+              setDetalleEntrenamiento(detalle)
+              setIsLoading(false)
+              return
+            }
+          }
+        }
+
+        // Fallback: datos simulados si no hay datos reales
+        const detalleSimulado: DetalleEntrenamiento = {
+          id: Number.parseInt(params.estadisticaId) || 0,
+          fecha: isFecha ? params.estadisticaId : '2024-01-15',
+          tiempoTotal: 75,
+          ejercicios: [
+            {
+              id: 1,
+              ejercicio: 'Press de banca',
+              series: 4,
+              repeticiones: '12, 10, 8, 6',
+              peso: '60, 65, 70, 75 kg',
+              tiempoDescanso: 90,
+              valoracion: 4,
+              notas: 'Buena ejecución, aumentar peso la próxima semana',
+            },
+            {
+              id: 2,
+              ejercicio: 'Sentadillas',
+              series: 3,
+              repeticiones: '15, 12, 10',
+              peso: '80, 85, 90 kg',
+              tiempoDescanso: 120,
+              valoracion: null,
+              notas: '',
+            },
+          ],
+        }
+
+        setDetalleEntrenamiento(detalleSimulado)
+        setIsLoading(false)
+      } catch (err) {
+        console.error('Error fetching desglose:', err)
+        setIsLoading(false)
+      }
     }
 
-    setDetalleEntrenamiento(detalleSimulado)
-    setIsLoading(false)
+    fetchDetalle()
   }, [isAuthenticated, isTrainer, router, params.estadisticaId])
 
   const formatearTiempo = (minutos: number) => {
@@ -124,41 +155,33 @@ export default function DesgloseEntrenamientoPage({
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-7xl mx-auto space-y-8">
-        <Card className="border-border shadow-lg bg-card">
-          <CardHeader className="bg-gradient-to-r from-primary to-secondary text-white rounded-t-lg">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <div className="h-16 w-16 border-4 border-white/20 rounded-full bg-secondary flex items-center justify-center">
-                  <Dumbbell className="h-8 w-8 text-white" />
-                </div>
-                <div>
-                  <CardTitle className="text-2xl font-bold text-white">Desglose del Entrenamiento</CardTitle>
-                  <p className="text-orange-100">{formatearFecha(detalleEntrenamiento?.fecha || "")}</p>
-                </div>
+        {/* Header frame similar to other pages */}
+        <div className="bg-gradient-to-r from-primary to-secondary text-white p-6 rounded-lg shadow-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="h-16 w-16 border-4 border-white/20 rounded-full bg-secondary flex items-center justify-center">
+                <Dumbbell className="h-8 w-8 text-white" />
               </div>
-              <Button
-                variant="outline"
-                className="border-white/20 text-white hover:bg-white/10 bg-transparent"
-                onClick={() => router.back()}
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Volver
-              </Button>
+              <div>
+                <h3 className="text-2xl font-bold">Desglose del Entrenamiento</h3>
+                <p className="text-orange-100">{formatearFecha(detalleEntrenamiento?.fecha || "")}</p>
+              </div>
             </div>
-          </CardHeader>
+            <Button
+              variant="outline"
+              className="border-white/20 text-white hover:bg-white/10 bg-transparent"
+              onClick={() => router.back()}
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Volver
+            </Button>
+          </div>
+        </div>
+
+        {/* Stats card below header */}
+        <Card className="border-border shadow-lg bg-card">
           <CardContent className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="flex items-center space-x-3 p-4 bg-primary/10 rounded-lg border border-primary/20">
-                <div className="p-2 bg-primary rounded-full">
-                  <Clock className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-primary">
-                    {formatearTiempo(detalleEntrenamiento?.tiempoTotal || 0)}
-                  </p>
-                  <p className="text-sm text-muted-foreground">Duración total</p>
-                </div>
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="flex items-center space-x-3 p-4 bg-primary/10 rounded-lg border border-primary/20">
                 <div className="p-2 bg-primary rounded-full">
                   <Dumbbell className="h-5 w-5 text-white" />
@@ -173,9 +196,7 @@ export default function DesgloseEntrenamientoPage({
                   <Hash className="h-5 w-5 text-white" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-primary">
-                    {detalleEntrenamiento?.ejercicios.reduce((acc, ej) => acc + ej.series, 0) || 0}
-                  </p>
+                  <p className="text-2xl font-bold text-primary">{detalleEntrenamiento?.ejercicios.reduce((acc, ej) => acc + ej.series, 0) || 0}</p>
                   <p className="text-sm text-muted-foreground">Series totales</p>
                 </div>
               </div>
@@ -201,10 +222,13 @@ export default function DesgloseEntrenamientoPage({
                       </div>
                       <h3 className="font-semibold text-foreground text-lg">{ejercicio.ejercicio}</h3>
                     </div>
-                    <Badge className="bg-orange-100 text-orange-800 border-orange-200">{ejercicio.series} series</Badge>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Series:</span>
+                      <p className="text-foreground font-medium">{ejercicio.series}</p>
+                    </div>
                     <div>
                       <span className="text-muted-foreground">Repeticiones:</span>
                       <p className="text-foreground font-medium">{ejercicio.repeticiones}</p>
@@ -214,9 +238,14 @@ export default function DesgloseEntrenamientoPage({
                       <p className="text-foreground font-medium">{ejercicio.peso}</p>
                     </div>
                     <div>
-                      <span className="text-muted-foreground">Descanso:</span>
-                      <p className="text-foreground font-medium">{ejercicio.tiempoDescanso}s</p>
+                      <span className="text-muted-foreground">Valoración:</span>
+                      <p className="text-foreground font-medium">{ejercicio.valoracion != null ? `${ejercicio.valoracion}/5` : '—'}</p>
                     </div>
+                  </div>
+
+                  <div className="mt-3 text-sm">
+                    <span className="text-muted-foreground">Nota:</span>
+                    <p className="text-foreground font-medium mt-1">{ejercicio.notas && ejercicio.notas.trim().length > 0 ? ejercicio.notas : 'El cliente no ha dejado nota para este ejercicio'}</p>
                   </div>
                 </div>
               ))}

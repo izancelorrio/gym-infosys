@@ -68,9 +68,7 @@ export function Header() {
               <a href="#clases" className="text-foreground hover:text-primary transition-colors">
                 Clases
               </a>
-              <a href="#testimonios" className="text-foreground hover:text-primary transition-colors">
-                Testimonios
-              </a>
+              {/* Testimonios removed from navigation */}
               <a href="#contacto" className="text-foreground hover:text-primary transition-colors">
                 Contacto
               </a>
@@ -173,13 +171,7 @@ export function Header() {
                 >
                   Clases
                 </a>
-                <a
-                  href="#testimonios"
-                  className="block px-3 py-2 text-foreground hover:text-primary transition-colors"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  Testimonios
-                </a>
+                {/* Testimonios removed from mobile navigation */}
                 <a
                   href="#contacto"
                   className="block px-3 py-2 text-foreground hover:text-primary transition-colors"

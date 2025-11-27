@@ -1,6 +1,8 @@
-import { Dumbbell, Facebook, Instagram, Twitter, Youtube } from "lucide-react"
+"use client"
+
+import { Dumbbell } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 
 export function Footer() {
   return (
@@ -17,20 +19,7 @@ export function Footer() {
               Tu gimnasio de confianza para alcanzar todos tus objetivos fitness. Más que un gimnasio, somos tu
               comunidad de apoyo.
             </p>
-            <div className="flex space-x-3">
-              <Button size="sm" variant="outline" className="p-2 bg-transparent" aria-label="Facebook">
-                <Facebook className="h-4 w-4" />
-              </Button>
-              <Button size="sm" variant="outline" className="p-2 bg-transparent" aria-label="Instagram">
-                <Instagram className="h-4 w-4" />
-              </Button>
-              <Button size="sm" variant="outline" className="p-2 bg-transparent" aria-label="Twitter">
-                <Twitter className="h-4 w-4" />
-              </Button>
-              <Button size="sm" variant="outline" className="p-2 bg-transparent" aria-label="YouTube">
-                <Youtube className="h-4 w-4" />
-              </Button>
-            </div>
+            {/* Social icons removed per request */}
           </div>
 
           {/* Quick Links */}
@@ -47,16 +36,7 @@ export function Footer() {
                   Clases
                 </a>
               </li>
-              <li>
-                <a href="#testimonios" className="text-muted-foreground hover:text-primary transition-colors">
-                  Testimonios
-                </a>
-              </li>
-              <li>
-                <a href="#" className="text-muted-foreground hover:text-primary transition-colors">
-                  Membresías
-                </a>
-              </li>
+              {/* Testimonios and Membresías links removed from quick links */}
             </ul>
           </div>
 
@@ -64,37 +44,66 @@ export function Footer() {
           <div>
             <h3 className="font-semibold text-foreground mb-4">Contacto</h3>
             <ul className="space-y-2 text-sm text-muted-foreground">
-              <li>📍 Av. Principal 123, Ciudad</li>
+              <li>📍 C. de María de Luna, 3, 50018 Zaragoza (EINA - UNIZAR)</li>
               <li>📞 +34 900 123 456</li>
-              <li>✉️ izan.celorrio.caballero@gmail.com</li>
-              <li>🕒 Lun-Dom: 24/7</li>
+              <li>
+                ✉️ <a href="mailto:900013@unizar.es" className="hover:text-primary transition-colors">900013@unizar.es</a>
+              </li>
+              <li>
+                ✉️ <a href="mailto:899577@unizar.es" className="hover:text-primary transition-colors">899577@unizar.es</a>
+              </li>
+              <li>🕒 Lun-Vie: 08:00 - 20:00</li>
             </ul>
           </div>
 
-          {/* Newsletter */}
+          {/* Location (Google Maps) */}
           <div>
-            <h3 className="font-semibold text-foreground mb-4">Newsletter</h3>
-            <p className="text-sm text-muted-foreground mb-4">Recibe tips de entrenamiento y ofertas exclusivas.</p>
-            <div className="flex gap-2">
-              <Input type="email" placeholder="Tu email" className="text-sm" />
-              <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90">
-                <span className="sm:inline hidden">✉</span>
-                <span className="hidden sm:inline">Suscribir</span>
-              </Button>
+            <h3 className="font-semibold text-foreground mb-4">Ubicación</h3>
+            <div className="text-sm text-muted-foreground mb-3">Escuela de Ingeniería y Arquitectura de Zaragoza (UNIZAR)</div>
+            <div className="w-full h-40 md:h-48 lg:h-40 overflow-hidden rounded">
+              <iframe
+                title="EINA Zaragoza"
+                src="https://www.google.com/maps?q=Escuela+de+Ingenier%C3%ADa+y+Arquitectura+Zaragoza&output=embed"
+                width="100%"
+                height="100%"
+                style={{ border: 0 }}
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+              />
             </div>
           </div>
         </div>
 
         <div className="border-t border-border mt-8 pt-8 text-center">
           <p className="text-sm text-muted-foreground">
-            © 2024 Gym-InfoSys. Todos los derechos reservados. |
-            <a href="#" className="hover:text-primary transition-colors ml-1">
-              Política de Privacidad
-            </a>{" "}
+            © 2025 Gym-InfoSys. Todos los derechos reservados. |
+            <Dialog>
+              <DialogTrigger asChild>
+                <a className="hover:text-primary transition-colors ml-1 cursor-pointer">Política de Privacidad</a>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Política de Privacidad</DialogTitle>
+                </DialogHeader>
+                <DialogDescription>
+                  Trabajo de la asignatura sistemas de información realizado por Izan Celorrio y Alejo Beamonte en el curso 2025/2026.
+                </DialogDescription>
+              </DialogContent>
+            </Dialog>
             |
-            <a href="#" className="hover:text-primary transition-colors ml-1">
-              Términos de Servicio
-            </a>
+            <Dialog>
+              <DialogTrigger asChild>
+                <a className="hover:text-primary transition-colors ml-1 cursor-pointer">Términos de Servicio</a>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Términos de Servicio</DialogTitle>
+                </DialogHeader>
+                <DialogDescription>
+                  Trabajo de la asignatura sistemas de información realizado por Izan Celorrio y Alejo Beamonte en el curso 2025/2026.
+                </DialogDescription>
+              </DialogContent>
+            </Dialog>
           </p>
         </div>
       </div>

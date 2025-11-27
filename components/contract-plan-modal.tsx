@@ -59,6 +59,68 @@ export function ContractPlanModal({ isOpen, onClose }: ContractPlanModalProps) {
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  // Helpers para número de tarjeta y CVV (copiados desde admin user edit)
+  const stripNonDigits = (s?: string | null) => {
+    if (!s) return ""
+    return String(s).replace(/[^0-9]/g, "")
+  }
+
+  const formatCardNumberForDisplay = (raw?: string | null) => {
+    const digits = stripNonDigits(raw)
+    if (!digits) return ""
+    return digits.replace(/(\d{4})(?=\d)/g, "$1 ")
+  }
+
+  const luhnCheck = (num: string) => {
+    const digits = stripNonDigits(num)
+    let sum = 0
+    let shouldDouble = false
+    for (let i = digits.length - 1; i >= 0; i--) {
+      let d = parseInt(digits.charAt(i), 10)
+      if (shouldDouble) {
+        d *= 2
+        if (d > 9) d -= 9
+      }
+      sum += d
+      shouldDouble = !shouldDouble
+    }
+    return digits.length > 0 && sum % 10 === 0
+  }
+
+  const isValidCVV = (cvv?: string | null) => {
+    if (!cvv) return false
+    return /^[0-9]{3,4}$/.test(String(cvv))
+  }
+
+  // Helpers para normalizar/parsear la fecha de caducidad de tarjeta
+  const cardExpiryToISO = (v?: string | null) => {
+    if (!v) return ""
+    if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v
+    const mmyy = v.match(/^\s*(\d{2})\/(\d{2})\s*$/)
+    if (mmyy) {
+      const mm = mmyy[1]
+      const yy = mmyy[2]
+      const yyyy = Number(yy) > 50 ? `19${yy}` : `20${yy}`
+      return `${yyyy}-${mm}-01`
+    }
+    const mmyyyy = v.match(/^\s*(\d{2})\/(\d{4})\s*$/)
+    if (mmyyyy) {
+      const mm = mmyyyy[1]
+      const yyyy = mmyyyy[2]
+      return `${yyyy}-${mm}-01`
+    }
+    return ""
+  }
+
+  const isoToCardDisplay = (iso?: string | null) => {
+    if (!iso) return ""
+    const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+    if (!m) return String(iso)
+    const yyyy = m[1]
+    const mm = m[2]
+    return `${mm}/${yyyy}`
+  }
+
   // Cargar planes desde la API
   useEffect(() => {
     const fetchPlanes = async () => {
@@ -158,6 +220,35 @@ export function ContractPlanModal({ isOpen, onClose }: ContractPlanModalProps) {
     }
     // asignar normalizado
     formData.telefono = normalizedPhone
+
+    // Validar número de tarjeta (Luhn)
+    const numTarjetaRaw = formData.numeroTarjeta || ""
+    if (!numTarjetaRaw) {
+      setFormError("Número de tarjeta inválido")
+      setIsSubmitting(false)
+      return
+    }
+    if (!luhnCheck(numTarjetaRaw)) {
+      setFormError("Número de tarjeta inválido")
+      setIsSubmitting(false)
+      return
+    }
+
+    // Validar fecha de caducidad
+    const fechaTarjetaRaw = formData.fechaExpiracion || ""
+    if (!fechaTarjetaRaw) {
+      setFormError("Formato de fecha de caducidad inválido")
+      setIsSubmitting(false)
+      return
+    }
+
+    // Validar CVV (3 o 4 dígitos)
+    const cvvRaw = formData.cvv || ""
+    if (!isValidCVV(cvvRaw)) {
+      setFormError("CVV inválido (debe tener 3 o 4 dígitos)")
+      setIsSubmitting(false)
+      return
+    }
 
     try {
       const contractData = {
@@ -401,8 +492,8 @@ export function ContractPlanModal({ isOpen, onClose }: ContractPlanModalProps) {
                                   <span className="text-sm font-bold text-primary">€{plan.precio_mensual}/mes</span>
                                 </div>
                                 <div className="text-xs text-muted-foreground">
-                                  {plan.caracteristicas.slice(0, 2).join(' • ')}
-                                  {plan.caracteristicas.length > 2 && '...'}
+                                  {(plan.caracteristicas || []).slice(0, 2).join(' • ')}
+                                  {(plan.caracteristicas || []).length > 2 && '...'}
                                 </div>
                               </div>
                             </div>
@@ -429,7 +520,7 @@ export function ContractPlanModal({ isOpen, onClose }: ContractPlanModalProps) {
                         <h4 className="font-medium text-sm">Características incluidas:</h4>
                         <div className="grid grid-cols-1 gap-1 text-xs">
                           {/* Mostrar todas las características del JSON */}
-                          {planSeleccionado.caracteristicas.map((caracteristica, index) => (
+                          {(planSeleccionado.caracteristicas || []).map((caracteristica, index) => (
                             <div key={index} className="flex items-center gap-2">
                               <div className="w-1.5 h-1.5 bg-primary rounded-full"></div>
                               {caracteristica}
@@ -458,10 +549,15 @@ export function ContractPlanModal({ isOpen, onClose }: ContractPlanModalProps) {
                       <Label htmlFor="numeroTarjeta">Número de Tarjeta *</Label>
                       <Input
                         id="numeroTarjeta"
-                        value={formData.numeroTarjeta}
-                        onChange={(e) => handleInputChange("numeroTarjeta", e.target.value)}
+                        value={formatCardNumberForDisplay(formData.numeroTarjeta)}
+                        onChange={(e) => {
+                          const raw = e.target.value
+                          const normalized = stripNonDigits(raw)
+                          handleInputChange("numeroTarjeta", normalized)
+                        }}
                         placeholder="1234 5678 9012 3456"
-                        maxLength={19}
+                        inputMode="numeric"
+                        maxLength={23}
                         required
                       />
                     </div>
@@ -469,10 +565,14 @@ export function ContractPlanModal({ isOpen, onClose }: ContractPlanModalProps) {
                       <div className="space-y-2">
                         <Label>Fecha de Expiración *</Label>
                         <Input 
-                          placeholder="MM/AA" 
-                          maxLength={5} 
-                          value={formData.fechaExpiracion}
-                          onChange={(e) => handleInputChange("fechaExpiracion", e.target.value)}
+                          type="date"
+                          value={formData.fechaExpiracion ? cardExpiryToISO(formData.fechaExpiracion) : ""}
+                          onChange={(e) => {
+                            // Preferir convertir formatos MM/YY o MM/YYYY a ISO, pero si el browser
+                            // devuelve YYYY-MM-DD lo guardamos tal cual.
+                            const iso = cardExpiryToISO(e.target.value) || e.target.value
+                            handleInputChange("fechaExpiracion", iso)
+                          }}
                           required 
                         />
                       </div>
@@ -480,10 +580,14 @@ export function ContractPlanModal({ isOpen, onClose }: ContractPlanModalProps) {
                         <Label>CVV *</Label>
                         <Input 
                           placeholder="123" 
-                          maxLength={3} 
+                          maxLength={4} 
                           value={formData.cvv}
-                          onChange={(e) => handleInputChange("cvv", e.target.value)}
+                          onChange={(e) => {
+                            const digits = stripNonDigits(e.target.value)
+                            handleInputChange("cvv", digits)
+                          }}
                           required 
+                          inputMode="numeric"
                         />
                       </div>
                     </div>

@@ -113,6 +113,60 @@ export default function EstadisticasClientePage({ params }: { params: { clienteI
     })
   }
 
+  // Agrupar estadisticas por día (YYYY-MM-DD)
+  const agrupadasPorDia = estadisticas.reduce((acc: Record<string, EstadisticaEntrenamiento[]>, item) => {
+    const d = new Date(item.fecha)
+    const key = isNaN(d.getTime()) ? String(item.fecha) : d.toISOString().slice(0, 10) // YYYY-MM-DD
+    if (!acc[key]) acc[key] = []
+    acc[key].push(item)
+    return acc
+  }, {})
+
+  // Ordenar claves de fecha ascendente (más antigua primero -> más arriba)
+  const diasOrdenados = Object.keys(agrupadasPorDia).sort((a, b) => a.localeCompare(b))
+
+  // Navegar a la pantalla de desglose para la fecha seleccionada
+  const handleVerDesgloseDia = (diaKey: string) => {
+    router.push(`/entrenador/estadisticas/${params.clienteId}/desglose/${encodeURIComponent(diaKey)}`)
+  }
+
+  // Semana seleccionada: offset relativo a la semana actual (0 = semana actual, -1 = anterior, ...)
+  const [weekOffset, setWeekOffset] = useState<number>(0)
+
+  const startOfWeekMonday = (d: Date) => {
+    const date = new Date(d)
+    const day = date.getDay() // 0 (Sun) - 6 (Sat)
+    const diff = (day + 6) % 7 // days since Monday
+    date.setDate(date.getDate() - diff)
+    date.setHours(0, 0, 0, 0)
+    return date
+  }
+
+  const today = new Date()
+  const currentWeekStart = startOfWeekMonday(today)
+  const selectedWeekStart = new Date(currentWeekStart)
+  selectedWeekStart.setDate(currentWeekStart.getDate() + weekOffset * 7)
+  selectedWeekStart.setHours(0, 0, 0, 0)
+  const selectedWeekEnd = new Date(selectedWeekStart)
+  selectedWeekEnd.setDate(selectedWeekStart.getDate() + 6)
+  selectedWeekEnd.setHours(23, 59, 59, 999)
+
+  const prevWeek = () => setWeekOffset((w) => w - 1)
+  const nextWeek = () => setWeekOffset((w) => Math.min(0, w + 1))
+
+  const formatShortDate = (isoOrDate: string | Date) => {
+    const d = typeof isoOrDate === 'string' ? new Date(isoOrDate) : isoOrDate
+    if (isNaN(d.getTime())) return String(isoOrDate)
+    return d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })
+  }
+
+  // Filtrar dias para quedarnos solo con los que pertenezcan a la semana seleccionada
+  const diasSemana = diasOrdenados.filter((diaKey) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(diaKey)) return false
+    const d = new Date(diaKey + 'T00:00:00')
+    return d.getTime() >= selectedWeekStart.getTime() && d.getTime() <= selectedWeekEnd.getTime()
+  })
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -157,7 +211,7 @@ export default function EstadisticasClientePage({ params }: { params: { clienteI
               <Calendar className="h-5 w-5 text-white" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-primary">{estadisticas.length}</p>
+              <p className="text-2xl font-bold text-primary">{Object.keys(agrupadasPorDia).length}</p>
               <p className="text-sm text-muted-foreground">Entrenamientos</p>
             </div>
           </div>
@@ -195,40 +249,52 @@ export default function EstadisticasClientePage({ params }: { params: { clienteI
 
         <Card className="border-border shadow-lg bg-card">
           <CardHeader className="bg-gradient-to-r from-primary/10 to-secondary/10 border-b border-border">
-            <CardTitle className="flex items-center space-x-2 text-foreground">
-              <Calendar className="h-5 w-5" />
-              <span>Historial de Entrenamientos</span>
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2 text-foreground">
+                <Calendar className="h-5 w-5" />
+                <span className="font-medium">Historial de Entrenamientos</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="text-sm text-muted-foreground mr-2">Semana: {formatShortDate(selectedWeekStart)} — {formatShortDate(selectedWeekEnd)}</div>
+                <Button size="sm" variant="outline" onClick={prevWeek}>Semana anterior</Button>
+                <Button size="sm" variant="outline" onClick={nextWeek} disabled={weekOffset === 0}>Semana siguiente</Button>
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="p-6">
             <div className="space-y-4">
-              <div className="grid grid-cols-4 gap-4 p-4 bg-primary/5 rounded-lg border border-primary/20">
-                <div className="font-semibold text-foreground">Ejercicio / Fecha</div>
-                <div className="font-semibold text-foreground text-center">Series</div>
-                <div className="font-semibold text-foreground text-center">Reps</div>
-                <div className="font-semibold text-foreground text-center">Peso</div>
-              </div>
+              {/* Column header removed as requested */}
 
-              {estadisticas.map((estadistica) => (
-                <div
-                  key={estadistica.id}
-                  className="grid grid-cols-4 gap-4 p-4 border border-border rounded-lg bg-card hover:bg-muted hover:border-primary/50 transition-all duration-200 shadow-sm cursor-pointer"
-                >
-                  <div className="text-foreground">
-                    <div className="font-medium">{estadistica.ejercicio}</div>
-                    <div className="text-sm text-muted-foreground">{formatearFecha(estadistica.fecha)}</div>
+              {diasSemana.length === 0 && (
+                <div className="p-6 text-center text-muted-foreground">No se realizaron entrenamientos esta semana.</div>
+              )}
+
+              {diasSemana.map((diaKey) => {
+                const items = agrupadasPorDia[diaKey] || []
+                const displayDate = (() => {
+                  // si la clave es YYYY-MM-DD, crear fecha para formatear bonito
+                  if (/^\d{4}-\d{2}-\d{2}$/.test(diaKey)) return formatearFecha(diaKey)
+                  return String(diaKey)
+                })()
+
+                return (
+                  <div key={diaKey} className="space-y-2">
+                    <div
+                      className="flex items-center justify-between p-3 bg-gradient-to-r from-primary/5 to-secondary/5 rounded-lg border border-border cursor-pointer"
+                      onClick={() => handleVerDesgloseDia(diaKey)}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <Calendar className="h-5 w-5 text-primary" />
+                        <div>
+                          <div className="font-semibold text-foreground">{displayDate}</div>
+                          <div className="text-sm text-muted-foreground">{items.length} ejercicio{items.length !== 1 ? 's' : ''}</div>
+                        </div>
+                      </div>
+                      <div className="text-sm text-muted-foreground">Ver desglose</div>
+                    </div>
                   </div>
-                  <div className="text-center">
-                    <div className="text-white font-semibold">{estadistica.series}</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-white font-semibold">{estadistica.repeticiones}</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-white font-semibold">{estadistica.peso ?? '—'}</div>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </CardContent>
         </Card>

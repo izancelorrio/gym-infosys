@@ -137,7 +137,7 @@ export function RegisterModal({ isOpen, onClose, onSwitchToLogin }: RegisterModa
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold text-center">Crear Cuenta</DialogTitle>
-          <DialogDescription className="text-center">Únete a Gym-InfoSys y comienza tu transformación</DialogDescription>
+          <DialogDescription className="text-center">Únete a Gym-InfoSys</DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
