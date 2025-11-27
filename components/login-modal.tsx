@@ -91,9 +91,12 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }: LoginModalPr
     setResetMessage("")
 
     try {
-      const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.SEND_RESET_EMAIL}`, {
+      const proxyUrl = "/api/auth/send-reset-email"
+      const response = await fetch(proxyUrl, {
         method: "POST",
-        headers: API_CONFIG.HEADERS,
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({ email: resetEmail }),
       })
 

@@ -1,0 +1,65 @@
+blockdiag {
+  // Nodos principales (navegación)
+  Home [label = "Home", color = "lightblue"];
+  
+
+  Registrarse [label = "Registrarse", color = "lightsalmon"];
+  Auth [label = "Auth", color = "orange"];
+  Videos [label = "Videos", color = "lightgreen"];
+
+  PerfilUsuario [label = "Usuario", color = "lightseagreen"];
+  ContratarPlan [label = "Contratar Plan", color = "lightseagreen"];
+
+  Client [label = "Cliente", color = "greenyellow"];
+  RegistrarEjercicio [label = "Registrar Ejercicio", color = "greenyellow"];
+  ReservarClase [label = "Reservar Clase", color = "greenyellow"];
+  Agenda [label = "Agenda", color = "greenyellow"];
+  EstadisticasCliente [label = "Estadisticas Cliente", color = "greenyellow"];
+
+  Trainer [label = "Entrenador", color = "gold"];
+  AsignarEntrenamiento [label = "Asignar Entrenamiento", color = "gold", width = 200];
+  EstadisticasTrainer [label = "Estadisticas Entrenador", color = "gold", width = 220];
+
+  Admin [label = "Admin", color = "pink"];
+  GestionUsuarios [label = "Gestion Usuarios", color = "pink"];
+  GestionClases [label = "Gestion Clases", color = "pink"];
+  GestionPlanes [label = "Gestion Planes", color = "pink"];
+
+  
+
+  // Relaciones / navegabilidad (solo navegación — sin llamadas API)
+  Home -> Registrarse;
+  Home -> Auth;
+  Home -> Videos;
+  Registrarse -> PerfilUsuario;
+
+  // Tras autenticación, rutas por rol
+  Auth -> Client;
+  Auth -> Trainer;
+  Auth -> Admin;
+  Auth -> PerfilUsuario;
+  PerfilUsuario -> ContratarPlan;
+  ContratarPlan -> Client;
+
+
+  // Flujo Cliente
+  Client -> RegistrarEjercicio;
+  Client -> ReservarClase;
+  Client -> Agenda;
+  Client -> EstadisticasCliente;
+
+  // Flujo Entrenador
+  Trainer -> AsignarEntrenamiento;
+  Trainer -> EstadisticasTrainer;
+
+  // Flujo Admin
+  Admin -> GestionUsuarios;
+  Admin -> GestionClases;
+  Admin -> GestionPlanes;
+
+  // Colores destacados
+  Home [color = "lightblue"];
+  Client [color = "greenyellow"];
+  Trainer [color = "gold"];
+  Admin [color = "pink"];
+}

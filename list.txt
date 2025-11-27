@@ -15,7 +15,7 @@ lo del correo tokens
 
 en el zip final dejar el env.local del docker y quitar los otros dos env.local t quitar la carpeta node_modules y cambiar el compose
 
-
+arrglar script
 
 notas memoria:
 portada de la memoria
