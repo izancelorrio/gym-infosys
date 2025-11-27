@@ -253,8 +253,6 @@ export default function EntrenadorPage() {
                       <p className="text-sm text-muted-foreground">{cliente.email}</p>
                       <div className="flex items-center space-x-4 mt-1">
                         <span className="text-xs text-muted-foreground">Asignado: {cliente.fecha_asignacion}</span>
-                        <span className="text-xs text-primary font-medium">Plan: {cliente.plan_nombre}</span>
-                        <span className="text-xs text-secondary font-medium">{cliente.total_workouts} entrenamientos</span>
                       </div>
                     </div>
                   </div>

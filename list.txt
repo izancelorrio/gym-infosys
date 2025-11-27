@@ -1,46 +1,40 @@
-cambiar la categoria en el insert de planes
 quitar del poblar los ejercicios eliptica. bicilceta estatica y caminadora
-de la tabla entrenamientos_realizados quitar hota_inmicio hora_fin tiempo_segundos y diatancia_metros
-pantalla cuando picnhas el entreno concreto de un cliente
+de la tabla entrenamientos_realizados quitar tiempo_segundos y diatancia_metros
 comprobar que todos los csripts create coincide con la base de datos
 revisar tablas porque iogual sobre campos o faltan
-estadistica del entrenador mejorarla
-al contartar pla securizar los campos de tarjeta cvv etc
 posibilidad de los horarios dispoibles gestionarlos como administrador
-en muchas llamadas para evitar la cache hemos creado un timestump para generar urls disitntas
-revisar tildes en frontend como en el deplegable de los planes
-quitar clientepro de gestion de usuarios
-en la tabla de asignacion cliente entrenador tengo que hacer operatiuva de desasignar
-hacer bien la pantalla de gestion de asignsaciones entrenador cliente
-en la pantalla panel de entrenador habra que modificar del cliente el texto de debajo
-cuando registro actividad manualmente me klleva a la pantalla de agenda
-los estados de la tabla de reservas no estan definidos
-poner campos de las tablas castellano o todos ingles y lo mismo con el nombre de las tablas
 verificar los inserts de poblacon como los timestamp que hay algubnos a mano y deberian ser automaticos
 en algunas tablas mirar si el campo estado se usa para algo y si no se usa se quita
-intentar quitar al editar y pasar de usuario a cliente los campos de tiempo
-quitar mensajes de debuj al psar un usuario a cliente desde el admin
+quitar el campo ubicacion de la tabla clases_programadas
+
+
+
+
+
+
+
 que un unstructor no se pueda tener clases a la misma hora el mismo dia, que cuando depliegues la hora te aparezca en rojo la hora que no se pueda
-en registrar actividad que los ejercicios se agrupen por dias
-eliminar funcion health
-hay que eliminar la duracion de gym_clases o de clases_programadas yo diria de gym_clases y lo mismo con la capacidad maxima
-quitar la ubicacion de la tabla clases_programadas
+lo del correo tokens
+
+
+
+
+
+
+
+
+
+en el zip final dejar el env.local del docker y quitar los otros dos env.local t quitar la carpeta node_modules
+
+
+
+notas memoria:
+portada de la memoria
+en muchas llamadas para evitar la cache hemos creado un timestump para generar urls disitntas
 poner en la memoria que suamos correo para verificar
 cambiar node.js de modo development a definitivo
 quitar comentarios de la ia en distinto ficheros
-en el script habra que crear el directorio del volumen del postgres, probar en otra maquina
 quitar y no exponer puertos api frontend
-pantalla asiganciones cambiar botones y cambiar la estetica
-en el zip final dejar el env.local del docker y quitar los otros dos env.local t quitar la carpeta node_modules
-portada de la memoria
-que el admin al programar una clase le salgan en rojo los horarios del entrenador uqe ya estan cojidos
-
-
-
-
-
-
-
 
 
 git clone https://github.com/izancelorrio/gym-infosys.git

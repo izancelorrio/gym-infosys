@@ -149,8 +149,16 @@ export default function ReservarClasePage() {
     return null
   }
 
-  // Filtrar clases basándose en el tipo seleccionado y que sean posteriores a la fecha/hora actual
-  const clasesFiltradas = clasesProgramadas.filter((clase: ClaseProgramada) => {
+  // Ordenar por fecha+hora (asc) y filtrar clases basándose en el tipo seleccionado y que sean posteriores a la fecha/hora actual
+  const sortedByDateTime = clasesProgramadas
+    .slice()
+    .sort((a, b) => {
+      const da = new Date(`${a.fecha}T${a.hora}`)
+      const db = new Date(`${b.fecha}T${b.hora}`)
+      return da.getTime() - db.getTime()
+    })
+
+  const clasesFiltradas = sortedByDateTime.filter((clase: ClaseProgramada) => {
     // Verificar si cumple el filtro de tipo
     const cumpleFiltroTipo = filtroTipo === "Todos" || clase.tipo === filtroTipo;
     
@@ -241,55 +249,61 @@ export default function ReservarClasePage() {
         return
       }
 
-      // Pedir confirmación al usuario
+      // Pedir confirmación por toast con acción
       const fechaFormateada = new Date(fecha).toLocaleDateString('es-ES', {
         weekday: 'long',
         year: 'numeric',
         month: 'long',
         day: 'numeric'
       })
-      
-      const confirmacion = window.confirm(
-        `🗑️ ANULAR RESERVA\n\n` +
-        `Clase: ${tipoClase}\n` +
-        `Fecha: ${fechaFormateada}\n` +
-        `Hora: ${hora}\n\n` +
-        `¿Estás seguro de que quieres anular esta reserva?`
-      )
-      
-      if (!confirmacion) {
-        return
-      }
 
-      const timestampDelete = new Date().getTime()
-      console.log(`[${timestampDelete}] Anulando reserva ${reserva.id} para clase ${claseId}`)
+      toast({
+        title: 'Confirmar anulación',
+        description: `🗑️ Anular reserva\n\nClase: ${tipoClase}\nFecha: ${fechaFormateada}\nHora: ${hora}`,
+        type: 'info',
+        actions: [
+          {
+            label: 'Anular',
+            onClick: async () => {
+              try {
+                const timestampDelete = new Date().getTime()
+                console.log(`[${timestampDelete}] Anulando reserva ${reserva.id} para clase ${claseId}`)
 
-      const response = await fetch(`/api/reservas/${reserva.id}?_t=${timestampDelete}`, {
-        method: 'DELETE',
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        }
+                const response = await fetch(`/api/reservas/${reserva.id}?_t=${timestampDelete}`, {
+                  method: 'DELETE',
+                  headers: {
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache',
+                    'Expires': '0'
+                  }
+                })
+
+                const resultado = await response.json()
+
+                if (!response.ok) {
+                  throw new Error(resultado.detail || 'Error al anular la reserva')
+                }
+
+                console.log(`[${timestampDelete}] Reserva anulada exitosamente:`, resultado)
+
+                // Quitar de la lista local de clases reservadas
+                setClasesReservadas((prev) => prev.filter(id => id !== claseId))
+
+                // Mostrar mensaje de éxito
+                toast({ title: 'Reserva anulada', description: `La reserva para ${tipoClase} del ${fechaFormateada} a las ${hora} ha sido anulada.`, type: 'success' })
+
+                // Recargar datos para actualizar la ocupación
+                await cargarClasesProgramadas()
+                await cargarReservasCliente()
+              } catch (error) {
+                console.error('Error al anular reserva (desde acción toast):', error)
+                toast({ title: 'Error al anular reserva', description: String(error instanceof Error ? error.message : 'Error desconocido'), type: 'error' })
+              }
+            }
+          },
+          { label: 'Cancelar', onClick: () => {} }
+        ]
       })
-
-      const resultado = await response.json()
-
-      if (!response.ok) {
-        throw new Error(resultado.detail || 'Error al anular la reserva')
-      }
-
-      console.log(`[${timestampDelete}] Reserva anulada exitosamente:`, resultado)
-      
-      // Quitar de la lista local de clases reservadas
-      setClasesReservadas(clasesReservadas.filter(id => id !== claseId))
-      
-      // Mostrar mensaje de éxito
-      toast({ title: 'Reserva anulada', description: `La reserva para ${tipoClase} del ${fechaFormateada} a las ${hora} ha sido anulada.`, type: 'success' })
-      
-      // Recargar datos para actualizar la ocupación
-      await cargarClasesProgramadas()
-      await cargarReservasCliente()
       
     } catch (error) {
       console.error('Error al anular reserva:', error)

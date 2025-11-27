@@ -339,8 +339,6 @@ CREATE TABLE entrenamientos_realizados (
     id_ejercicio INTEGER NOT NULL,
     id_entrenamiento_asignado INTEGER,
     fecha_realizacion DATE NOT NULL,
-    hora_inicio TIME,
-    hora_fin TIME,
     series_realizadas INTEGER NOT NULL CHECK (series_realizadas > 0),
     repeticiones INTEGER CHECK (repeticiones > 0),
     peso_kg DECIMAL(5,2) CHECK (peso_kg >= 0),

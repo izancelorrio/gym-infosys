@@ -24,8 +24,8 @@ VALUES
 -- Planes table seed data
 INSERT INTO planes (nombre, precio_mensual, caracteristicas, activo, color_tema, orden_display, created_at, updated_at, acceso_entrenador) 
 VALUES 
-('Premium', 79.99, '["Todo lo del plan Estándar", "Entrenador personal asignado", "Acceso 24/7 al gimnasio", "Áreas VIP exclusivas", "Evaluaciones corporales mensuales", "Planes de nutrición personalizados", "Acceso a sauna y spa", "Invitado gratis semanal"]', 1, '#8b5cf6', 3, '2025-09-22 20:54:57', '2025-10-16 14:23:15', 1),
-('Estándar', 49.99, '["Todo lo del plan Básico", "Acceso a clases grupales", "Horario extendido (24/7)", "1 sesión mensual con nutricionista", "Descuentos en tienda"]', 1, '#3b82f6', 2, '2025-09-22 20:54:57', '2025-09-22 20:54:57', 0),
+('Premium', 79.99, '["Todo lo del plan Estándar", "Entrenador personal asignado", "Acceso 24/7 al gimnasio", "Áreas VIP exclusivas", "Acceso a sauna y spa", "Invitado gratis semanal"]', 1, '#8b5cf6', 3, '2025-09-22 20:54:57', '2025-10-16 14:23:15', 1),
+('Estándar', 49.99, '["Todo lo del plan Básico", "Horario extendido (24/7)", "Descuentos en tienda"]', 1, '#3b82f6', 2, '2025-09-22 20:54:57', '2025-09-22 20:54:57', 0),
 ('Básico', 29.99, '["Acceso a todas las máquinas", "Vestuarios y duchas", "Wi-Fi gratuito", "Horario estándar (6:00 - 22:00)"]', 1, '#10b981', 1, '2025-09-22 20:54:57', '2025-09-22 20:54:57', 0);
 
 -- Clientes table seed data
@@ -124,10 +124,10 @@ VALUES
 (17, 1, 8, '2025-10-20', 3, 'pendiente', '2025-10-16 19:35:26', '2025-10-16 19:35:26');
 
 -- Entrenamientos realizados table seed data
-INSERT INTO entrenamientos_realizados (id_cliente, id_ejercicio, id_entrenamiento_asignado, fecha_realizacion, hora_inicio, hora_fin, series_realizadas, repeticiones, peso_kg, tiempo_segundos, distancia_metros, notas, valoracion, tipo_registro, created_at, updated_at) 
+INSERT INTO entrenamientos_realizados (id_cliente, id_ejercicio, id_entrenamiento_asignado, fecha_realizacion, series_realizadas, repeticiones, peso_kg, tiempo_segundos, distancia_metros, notas, valoracion, tipo_registro, created_at, updated_at) 
 VALUES 
-(1, 10, NULL, '2025-10-07', NULL, NULL, 5, 5, 5, 300, 5, '', 3, 'libre', '2025-10-16 20:10:33', '2025-10-16 20:10:33'),
-(1, 12, NULL, '2025-10-16', NULL, NULL, 3, 3, 55, 480, 55, 'hrhrh', 4, 'libre', '2025-10-16 20:08:10', '2025-10-16 20:08:10'),
-(1, 6, 8, '2025-10-16', NULL, NULL, 1, 1, 1, 31313, 313, '', 3, 'planificado', '2025-10-16 19:56:24', '2025-10-16 19:56:24'),
-(1, 14, 5, '2025-10-16', NULL, NULL, 1, 33, 33, 33, NULL, '', 3, 'planificado', '2025-10-16 19:55:41', '2025-10-16 19:55:41'),
-(1, 1, 7, '2025-10-16', NULL, NULL, 1, 33, 33, 33, NULL, '', 3, 'planificado', '2025-10-16 19:55:41', '2025-10-16 19:55:41');
+(1, 10, NULL, '2025-10-07', 5, 5, 5, 300, 5, '', 3, 'libre', '2025-10-16 20:10:33', '2025-10-16 20:10:33'),
+(1, 12, NULL, '2025-10-16', 3, 3, 55, 480, 55, 'hrhrh', 4, 'libre', '2025-10-16 20:08:10', '2025-10-16 20:08:10'),
+(1, 6, 8, '2025-10-16', 1, 1, 1, 31313, 313, '', 3, 'planificado', '2025-10-16 19:56:24', '2025-10-16 19:56:24'),
+(1, 14, 5, '2025-10-16', 1, 33, 33, 33, NULL, '', 3, 'planificado', '2025-10-16 19:55:41', '2025-10-16 19:55:41'),
+(1, 1, 7, '2025-10-16', 1, 33, 33, 33, NULL, '', 3, 'planificado', '2025-10-16 19:55:41', '2025-10-16 19:55:41');
