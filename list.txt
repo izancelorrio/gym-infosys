@@ -10,21 +10,10 @@ quitar el campo ubicacion de la tabla clases_programadas
 
 
 
-
-
-
 que un unstructor no se pueda tener clases a la misma hora el mismo dia, que cuando depliegues la hora te aparezca en rojo la hora que no se pueda
 lo del correo tokens
 
-
-
-
-
-
-
-
-
-en el zip final dejar el env.local del docker y quitar los otros dos env.local t quitar la carpeta node_modules
+en el zip final dejar el env.local del docker y quitar los otros dos env.local t quitar la carpeta node_modules y cambiar el compose
 
 
 

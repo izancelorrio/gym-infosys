@@ -51,7 +51,7 @@ export default function EstadisticasClientePage({ params }: { params: { clienteI
       setIsLoading(true)
       setServerError(null)
       try {
-        const res = await fetch(`${API_CONFIG.BASE_URL}/cliente/${params.clienteId}/estadisticas`)
+        const res = await fetch(`/api/cliente/${params.clienteId}/estadisticas`)
         if (!res.ok) {
           throw new Error(`HTTP ${res.status}`)
         }

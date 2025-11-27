@@ -74,7 +74,7 @@ export default function AsignacionesEntrenadorPage() {
   const fetchAsignaciones = async () => {
     try {
       setLoading(true);
-  const response = await fetch(`${API_CONFIG.BASE_URL}/asignaciones-entrenador`, {
+  const response = await fetch(`/api/asignaciones-entrenador`, {
         method: "GET",
         headers: {
           "Cache-Control": "no-cache, no-store, must-revalidate",
@@ -105,7 +105,7 @@ export default function AsignacionesEntrenadorPage() {
 
     try {
       setAssigningLoading(true);
-      const response = await fetch(`${API_CONFIG.BASE_URL}/asignar-entrenador`, {
+      const response = await fetch(`/api/asignar-entrenador`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -146,7 +146,7 @@ export default function AsignacionesEntrenadorPage() {
 
     try {
       setAssigningLoading(true);
-  const response = await fetch(`${API_CONFIG.BASE_URL}/asignar-entrenador`, {
+  const response = await fetch(`/api/asignar-entrenador`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -198,7 +198,7 @@ export default function AsignacionesEntrenadorPage() {
           label: 'Desasignar',
           onClick: async () => {
             try {
-              const response = await fetch(`${API_CONFIG.BASE_URL}/desasignar-entrenador/${asignacionId}`, {
+              const response = await fetch(`/api/desasignar-entrenador/${asignacionId}`, {
                 method: "DELETE",
               });
 

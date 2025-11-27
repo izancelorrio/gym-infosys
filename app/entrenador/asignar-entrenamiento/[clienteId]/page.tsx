@@ -78,7 +78,7 @@ export default function AsignarEntrenamientoPage() {
     const fetchData = async () => {
       try {
         // Obtener datos del entrenador y sus clientes
-  const clientesResponse = await fetch(`${API_CONFIG.BASE_URL}/entrenador/${user?.id}/clientes`, {
+  const clientesResponse = await fetch(`/api/entrenador/${user?.id}/clientes`, {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
@@ -191,7 +191,7 @@ export default function AsignarEntrenamientoPage() {
 
       console.log("[DEBUG] Guardando entrenamientos:", entrenamientosCompletos)
 
-  const response = await fetch(`${API_CONFIG.BASE_URL}/entrenador/${user?.id}/cliente/${clienteId}/plan-entrenamiento`, {
+  const response = await fetch(`/api/entrenador/${user?.id}/cliente/${clienteId}/plan-entrenamiento`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

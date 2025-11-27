@@ -49,7 +49,7 @@ export default function EntrenadorPage() {
       setIsLoading(true)
       setError(null)
       
-  const response = await fetch(`${API_CONFIG.BASE_URL}/entrenador/${user.id}/clientes`, {
+  const response = await fetch(`/api/entrenador/${user.id}/clientes`, {
         method: "GET",
         headers: {
           "Cache-Control": "no-cache, no-store, must-revalidate",

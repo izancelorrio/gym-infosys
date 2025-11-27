@@ -65,7 +65,7 @@ export default function EstadisticasPage() {
       if (!user?.id) return
       setIsLoading(true)
       try {
-        const url = `${API_CONFIG.BASE_URL}/cliente/${user.id}/estadisticas`
+        const url = `/api/cliente/${user.id}/estadisticas`
         const resp = await fetch(url, { headers: { "Content-Type": "application/json" } })
         if (!resp.ok) {
           console.error("Error al obtener estadísticas del servidor:", resp.status)

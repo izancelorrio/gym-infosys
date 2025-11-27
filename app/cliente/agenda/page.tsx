@@ -70,7 +70,7 @@ export default function AgendaClientePage() {
 
         // 2) Entrenamientos asignados (todos los estados) - usamos nuevo endpoint
         try {
-          const resEntr = await fetch(`${API_CONFIG.BASE_URL}/cliente/${user.id}/entrenamientos-asignados`)
+          const resEntr = await fetch(`/api/cliente/${user.id}/entrenamientos-asignados`)
           if (resEntr.ok) {
             const json = await resEntr.json()
             if (json && json.success) {

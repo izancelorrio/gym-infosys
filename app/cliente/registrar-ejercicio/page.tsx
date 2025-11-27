@@ -139,7 +139,7 @@ export default function RegistrarEjercicioPage() {
     // Cargar entrenamientos pendientes
     const cargarEntrenamientosPendientes = async () => {
       try {
-  const response = await fetch(`${API_CONFIG.BASE_URL}/cliente/${user?.id}/entrenamientos-pendientes`, {
+    const response = await fetch(`/api/cliente/${user?.id}/entrenamientos-pendientes`, {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
@@ -163,7 +163,7 @@ export default function RegistrarEjercicioPage() {
     // Cargar ejercicios disponibles
     const cargarEjerciciosDisponibles = async () => {
       try {
-  const response = await fetch(`${API_CONFIG.BASE_URL}/ejercicios`, {
+  const response = await fetch(`/api/ejercicios`, {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
@@ -196,7 +196,7 @@ export default function RegistrarEjercicioPage() {
           return
         }
         
-  const url = `${API_CONFIG.BASE_URL}/user/${user.id}/reservas`
+  const url = `/api/user/${user.id}/reservas`
         console.log("[DEBUG] URL de la petición:", url)
         
         const response = await fetch(url, {
@@ -284,7 +284,7 @@ export default function RegistrarEjercicioPage() {
 
       console.log("[DEBUG] Registrando actividad planificada:", actividadData)
 
-  const response = await fetch(`${API_CONFIG.BASE_URL}/cliente/${user?.id}/registrar-actividad`, {
+      const response = await fetch(`/api/cliente/${user?.id}/registrar-actividad`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -325,7 +325,7 @@ export default function RegistrarEjercicioPage() {
           label: 'Descartar',
           onClick: async () => {
             try {
-              const response = await fetch(`${API_CONFIG.BASE_URL}/entrenamientos-asignados/${id_asignado}?cliente_user_id=${user?.id}`, {
+              const response = await fetch(`/api/entrenamientos-asignados/${id_asignado}?cliente_user_id=${user?.id}`, {
                 method: 'DELETE',
                 headers: { 'Content-Type': 'application/json' }
               })
@@ -357,7 +357,7 @@ export default function RegistrarEjercicioPage() {
     try {
       console.log("[DEBUG] Registrando asistencia a clase:", claseReservada)
 
-  const response = await fetch(`${API_CONFIG.BASE_URL}/reservas/${claseReservada.id}/registrar-asistencia`, {
+      const response = await fetch(`/api/reservas/${claseReservada.id}/registrar-asistencia`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -418,7 +418,7 @@ export default function RegistrarEjercicioPage() {
           valoracion: ejercicio.valoracion || null
         }
 
-  const response = await fetch(`${API_CONFIG.BASE_URL}/cliente/${user?.id}/registrar-actividad`, {
+  const response = await fetch(`/api/cliente/${user?.id}/registrar-actividad`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

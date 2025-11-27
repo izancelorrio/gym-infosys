@@ -47,7 +47,7 @@ import { API_CONFIG } from "@/lib/config"
       const fetchStats = async () => {
         setLoading(true)
         try {
-          const res = await fetch(`${API_CONFIG.BASE_URL}/admin/estadisticas`)
+          const res = await fetch(`/api/admin/estadisticas`)
           if (!res.ok) throw new Error(`HTTP ${res.status}`)
           const json = await res.json()
           setStats(json)

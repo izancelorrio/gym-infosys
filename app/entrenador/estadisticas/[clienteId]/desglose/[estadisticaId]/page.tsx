@@ -55,7 +55,7 @@ export default function DesgloseEntrenamientoPage({
         const isFecha = /^\d{4}-\d{2}-\d{2}$/.test(fechaParam)
 
         if (isFecha) {
-          const res = await fetch(`${API_CONFIG.BASE_URL}/cliente/${params.clienteId}/estadisticas`)
+          const res = await fetch(`/api/cliente/${params.clienteId}/estadisticas`)
           if (res.ok) {
             const json = await res.json()
             const realizados = json.ejercicios_realizados || []
