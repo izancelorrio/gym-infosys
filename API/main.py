@@ -52,7 +52,6 @@ logger.setLevel(logging.INFO)
 # POST   /reset-password                              - Restablecer contraseña mediante token válido.
 # POST   /verify-email                                - Confirmación de correo electrónico de usuario (POST).
 # GET    /verify-email                                - Verificación vía GET (redirección a frontend).
-# GET    /reset-password                              - Redirección GET para reset (frontend).
 # GET    /count-members                               - Conteo total de usuarios con rol cliente.
 # GET    /count-trainers                              - Conteo total de entrenadores activos.
 # GET    /planes                                      - Listado de planes disponibles.
@@ -100,15 +99,11 @@ REQUIRED_TABLES = {
     "entrenamientos_realizados",
 }
 
-# Configuración del entorno
-# Cambia esta URL según tu entorno: desarrollo local o producción
-FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL")
-
 
 def _infer_frontend_base_from_request(request: Request) -> str:
     """Inferir la URL base del frontend a partir de los headers de la petición.
-    Prioriza `Origin`, luego `Referer`. Si ninguno está presente, usa la
-    variable de entorno `FRONTEND_BASE_URL` o el valor por defecto.
+    Prioriza el header personalizado X-Frontend-Base (enviado por el proxy Next.js),
+    luego Origin, luego Referer. Si ninguno está presente, usa un valor por defecto.
     """
     try:
         # Primero, permitir que el frontend envíe explícitamente su URL base
@@ -139,17 +134,17 @@ def _infer_frontend_base_from_request(request: Request) -> str:
         logger.debug("_infer_frontend_base_from_request failed: %s", e)
 
     # Si no hubo headers útiles, intentar componer la base desde la petición
-    # misma (host + esquema). `request.base_url` normalmente contiene
-    # scheme://host/ y es el más fiable cuando la petición llega al dominio
-    # que debe actuar como frontend en producción.
+    # misma (host + esquema). X-Forwarded-Host ya incluye el puerto si viene de nginx.
     try:
         base = None
-        # Preferir X-Forwarded proto/host si existe (por proxies)
+        # Preferir X-Forwarded proto/host si existe (por proxies como nginx)
+        # X-Forwarded-Host ya debería incluir el puerto (ej: 192.168.0.41:8080)
         forwarded_proto = request.headers.get("x-forwarded-proto")
         forwarded_host = request.headers.get("x-forwarded-host")
+        
         if forwarded_host:
             scheme = forwarded_proto or request.url.scheme or "https"
-            base = f"{scheme}://{forwarded_host.rstrip('/') }"
+            base = f"{scheme}://{forwarded_host}"
 
         if not base:
             # request.base_url devuelve un objeto URL; convertir a str
@@ -163,8 +158,8 @@ def _infer_frontend_base_from_request(request: Request) -> str:
     except Exception as e:
         logger.debug("_infer_frontend_base_from_request fallback build failed: %s", e)
 
-    # Último recurso: usar la variable de entorno (puede ser None también)
-    return FRONTEND_BASE_URL
+    # Último recurso: fallback para desarrollo local
+    return "http://localhost:3000"
 
 
 app = FastAPI()
@@ -663,14 +658,22 @@ def send_reset_email_endpoint(req: SendResetEmailRequest, request: Request):
     expires_at = (datetime.utcnow() + timedelta(hours=1)).isoformat()
     cursor.execute("INSERT INTO reset_tokens (user_id, token, expires_at) VALUES (%s, %s, %s)", (user_id, token, expires_at))
     conn.commit()
-    conn.close()    
+    conn.close()
+    
+    # Log headers recibidos para debug
+    x_frontend = request.headers.get("x-frontend-base") or request.headers.get("X-Frontend-Base")
+    logger.info("[DEBUG] /send-reset-email - X-Frontend-Base header: %s", x_frontend)
+    logger.info("[DEBUG] /send-reset-email - Origin header: %s", request.headers.get("origin"))
+    logger.info("[DEBUG] /send-reset-email - Referer header: %s", request.headers.get("referer"))
+    
     frontend_base = _infer_frontend_base_from_request(request)
+    logger.info("[DEBUG] /send-reset-email - frontend_base inferido: %s", frontend_base)
     reset_link = f"{frontend_base}/reset-password?token={token}"
     try:
         send_reset_email(req.email, reset_link)
     except Exception as e:
-        print("[DEBUG] Error enviando email:", e)
-        print("[DEBUG] Link de recuperación (solo debug):", reset_link)
+        logger.error("[DEBUG] Error enviando email: %s", e)
+        logger.info("[DEBUG] Link de recuperación (solo debug): %s", reset_link)
     return {"success": True, "message": "Email de recuperación enviado"}
 
 ## Endpoint para restablecer la contraseña usando un token
@@ -684,7 +687,21 @@ def reset_password(req: ResetPasswordRequest):
         conn.close()
         raise HTTPException(status_code=400, detail="Token inválido")
     user_id, expires_at = row
-    if datetime.utcnow() > datetime.fromisoformat(expires_at):
+    
+    # expires_at puede venir como datetime object o como string dependiendo del driver
+    if isinstance(expires_at, str):
+        expires_at_dt = datetime.fromisoformat(expires_at)
+    else:
+        expires_at_dt = expires_at
+    
+    # Hacer la comparación timezone-aware (si expires_at tiene tz) o naive
+    now = datetime.utcnow()
+    if expires_at_dt.tzinfo is not None:
+        # expires_at tiene timezone, convertir now a timezone-aware UTC
+        from datetime import timezone
+        now = now.replace(tzinfo=timezone.utc)
+    
+    if now > expires_at_dt:
         cursor.execute("DELETE FROM reset_tokens WHERE token=%s", (req.token,))
         conn.commit()
         conn.close()
@@ -776,26 +793,6 @@ def verify_email_get(token: str, request: Request):
             return Response(content=html, media_type="text/html")
         return RedirectResponse(redirect_url)
 
-
-@app.get("/reset-password")
-def reset_password_get(token: str, request: Request):
-    """Redirect GET requests with token to the frontend reset-password page."""
-    frontend_base = _infer_frontend_base_from_request(request)
-    redirect_url = f"{frontend_base}/reset-password?token={token}"
-    logger.info("/reset-password GET -> frontend_base=%s redirect_url=%s incoming=%s", frontend_base, redirect_url, str(request.url))
-    incoming_origin = f"{request.url.scheme}://{request.url.netloc}"
-    if frontend_base and frontend_base.rstrip('/') == incoming_origin.rstrip('/'):
-        html = (
-            '<html><head><title>Restablecer contraseña</title></head><body>'
-            '<p>Vamos a abrir la página para restablecer la contraseña.</p>'
-            '<p>Si no se redirige automáticamente, haz clic en el siguiente enlace:</p>'
-            '<a id="link" href="{redirect_url}">Abrir restablecimiento</a>'
-            '<p>Si el enlace no funciona, copia y pega esta URL en tu navegador:</p>'
-            '<pre>{redirect_url}</pre>'
-            '</body></html>'
-        ).format(redirect_url=redirect_url)
-        return Response(content=html, media_type="text/html")
-    return RedirectResponse(redirect_url)
 
 ## Endpoint para obtener el número total de usuarios registrados
 @app.get("/count-members")

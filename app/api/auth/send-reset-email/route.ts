@@ -15,9 +15,24 @@ export async function POST(request: NextRequest) {
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.TIMEOUT)
 
+      // Obtener la URL del frontend desde los headers de la petición
+      // X-Forwarded-Host ya incluye el puerto si viene de nginx ($http_host)
+      const forwardedHost = request.headers.get("x-forwarded-host")
+      const forwardedProto = request.headers.get("x-forwarded-proto") || "http"
+      
+      // X-Forwarded-Host ya debería tener el puerto (ej: 192.168.0.41:8080)
+      const frontendBase = forwardedHost ? `${forwardedProto}://${forwardedHost}` : `${forwardedProto}://${request.headers.get("host") || request.nextUrl.host}`
+      
+      console.log("[DEBUG] Frontend URL construida:", frontendBase)
+      console.log("[DEBUG] Headers - x-forwarded-host:", forwardedHost)
+      console.log("[DEBUG] Headers - x-forwarded-proto:", forwardedProto)
+
       const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.SEND_RESET_EMAIL}`, {
         method: "POST",
-        headers: API_CONFIG.HEADERS,
+        headers: {
+          ...API_CONFIG.HEADERS,
+          "X-Frontend-Base": frontendBase,
+        },
         body: JSON.stringify({ email }),
         signal: controller.signal,
       })
