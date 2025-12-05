@@ -1,116 +1,122 @@
-"use client"
+'use client';
 
-import { useEffect, useState } from "react"
-import { useSearchParams, useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { CheckCircle, XCircle, Loader2 } from "lucide-react"
+import { useSearchParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
 
 export default function VerifyEmailPage() {
-  const [status, setStatus] = useState<"loading" | "success" | "error">("loading")
-  const [message, setMessage] = useState("")
-  const searchParams = useSearchParams()
-  const router = useRouter()
-  const token = searchParams.get("token")
+  const searchParams = useSearchParams();
+  const status = searchParams.get('status');
+  const reason = searchParams.get('reason');
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    if (!token) {
-      setStatus("error")
-      setMessage("Token de verificación no encontrado")
-      return
-    }
+    setMounted(true);
+  }, []);
 
-    const verifyEmail = async () => {
-      try {
-        console.log("[v0] Verificando email con token:", token)
-
-        const response = await fetch("/api/auth/verify-email", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ token }),
-        })
-
-        const data = await response.json()
-        console.log("[v0] Respuesta de verificación:", data)
-
-        if (response.ok && data.success) {
-          setStatus("success")
-          setMessage(data.message)
-        } else {
-          setStatus("error")
-          setMessage(data.error || "Error al verificar el email")
-        }
-      } catch (error) {
-        console.error("[v0] Error en verificación:", error)
-        setStatus("error")
-        setMessage("Error de conexión. Inténtalo de nuevo.")
-      }
-    }
-
-    verifyEmail()
-  }, [token])
-
-  const handleGoToLogin = () => {
-    router.push("/")
+  if (!mounted) {
+    return null;
   }
 
+  const isSuccess = status === 'success';
+
+  const getErrorMessage = () => {
+    switch (reason) {
+      case 'invalid_token':
+        return 'El enlace de verificación es inválido o ha expirado.';
+      case 'token_expired':
+        return 'El enlace de verificación ha expirado. Por favor, solicita uno nuevo.';
+      case 'server_error':
+        return 'Ocurrió un error al procesar tu verificación. Intenta más tarde.';
+      default:
+        return 'No se pudo verificar tu correo electrónico.';
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="flex justify-center mb-4">
-            {status === "loading" && (
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
-                <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-900 to-slate-800 px-4">
+      <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8">
+        {isSuccess ? (
+          <>
+            {/* Success state */}
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg
+                  className="w-8 h-8 text-green-600"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
               </div>
-            )}
-            {status === "success" && (
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
-                <CheckCircle className="w-8 h-8 text-green-600" />
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                ¡Email Verificado!
+              </h1>
+              <p className="text-gray-600">
+                Tu correo electrónico ha sido verificado correctamente.
+              </p>
+            </div>
+
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+              <p className="text-sm text-green-800">
+                Ahora puedes iniciar sesión en tu cuenta y acceder a todos los servicios del gimnasio.
+              </p>
+            </div>
+
+            <div className="text-center mt-2">
+              <p className="text-sm text-gray-700">Puedes cerrar esta ventana. Si no puedes iniciar sesión, solicita ayuda a soporte.</p>
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Error state */}
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg
+                  className="w-8 h-8 text-red-600"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
               </div>
-            )}
-            {status === "error" && (
-              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
-                <XCircle className="w-8 h-8 text-red-600" />
-              </div>
-            )}
-          </div>
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                Error en la Verificación
+              </h1>
+              <p className="text-gray-600">
+                {getErrorMessage()}
+              </p>
+            </div>
 
-          <CardTitle className="text-2xl font-bold">
-            {status === "loading" && "Verificando Email..."}
-            {status === "success" && "¡Email Verificado!"}
-            {status === "error" && "Error de Verificación"}
-          </CardTitle>
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+              <p className="text-sm text-red-800 mb-2">
+                <span className="font-semibold">Posibles soluciones:</span>
+              </p>
+              <ul className="text-sm text-red-700 space-y-1 list-disc list-inside">
+                <li>Verifica que hayas copiado el enlace completo del email</li>
+                <li>Intenta solicitar un nuevo enlace de verificación</li>
+                <li>Contacta con soporte si el problema persiste</li>
+              </ul>
+            </div>
 
-          <CardDescription>
-            {status === "loading" && "Por favor espera mientras verificamos tu email"}
-            {status === "success" && "Tu cuenta ha sido activada exitosamente"}
-            {status === "error" && "No pudimos verificar tu email"}
-          </CardDescription>
-        </CardHeader>
-
-        <CardContent className="space-y-4">
-          <div
-            className={`p-4 rounded-lg ${
-              status === "success"
-                ? "bg-green-50 border border-green-200 text-green-700"
-                : status === "error"
-                  ? "bg-red-50 border border-red-200 text-red-700"
-                  : "bg-blue-50 border border-blue-200 text-blue-700"
-            }`}
-          >
-            <p className="text-sm">{message}</p>
-          </div>
-
-          {status !== "loading" && (
-            <Button onClick={handleGoToLogin} className="w-full">
-              Ir a Iniciar Sesión
-            </Button>
-          )}
-        </CardContent>
-      </Card>
+            <div className="text-center mt-2">
+              <p className="text-sm text-gray-700">Si necesitas un nuevo enlace o ayuda, ponte en contacto con soporte.</p>
+            </div>
+          </>
+        )}
+      </div>
     </div>
-  )
+  );
 }

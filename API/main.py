@@ -744,31 +744,62 @@ def verify_email_get(token: str, request: Request):
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
+        # Obtener el registro de verificación
         cursor.execute("SELECT user_id, expires_at FROM email_verifications WHERE token=%s", (token,))
         row = cursor.fetchone()
+        
         if not row:
+            # Token no existe o es inválido
             try:
                 conn.close()
             except Exception:
                 pass
             frontend_base = _infer_frontend_base_from_request(request)
             redirect_url = f"{frontend_base}/verify-email?status=error&reason=invalid_token"
-            incoming_origin = f"{request.url.scheme}://{request.url.netloc}"
-            logger.info("/verify-email missing token -> frontend_base=%s redirect_url=%s incoming=%s", frontend_base, redirect_url, str(request.url))
-            if frontend_base and frontend_base.rstrip('/') == incoming_origin.rstrip('/'):
-                html = (
-                    '<html><head><title>Verificación de email</title></head><body>'
-                    '<p>Estamos intentando redirigirte al frontend para completar la verificación.</p>'
-                    '<p>Si no se redirige automáticamente, haz clic en el siguiente enlace:</p>'
-                    '<a id="link" href="{redirect_url}">Abrir verificación</a>'
-                    '<p>Si el enlace no funciona, copia y pega esta URL en tu navegador:</p>'
-                    '<pre>{redirect_url}</pre>'
-                    '</body></html>'
-                ).format(redirect_url=redirect_url)
-                return Response(content=html, media_type="text/html")
+            print(f"[DEBUG] /verify-email GET: Redirigiendo a {redirect_url}")
+            logger.info("/verify-email GET invalid token -> redirecting to %s", redirect_url)
             return RedirectResponse(redirect_url)
+        
+        user_id, expires_at = row
+        
+        # Verificar que el token no ha expirado
+        if isinstance(expires_at, str):
+            expires_at_dt = datetime.fromisoformat(expires_at)
+        else:
+            expires_at_dt = expires_at
+        
+        # Hacer la comparación timezone-aware si es necesario
+        now = datetime.utcnow()
+        if expires_at_dt.tzinfo is not None:
+            from datetime import timezone
+            now = now.replace(tzinfo=timezone.utc)
+        
+        if now > expires_at_dt:
+            # Token expirado
+            cursor.execute("DELETE FROM email_verifications WHERE token=%s", (token,))
+            conn.commit()
+            conn.close()
+            
+            frontend_base = _infer_frontend_base_from_request(request)
+            redirect_url = f"{frontend_base}/verify-email?status=error&reason=token_expired"
+            print(f"[DEBUG] /verify-email GET: Redirigiendo a {redirect_url}")
+            logger.info("/verify-email GET expired token -> redirecting to %s", redirect_url)
+            return RedirectResponse(redirect_url)
+        
+        # Token válido y no expirado: marcar email como verificado
+        cursor.execute("UPDATE users SET email_verified=1 WHERE id=%s", (user_id,))
+        cursor.execute("DELETE FROM email_verifications WHERE token=%s", (token,))
+        conn.commit()
+        conn.close()
+        
+        # Redirigir al frontend con status=success
+        frontend_base = _infer_frontend_base_from_request(request)
+        redirect_url = f"{frontend_base}/verify-email?status=success"
+        print(f"[DEBUG] /verify-email GET: Redirigiendo a {redirect_url}")
+        logger.info("/verify-email GET success for user_id=%s -> redirecting to %s", user_id, redirect_url)
+        return RedirectResponse(redirect_url)
 
-    except Exception:
+    except Exception as e:
         try:
             conn.rollback()
         except Exception:
@@ -777,20 +808,11 @@ def verify_email_get(token: str, request: Request):
             conn.close()
         except Exception:
             pass
+        logger.error("/verify-email GET exception: %s", str(e))
         frontend_base = _infer_frontend_base_from_request(request)
         redirect_url = f"{frontend_base}/verify-email?status=error&reason=server_error"
-        incoming_origin = f"{request.url.scheme}://{request.url.netloc}"
-        logger.info("/verify-email GET error -> frontend_base=%s redirect_url=%s incoming=%s", frontend_base, redirect_url, str(request.url))
-        if frontend_base and frontend_base.rstrip('/') == incoming_origin.rstrip('/'):
-            html = (
-                '<html><head><title>Error verificación</title></head><body>'
-                '<p>Ocurrió un error procesando la verificación.</p>'
-                '<a id="link" href="{redirect_url}">Abrir detalles</a>'
-                '<p>Si el enlace no funciona, copia y pega esta URL en tu navegador:</p>'
-                '<pre>{redirect_url}</pre>'
-                '</body></html>'
-            ).format(redirect_url=redirect_url)
-            return Response(content=html, media_type="text/html")
+        print(f"[DEBUG] /verify-email GET: Redirigiendo a {redirect_url}")
+        logger.info("/verify-email GET error -> redirecting to %s", redirect_url)
         return RedirectResponse(redirect_url)
 
 
